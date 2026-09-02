@@ -1,0 +1,57 @@
+# ---- Python artifacts ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# ---- Virtualenvs ----
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.conda/
+
+# ---- Generated data (never commit) ----
+# Mobility traces / simulation rollouts
+traces/
+data/traces/
+*.trace
+*.trace.npz
+
+# Model checkpoints
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+
+# Results tables, metrics, logs
+results/
+runs/
+logs/
+*.log
+
+# Figures / plots
+figures/
+plots/
+*.png
+*.pdf
+*.svg
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
