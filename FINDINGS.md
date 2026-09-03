@@ -94,3 +94,38 @@ Interpretation: the pipeline is reproducible from (config, seed) as Standing Rul
 requires; the narrow trust range (0.385-0.427, spread 0.042) is the expected signature
 of an untrained sigmoid head on random features and is a baseline to compare against
 once training exists - not a result about trust.
+
+### F3 — First S1 scenario: coverage too sparse, vehicles usually have no choice
+Date: 2026-09-03 | Session: S1 | Commit: 4d09f25
+Config: `configs/demo.yaml` (2400 m region, 5x5 blocks, 20 RSUs, coverage 350 m,
+60 vehicles, 300 steps at dt=1 s) | Seed(s): 20260903
+Command: `python scripts/generate_trace.py --config configs/demo.yaml`
+         `python scripts/s1_report.py --config configs/demo.yaml`
+
+Numbers:
+```
+backhaul segment sizes     : [5, 5, 4, 6]
+RSU-RSU edges (undirected) : 14
+mean speed                 : 12.44 m/s (sd 4.29) = 44.8 km/h
+mean vehicles per RSU      : 2.595 (sd 1.492)
+mean vehicle-RSU edges     : 51.90 per step
+vehicle-timesteps covered  : 78.2%
+mean RSUs in range         : 0.865
+mean dwell time            : 45.76 s (median 44.00, sd 18.45)
+completed dwell episodes   : 250
+handoffs per veh per min   : 0.403
+total handoffs             : 121
+total coverage gaps        : 352
+directed edges per snapshot: 131.8 (min 110, max 152)
+same_segment edges         : 18.0 per snapshot
+sequence sha256            : 38dc8a778104676c3dca3af00b383a8ae2f3de3b1772a9d0d9256865aa4ae8dc
+```
+
+Interpretation: the scenario is not usable as configured — with 0.865 RSUs in range
+on average and 22% of vehicle-timesteps uncovered, the typical offloading decision
+has one candidate or none, so the selection rule of L1 has nothing to choose between
+and there are more coverage gaps (352) than handoffs (121). The cause is geometric,
+not a bug: 28.8 km of road against 20 RSUs covering ~700 m of road each cannot
+produce redundant coverage. Farthest-point RSU placement also drives sites onto the
+region boundary, leaving the interior thin and the RSU-RSU graph fragmented at 14
+edges over 20 nodes.
