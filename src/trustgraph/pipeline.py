@@ -1,10 +1,12 @@
-"""End-to-end walking skeleton.
+"""End-to-end scenario run.
 
-Wires the pieces together: synthetic mobility (L7) -> dynamic graph (L6) -> untrained
-trust head (L1) -> analytic selection rule (L1/L2) -> printed decision sequence.
+Wires the pieces together: a mobility trace read from disk (L7) -> dynamic graph
+sequence (L6) -> untrained trust head (L1) -> analytic selection rule (L1/L2) ->
+printed decision sequence.
 
-S0 has no training, no degradation injection, and no explanation rendering. Every
-feature value is fake. What is real is the shape of the pipeline and its determinism.
+There is still no training, no degradation injection, and no explanation rendering -
+those are later sessions. As of S1 the topology, mobility, geometry, and link
+features are real; the behavioural features are the placeholders named in `graph.py`.
 """
 
 from __future__ import annotations
@@ -14,60 +16,66 @@ import torch
 
 from .config import Config
 from .features import RSU_COL
-from .graph import build_snapshot
-from .mobility import build_mobility
 from .model import build_trust_head
+from .scenario import World, build_snapshot_builder, build_world
 from .selection import Decision, select
-from .topology import build_topology
+from .trace import Trace
+
+# How many decision rows `format_decisions` prints in full. A five-minute scenario
+# produces hundreds; the exit condition needs the run to be inspectable and
+# byte-reproducible, not exhaustively listed.
+MAX_PRINTED_DECISIONS = 30
 
 
-def run_pipeline(cfg: Config) -> list[Decision]:
-    """Run the scenario and return the decision sequence.
+def run_pipeline(cfg: Config, trace: Trace, world: World | None = None) -> list[Decision]:
+    """Run the scenario over a trace and return the decision sequence.
 
     All randomness is drawn from per-purpose generators derived from `cfg.seed`
-    (DECISIONS.md D17), so two runs with the same config produce identical output.
+    (DECISIONS.md D17), and the trace is read rather than regenerated, so two runs
+    with the same config and trace produce identical output.
     """
-    seeds = cfg.seeds
+    world = world or build_world(cfg)
+    topology = world.topology
     device = torch.device(cfg.device)
 
-    topology = build_topology(cfg.topology, seeds.generator("topology"))
-    mobility = build_mobility(cfg.mobility, seeds.generator("mobility"))
-    model = build_trust_head(cfg.model, seeds.torch_seed("model_init"), cfg.device)
+    model = build_trust_head(cfg.model, cfg.seeds.torch_seed("model_init"), cfg.device)
+    builder = build_snapshot_builder(cfg, world, trace)
+    task_rng = cfg.seeds.generator("tasks")
 
-    feature_rng = seeds.generator("features")
-    task_rng = seeds.generator("tasks")
-
-    num_steps = int(cfg.scenario["num_steps"])
     tasks_per_step = int(cfg.scenario["tasks_per_step"])
     alpha = float(cfg.selection["alpha"])
     beta = float(cfg.selection["beta"])
     gamma = float(cfg.selection["gamma"])
+    num_rsus = topology.num_rsus
 
     decisions: list[Decision] = []
-    positions = mobility.reset()
 
-    for t in range(num_steps):
-        if t > 0:
-            positions = mobility.step()
-
-        data = build_snapshot(topology, positions, feature_rng)
-        data = data.to(device)
+    for data in builder.snapshots():
+        t = int(data.timestep)
+        graph = data.to(device)
 
         with torch.no_grad():
-            trust_all = model(data.x, data.edge_index).cpu().numpy()
+            trust_all = model(graph.x, graph.edge_index).cpu().numpy()
 
-        num_rsus = topology.num_rsus
         # Advertised load is read straight out of the graph's RSU block, so there is
         # no parallel array to drift out of sync with the features.
-        load_all = data.x[:num_rsus, RSU_COL["load"]].cpu().numpy()
-        distances = data.vehicle_rsu_distance.cpu().numpy()
+        load_all = graph.x[:num_rsus, RSU_COL["load"]].cpu().numpy()
+        distances = graph.vehicle_rsu_distance.cpu().numpy()
+        # Latency is scaled onto the same [0, 1] range as trust and load so the
+        # hand-tuned alpha/beta/gamma of L1 stay commensurable.
+        latency = np.clip(
+            graph.vehicle_rsu_latency_ms.cpu().numpy()
+            / world.link_model.latency_norm_ms,
+            0.0,
+            1.0,
+        )
 
         # Which vehicles offload this step. Sampling without replacement from a
         # dedicated stream keeps the choice independent of how many draws mobility or
         # feature generation happened to take.
-        n_tasks = min(tasks_per_step, mobility.num_vehicles)
+        n_tasks = min(tasks_per_step, trace.num_vehicles)
         offloaders = np.sort(
-            task_rng.choice(mobility.num_vehicles, size=n_tasks, replace=False)
+            task_rng.choice(trace.num_vehicles, size=n_tasks, replace=False)
         )
 
         for vehicle in offloaders:
@@ -81,9 +89,7 @@ def run_pipeline(cfg: Config) -> list[Decision]:
                 vehicle_id=int(vehicle),
                 candidates=in_range,
                 trust=trust_all[in_range],
-                # Latency proxy: normalised distance. A real latency model arrives
-                # with the real features.
-                latency=distances[vehicle][in_range] / topology.coverage_radius_m,
+                latency=latency[vehicle][in_range],
                 load=load_all[in_range],
                 alpha=alpha,
                 beta=beta,
@@ -95,22 +101,26 @@ def run_pipeline(cfg: Config) -> list[Decision]:
     return decisions
 
 
-def format_decisions(cfg: Config, decisions: list[Decision]) -> str:
+def format_decisions(cfg: Config, decisions: list[Decision], trace: Trace) -> str:
     """Render the decision sequence as fixed-width text.
 
     Floats are printed at fixed precision so two runs can be compared byte-for-byte -
-    that is the S0 exit condition.
+    the reproducibility check Standing Rule 7 requires.
     """
     lines: list[str] = []
     lines.append("=" * 78)
-    lines.append("TrustGraph - S0 walking skeleton (fake features, UNTRAINED model)")
+    lines.append("TrustGraph - S1 (real topology and mobility, UNTRAINED model)")
     lines.append("=" * 78)
     lines.append(f"seed                 : {cfg.seed}")
     lines.append(f"device               : {cfg.device}")
     lines.append(f"RSUs                 : {cfg.topology['num_rsus']}")
     lines.append(f"backhaul segments    : {cfg.topology['num_backhaul_segments']}")
-    lines.append(f"vehicles             : {cfg.mobility['num_vehicles']}")
-    lines.append(f"steps                : {cfg.scenario['num_steps']}")
+    lines.append(f"vehicles             : {trace.num_vehicles}")
+    lines.append(
+        f"steps                : {trace.num_steps} ({trace.duration_s:.0f} s "
+        f"at dt={trace.dt_s:g}s)"
+    )
+    lines.append(f"mobility source      : {trace.source}")
     lines.append(
         "selection weights    : "
         f"alpha={cfg.selection['alpha']} beta={cfg.selection['beta']} "
@@ -123,7 +133,7 @@ def format_decisions(cfg: Config, decisions: list[Decision]) -> str:
     )
     lines.append("-" * 78)
 
-    for d in decisions:
+    for d in decisions[:MAX_PRINTED_DECISIONS]:
         runner = "-" if d.runner_up is None else f"RSU{d.runner_up:02d}"
         margin = (
             "     -"
@@ -136,6 +146,12 @@ def format_decisions(cfg: Config, decisions: list[Decision]) -> str:
             f"|   {runner:>6}  {margin}  {len(d.candidates):3d}"
         )
 
+    if len(decisions) > MAX_PRINTED_DECISIONS:
+        lines.append(
+            f"... {len(decisions) - MAX_PRINTED_DECISIONS} further decisions not "
+            "printed"
+        )
+
     lines.append("-" * 78)
     lines.append(f"total decisions      : {len(decisions)}")
     if decisions:
@@ -144,6 +160,10 @@ def format_decisions(cfg: Config, decisions: list[Decision]) -> str:
         lines.append(
             "mean score           : "
             f"{sum(d.score for d in decisions) / len(decisions):.6f}"
+        )
+        lines.append(
+            "mean candidates      : "
+            f"{sum(len(d.candidates) for d in decisions) / len(decisions):.4f}"
         )
     lines.append("=" * 78)
     return "\n".join(lines)

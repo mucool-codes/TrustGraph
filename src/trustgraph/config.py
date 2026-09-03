@@ -59,8 +59,11 @@ class Config:
     seed: int
     device: str
     scenario: dict[str, Any]
+    road: dict[str, Any]
     topology: dict[str, Any]
     mobility: dict[str, Any]
+    link: dict[str, Any]
+    graph: dict[str, Any]
     model: dict[str, Any]
     selection: dict[str, Any]
 
@@ -79,8 +82,13 @@ def load_config(path: str | Path) -> Config:
         seed=int(raw["seed"]),
         device=str(raw.get("device", "cpu")),
         scenario=raw["scenario"],
+        road=raw["road"],
         topology=raw["topology"],
         mobility=raw["mobility"],
+        # `link` and `graph` are optional: every field in them has a documented
+        # default in links.py / graph.py, so a config need only name what it changes.
+        link=raw.get("link") or {},
+        graph=raw.get("graph") or {},
         model=raw["model"],
         selection=raw["selection"],
     )
@@ -101,8 +109,22 @@ def _validate(cfg: Config) -> None:
     if n_rsu < 1 or n_veh < 1:
         raise ValueError("num_rsus and num_vehicles must both be >= 1")
 
-    if int(cfg.topology["num_backhaul_segments"]) < 1:
+    num_segments = int(cfg.topology["num_backhaul_segments"])
+    if num_segments < 1:
         raise ValueError("num_backhaul_segments must be >= 1")
+    if num_segments > n_rsu:
+        raise ValueError(
+            f"num_backhaul_segments={num_segments} exceeds num_rsus={n_rsu}"
+        )
+
+    for radius in ("coverage_radius_m", "rsu_link_radius_m"):
+        if float(cfg.topology[radius]) <= 0:
+            raise ValueError(f"topology.{radius} must be positive")
+
+    if float(cfg.mobility["dt_s"]) <= 0:
+        raise ValueError("mobility.dt_s must be positive")
+    if int(cfg.scenario["num_steps"]) < 1:
+        raise ValueError("scenario.num_steps must be >= 1")
 
     for weight in ("alpha", "beta", "gamma"):
         if float(cfg.selection[weight]) < 0:

@@ -352,3 +352,150 @@ raise rather than fall back. At the L9 scale — at most 30 RSUs and 100 vehicle
 graph in the low hundreds of nodes — the GPU is a convenience, not a requirement, and
 `device` stays a config field so training sessions can opt in where exact
 reproducibility of a forward pass matters less than throughput.
+
+### D20 — Road layout is a synthetic Manhattan grid, not a real map
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** The road layout is a grid of arterials over a square region:
+`blocks_x + 1` vertical roads crossing `blocks_y + 1` horizontal roads, all parameters
+from the config. RSU candidate sites and vehicle waypoints both read this one object.
+
+**Alternatives:** (a) an OpenStreetMap extract of a real city district; (b) keeping S0's
+bare lattice with no notion of roads at all.
+
+**Rationale:** D7 already put SUMO and map realism off the critical path, and importing
+a real map would drag in the same dependency question through a different door — a
+parser, a projection, and a set of degenerate geometries to handle — for realism that
+none of H1-H5 depends on. A grid is the standard synthetic road model in the VANET
+literature and is enough to produce what S1 actually needs: vehicles that follow roads,
+enter and leave coverage zones, and hand off. Option (b) is what S0 had and is what this
+session was asked to replace: without roads there is no reason for RSUs to be anywhere
+in particular, and "RSU placement" has no meaning. The grid is named in the limitations
+alongside synthetic mobility.
+
+### D21 — RSUs are sited by greedy coverage maximisation with a redundancy discount
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** RSUs are placed on road intersections and segment midpoints, chosen
+greedily to maximise covered road, where a road point already reached by `c` chosen
+RSUs contributes `redundancy_decay ** c` (default 0.5) rather than nothing.
+
+**Alternatives:** (a) farthest-point sampling over candidate sites, which was
+implemented first; (b) uniform random sampling of sites; (c) pure coverage maximisation
+with no redundancy discount.
+
+**Rationale:** (b) clusters, leaving bare patches whose size is an artefact of the seed.
+(a) was tried and measured (FINDINGS.md F3): maximising the minimum pairwise distance
+drives sites onto the region boundary, which left the interior thin, the RSU-RSU graph
+fragmented at 14 edges over 20 nodes, and 22% of vehicle-timesteps with no RSU in range
+at all. (c) fixes coverage but then spreads the remaining RSUs to *minimise* overlap,
+which is the opposite of what is wanted: under L1 selection is an argmax over in-range
+candidates, so a vehicle that can see exactly one RSU produces a decision with nothing
+to decide, and an evaluation full of those measures coverage rather than trust. The
+discount makes the RSUs left over once the road is covered build a second layer instead.
+Measured effect (F4): 100% of vehicle-timesteps covered, 2.44 RSUs in range on average,
+and a single connected RSU-RSU component with mean degree 4.6.
+
+### D22 — Backhaul segments by spatial clustering, plus a minority of off-region swaps
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** `backhaul_segment_id` is assigned by Lloyd clustering over RSU positions
+with a farthest-point initialisation, then each RSU is reassigned to a different segment
+with probability `segment_swap_prob` (0.10), skipping any swap that would take a segment
+below `min_segment_size`.
+
+**Alternatives:** (a) S0's contiguous runs in sorted-x order; (b) pure spatial clustering
+with no swap noise; (c) uniformly random assignment.
+
+**Rationale:** (c) is what D5 already rejects — a segment scattered across the region
+gives message passing nothing local to propagate along. (a) is coherent only along one
+axis and produces stripes rather than regions. (b) is the obvious choice and is most of
+what is implemented, but it makes `same_segment` a deterministic function of position:
+a model could then recover the segment structure from geometry without ever using the
+edge feature, and an H2 result about that feature would be unfalsifiable. The swap noise
+corresponds to something real — a spur off a neighbouring backhaul link, a site re-homed
+during a build-out — and measurably breaks the equivalence: a distance-threshold
+predictor recovers `same_segment` with only 63.0% accuracy (F4). The minimum-size guard
+keeps L5's "several RSUs each" true, and every segment stays internally connected through
+same_segment edges, which is the precondition for propagating segment-level evidence.
+
+### D23 — Mobility sources emit a trace; the pipeline never steps a mobility model
+Date: 2026-09-03 | Session: S1 | Status: active
+Supersedes the `reset()` / `step()` interface introduced in S0.
+
+**Decision:** `MobilitySource` exposes `generate(num_steps, seed) -> Trace` instead of
+`reset()` / `step()`. `scripts/generate_trace.py` writes the trace to a compressed .npz;
+the pipeline, the statistics, and the plots all read it back. `run.py` fails with an
+actionable error rather than generating a trace itself.
+
+**Alternatives:** (a) keep the stepped interface and have each consumer drive its own
+copy of the mobility model; (b) generate the trace in-process on first use and cache it.
+
+**Rationale:** Under (a) every consumer re-derives the motion, and they diverge the
+moment one of them takes an extra RNG draw — the exact failure mode D17 exists to
+prevent, but at the level of whole components rather than single streams. Since the
+evaluation plan (L12) freezes a model and replays it across many conditions, a single
+on-disk realisation per (config, seed) is also what makes those runs comparable at all.
+(b) keeps the convenience but loses the artefact: nothing on disk to point at when a
+result needs reproducing months later. It also makes the L7 swap cheaper, not more
+expensive — a SUMO source becomes another implementation returning a `Trace`, and
+nothing downstream changes.
+
+### D24 — Placeholder features are named constants, never random values
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** The behavioural features (`success_ewma`, `latency_dev`,
+`uptime_stability`) and `cert_valid` are module-level constants in `graph.py` with the
+neutral value for each — no discrepancy, no revocation — not random draws. S0 filled
+them with seeded uniforms.
+
+**Alternatives:** keep S0's random placeholder values so the columns have variance.
+
+**Rationale:** Random placeholders have exactly the property that makes them dangerous:
+a model trained on them produces a plausible-looking result, and nothing distinguishes
+"learned from the real signal" from "fitted noise in a column that means nothing yet".
+Constants make any dependence on them degenerate and obvious — a trust score that varies
+cannot be varying because of `success_ewma`. Under L8 these are discrepancy quantities,
+so the neutral value is also the honest one: as of S1 no task has been observed, so
+there is no evidence of misbehaviour anywhere. A test asserts the constants, so the
+session that makes them real has to delete that test deliberately.
+
+### D25 — link_age is tracked across timesteps by a stateful snapshot builder
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** Snapshots come from a `SnapshotBuilder` that remembers when each present
+link first appeared. `build(t)` accepts only `t = 0` or one past the previous call and
+raises otherwise; `reset()` rewinds. A link that breaks forgets its history, so a
+re-formed link starts again at age zero.
+
+**Alternatives:** (a) a free function over an arbitrary timestep, with `link_age`
+dropped or faked; (b) precomputing the whole age tensor for the trace up front.
+
+**Rationale:** `link_age` is in the glossary (PROJECT_SPEC.md 5.3) precisely because a
+newly formed link is less characterised and carries more uncertainty — that is a
+statement about history, and (a) cannot express it. Making the ordering requirement an
+explicit error rather than a silent wrong answer matters because the failure would
+otherwise be a quietly too-old age on a link, which nothing would catch. (b) is a valid
+optimisation but at 300 steps x 20 RSUs x 60 vehicles the state is a single (V, R)
+integer array updated in place, so there is nothing to optimise yet (Standing Rule 3).
+
+### D26 — Radio and backhaul link model isolated in one module
+Date: 2026-09-03 | Session: S1 | Status: active
+
+**Decision:** `links.py` holds the only assumption in the codebase about radio
+propagation: a log-distance path-loss model for `signal_strength` and a
+retransmission-cost model for `link_latency`, with separate latency bands for access
+(vehicle-RSU) and backhaul (RSU-RSU) links. matplotlib is added as a dependency for the
+two S1 figures and is imported nowhere on the model or evaluation path.
+
+**Alternatives:** compute both quantities inline in the graph constructor, as S0 did
+with a normalised-distance stand-in.
+
+**Rationale:** The propagation model is the piece of S1 most likely to be challenged in
+review as unrealistic, and therefore the piece most likely to need swapping. Keeping it
+in one dataclass means a reviewer's objection is answered by changing one file, and it
+made a real defect findable: the receiver sensitivity floor and the coverage radius are
+not independent, and at the initial values the floor landed at exactly the coverage
+radius, saturating every cell-edge link to `signal_strength = 0` (FINDINGS.md F5). That
+was caught by a monotonicity test over the model in isolation, which would have been
+awkward to write against geometry embedded in the graph builder.
