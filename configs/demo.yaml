@@ -1,33 +1,73 @@
-# TrustGraph demo scenario - S0 walking skeleton.
+# TrustGraph demo scenario.
 #
 # Every value that affects the run lives here. A run is reproducible from
 # (this file, seed) alone - Standing Rule 7.
 
 seed: 20260903
 
-# S0 runs on CPU by default. GraphSAGE aggregation on GPU uses non-deterministic
-# scatter reductions, which would break byte-identical output across processes - the
-# S0 exit condition. At the L9 scale (<=30 RSUs) the GPU buys nothing here anyway.
-# GPU availability is verified separately by scripts/verify_env.py.
+# CPU by default. GraphSAGE aggregation on GPU uses non-deterministic scatter
+# reductions, which would break byte-identical output across processes. At the L9
+# scale (<=30 RSUs) the GPU buys nothing here anyway (DECISIONS.md D19). GPU
+# availability is verified separately by scripts/verify_env.py.
 device: cpu
 
 scenario:
-  num_steps: 8         # timesteps to simulate
+  num_steps: 300       # timesteps; 300 x dt = 5 minutes of traffic
   tasks_per_step: 3    # vehicles that offload a task each step
+
+# The road layout. A Manhattan grid of arterials: blocks_x + 1 vertical roads
+# crossing blocks_y + 1 horizontal roads over a square region.
+road:
+  extent_m: 2400.0
+  blocks_x: 5          # -> 6 vertical roads, 480 m blocks
+  blocks_y: 5          # -> 6 horizontal roads
 
 topology:
   num_rsus: 20                # L9: 15-30
   num_backhaul_segments: 4    # L5: degradation later applies per segment
-  region_extent_m: 2000.0
-  placement_jitter_m: 60.0
-  coverage_radius_m: 400.0    # vehicle <-> RSU link threshold
-  rsu_link_radius_m: 700.0    # RSU <-> RSU link threshold (L6)
+  placement_jitter_m: 25.0    # a mast stands beside the road, not on it
+  coverage_radius_m: 350.0    # vehicle <-> RSU link threshold
+  rsu_link_radius_m: 620.0    # RSU <-> RSU coordination threshold (L6)
+  # A minority of RSUs are homed to a segment other than their geographic one, so
+  # same_segment is not recoverable from position alone (see topology.py).
+  segment_swap_prob: 0.10
+  min_segment_size: 3
 
 mobility:
-  source: synthetic_grid      # L7: synthetic is the default and on the critical path
+  source: synthetic_road      # L7: synthetic is the default and on the critical path
   num_vehicles: 60            # L9: 50-100
-  grid_cells: 20
-  cell_size_m: 100.0
+  dt_s: 1.0
+  # ~50 km/h urban arterial, spread across the population.
+  speed_mean_mps: 13.9
+  speed_std_mps: 3.0
+  speed_min_mps: 5.0
+  speed_max_mps: 22.0
+  speed_jitter_mps: 0.8       # per-step variation about a vehicle's own speed
+  intersection_stop_prob: 0.25
+  intersection_stop_mean_s: 8.0
+  straight_preference: 3.0    # relative odds of carrying straight on vs turning
+
+# Radio and backhaul link model (links.py). Defaults describe a 5.9 GHz roadside
+# link; every field here has a documented default, so this block may be omitted.
+link:
+  tx_power_dbm: 23.0
+  reference_loss_db: 47.9
+  path_loss_exponent: 2.7
+  rssi_max_dbm: -40.0
+  rssi_min_dbm: -95.0
+  access_base_ms: 4.0
+  access_span_ms: 16.0
+  backhaul_base_ms: 2.0
+  backhaul_span_ms: 4.0
+  latency_norm_ms: 25.0       # divisor putting latency on the [0, 1] feature scale
+
+# Graph construction (graph.py): the scales that map physical quantities onto the
+# [0, 1] range the model reads.
+graph:
+  rsu_capacity_vehicles: 12.0
+  link_age_norm_s: 60.0
+  dwell_norm_s: 60.0
+  speed_norm_mps: 22.0
 
 model:
   hidden_dim: 32

@@ -7,22 +7,41 @@ seed: 7
 device: cpu
 
 scenario:
-  num_steps: 3
+  num_steps: 12
   tasks_per_step: 2
+
+road:
+  extent_m: 800.0
+  blocks_x: 2
+  blocks_y: 2
 
 topology:
   num_rsus: 4
   num_backhaul_segments: 2
-  region_extent_m: 600.0
   placement_jitter_m: 10.0
-  coverage_radius_m: 500.0
-  rsu_link_radius_m: 500.0
+  coverage_radius_m: 400.0
+  rsu_link_radius_m: 600.0
+  segment_swap_prob: 0.0     # too few RSUs for the swap noise to be meaningful
+  min_segment_size: 2
 
 mobility:
-  source: synthetic_grid
+  source: synthetic_road
   num_vehicles: 5
-  grid_cells: 6
-  cell_size_m: 100.0
+  dt_s: 1.0
+  speed_mean_mps: 12.0
+  speed_std_mps: 3.0
+  speed_min_mps: 5.0
+  speed_max_mps: 20.0
+  speed_jitter_mps: 0.5
+  intersection_stop_prob: 0.2
+  intersection_stop_mean_s: 5.0
+  straight_preference: 3.0
+
+graph:
+  rsu_capacity_vehicles: 4.0
+  link_age_norm_s: 30.0
+  dwell_norm_s: 30.0
+  speed_norm_mps: 20.0
 
 model:
   hidden_dim: 8
