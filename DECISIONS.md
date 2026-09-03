@@ -419,6 +419,22 @@ predictor recovers `same_segment` with only 63.0% accuracy (F4). The minimum-siz
 keeps L5's "several RSUs each" true, and every segment stays internally connected through
 same_segment edges, which is the precondition for propagating segment-level evidence.
 
+**Note added 2026-09-03 (S1, post-merge verification).** Two corrections to the
+rationale above; the decision itself stands.
+
+1. The 63.0% figure does not support the claim it is attached to. The same predictor
+   scores 60.9% against a pure-geometry assignment of the same seed, so it measures the
+   weakness of the probe rather than the effect of the swap — see the dated note on F4.
+   The swap does make `same_segment` non-geometric, but by a margin this metric cannot
+   resolve.
+2. `figures/s1_topology.png` does not visually demonstrate the swap and must not be read
+   as evidence either way. The plot colours each RSU by its *assigned* segment, so a
+   swapped RSU appears in its new segment's colour; on seed 20260903 the single swapped
+   node (RSU 19) also sits on the boundary between the two clusters rather than inside
+   the wrong one, leaving nothing visible to spot. A reader looking at that image alone
+   will conclude the segments are purely geometric. Verify with the assignment diff, not
+   the figure.
+
 ### D23 — Mobility sources emit a trace; the pipeline never steps a mobility model
 Date: 2026-09-03 | Session: S1 | Status: active
 Supersedes the `reset()` / `step()` interface introduced in S0.

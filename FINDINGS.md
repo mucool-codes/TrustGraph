@@ -180,6 +180,27 @@ members can reach each other over same_segment edges, and `same_segment` is not
 recoverable from position alone. These are scenario properties, not results about
 trust — the behavioural features are still constants (S2/S3).
 
+**Note added 2026-09-03 (S1, post-merge verification; raw numbers above unchanged):**
+the 63.0% figure is real but does not support the conclusion drawn from it, and the
+last sentence of the interpretation above is withdrawn. Rebuilding seed 20260903 with
+`segment_swap_prob: 0.0` — which isolates the swap exactly, since the Lloyd step
+consumes no randomness — gives:
+
+```
+                    median-split   best-threshold
+actual (swap 0.10)         63.0%            78.3%
+pure geometry (swap 0)     60.9%            80.4%
+```
+
+The predictor scores about the same either way, so 63.0% measures the weakness of the
+probe — edge *length* cannot express which 2D region an edge lies in — not the effect
+of the swap. What the swap actually did on this seed: exactly one RSU (19, at
+(793, 0), geometric segment 0, assigned segment 3) differs from the pure-geometry
+assignment, flipping 5 of 46 RSU-RSU edges. So `same_segment` is *not* purely
+geometric, but by a small and, on this metric, unquantified margin. A probe that
+actually separates the two conditions is still owed; until then no claim about the
+recoverability of `same_segment` from position should rest on this number.
+
 ### F5 — Link model saturated at the cell edge under the -95 dBm sensitivity floor
 Date: 2026-09-03 | Session: S1 | Commit: 4d09f25
 Config: `configs/demo.yaml` | Seed(s): n/a (a property of the model, not a run)
