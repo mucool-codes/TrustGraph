@@ -31,10 +31,7 @@ def run_pipeline(cfg: Config) -> list[Decision]:
     device = torch.device(cfg.device)
 
     topology = build_topology(cfg.topology, seeds.generator("topology"))
-    mobility = build_mobility(
-        {**cfg.mobility, "num_vehicles": cfg.mobility["num_vehicles"]},
-        seeds.generator("mobility"),
-    )
+    mobility = build_mobility(cfg.mobility, seeds.generator("mobility"))
     model = build_trust_head(cfg.model, seeds.torch_seed("model_init"), cfg.device)
 
     feature_rng = seeds.generator("features")

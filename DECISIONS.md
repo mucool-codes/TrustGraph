@@ -332,3 +332,23 @@ optional — `SAGEConv` and the rest of the core run on pure-PyTorch fallbacks �
 wheels are the single most common source of version-matrix breakage on Windows. Omitting
 them removes that failure mode at no functional cost at D9's scale. Measured environment
 state is recorded in `FINDINGS.md` F1.
+
+### D19 — The skeleton runs on CPU by default; GPU is verified separately
+Date: 2026-09-03 | Session: S0 | Status: active
+
+**Decision:** `configs/demo.yaml` sets `device: cpu`. GPU availability is verified
+independently by `scripts/verify_env.py`, which runs a real GraphSAGE forward pass
+through the project's own `TrustHead` on CUDA.
+
+**Alternatives:** (a) `device: auto`, preferring CUDA when present; (b) CUDA by default
+with `torch.use_deterministic_algorithms(True)`.
+
+**Rationale:** GraphSAGE aggregation uses scatter reductions, and their GPU
+implementations are not bit-reproducible across runs — floating-point addition is not
+associative and the reduction order varies. That would break the S0 exit condition
+(byte-identical output across two runs) for a reason that has nothing to do with the
+project. Option (b) would restore determinism but at a real speed cost and with ops that
+raise rather than fall back. At the L9 scale — at most 30 RSUs and 100 vehicles, so a
+graph in the low hundreds of nodes — the GPU is a convenience, not a requirement, and
+`device` stays a config field so training sessions can opt in where exact
+reproducibility of a forward pass matters less than throughput.
