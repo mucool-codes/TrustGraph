@@ -151,33 +151,113 @@ def test_segments_are_spatially_coherent(demo_cfg):
     assert dist[i, j][same].mean() < 0.6 * dist[i, j][~same].mean()
 
 
-def test_segment_swap_noise_changes_assignments(demo_cfg):
-    """The swap probability must actually do something, or same_segment is geometry.
+def _geometric_topology(cfg, seed: int):
+    """The pure-geometry assignment for a seed: both swap mechanisms disabled.
 
-    Compared across several seeds because a single seed can draw no swaps at all.
+    The Lloyd step consumes no randomness and the jitter draw is unchanged, so this
+    isolates the swaps exactly rather than approximating them with re-derived
+    centroids (which a swapped RSU would itself have pulled).
     """
-    without = {
-        s: build_world(
-            type(demo_cfg)(
-                **{
-                    **demo_cfg.__dict__,
-                    "seed": s,
-                    "topology": {**demo_cfg.topology, "segment_swap_prob": 0.0},
-                }
-            )
-        ).topology.backhaul_segment_id
-        for s in range(1, 7)
-    }
-    with_swaps = {
-        s: build_world(
-            type(demo_cfg)(**{**demo_cfg.__dict__, "seed": s})
-        ).topology.backhaul_segment_id
-        for s in range(1, 7)
-    }
-    differing = sum(
-        1 for s in without if not np.array_equal(without[s], with_swaps[s])
+    return build_world(
+        type(cfg)(
+            **{
+                **cfg.__dict__,
+                "seed": seed,
+                "topology": {
+                    **cfg.topology,
+                    "segment_swap_prob": 0.0,
+                    "min_swap_fraction": 0.0,
+                },
+            }
+        )
+    ).topology
+
+
+def test_swap_count_meets_the_floor_on_every_seed(demo_cfg):
+    """The off-geometry property must hold on every evaluation seed, not on average.
+
+    A binomial draw at swap_prob=0.10 over 20 RSUs yields zero often enough to matter
+    - seed 4 produced none before the floor existed (FINDINGS.md F6) - which would
+    have made the property silently false for one seed of a multi-seed evaluation.
+    """
+    floor = int(np.ceil(demo_cfg.topology["min_swap_fraction"] * demo_cfg.topology["num_rsus"]))
+    assert floor >= 3
+
+    for seed in range(1, 6):
+        topo = build_world(type(demo_cfg)(**{**demo_cfg.__dict__, "seed": seed})).topology
+        geometric = _geometric_topology(demo_cfg, seed)
+        assert np.array_equal(topo.positions, geometric.positions)
+
+        actual = int(
+            (topo.backhaul_segment_id != geometric.backhaul_segment_id).sum()
+        )
+        assert actual == topo.num_swapped_rsus, "reported swap count disagrees"
+        assert actual >= floor, f"seed {seed} has {actual} swaps, floor is {floor}"
+
+
+def test_swap_count_is_reported_on_the_topology(demo_cfg):
+    topo = build_world(demo_cfg).topology
+    geometric = _geometric_topology(demo_cfg, demo_cfg.seed)
+    assert topo.num_swapped_rsus == int(
+        (topo.backhaul_segment_id != geometric.backhaul_segment_id).sum()
     )
-    assert differing >= 2, "segment_swap_prob had almost no effect"
+    assert geometric.num_swapped_rsus == 0
+
+
+def test_forced_swaps_take_boundary_rsus_first(demo_cfg):
+    """A forced swap should move the site least deep inside its region.
+
+    Otherwise the floor would distort the layout more than it needs to, moving an RSU
+    from the middle of one segment into a segment it is nowhere near.
+    """
+    cfg = type(demo_cfg)(
+        **{
+            **demo_cfg.__dict__,
+            "topology": {**demo_cfg.topology, "segment_swap_prob": 0.0},
+        }
+    )
+    topo = build_world(cfg).topology
+    geometric = _geometric_topology(demo_cfg, demo_cfg.seed)
+    swapped = np.flatnonzero(topo.backhaul_segment_id != geometric.backhaul_segment_id)
+    assert swapped.size == topo.num_swapped_rsus >= 3
+
+    centroids = np.stack(
+        [
+            topo.positions[geometric.backhaul_segment_id == s].mean(axis=0)
+            for s in range(topo.num_segments)
+        ]
+    )
+    distance = pairwise_distances(topo.positions, centroids)
+    rows = np.arange(topo.num_rsus)
+    own = distance[rows, geometric.backhaul_segment_id]
+    across = distance.copy()
+    across[rows, geometric.backhaul_segment_id] = np.inf
+    margin = across.min(axis=1) - own
+
+    # Swapped RSUs sit nearer a boundary than the ones left alone. Asserted on the
+    # means rather than as a strict total order, because a boundary RSU is skipped
+    # when re-homing it would split its source segment or land it in a segment it has
+    # no link to - so a slightly deeper RSU can legitimately be taken instead.
+    untouched = np.setdiff1d(rows, swapped)
+    assert margin[swapped].mean() < margin[untouched].mean()
+    assert margin[swapped].max() < np.median(margin)
+
+
+def test_swap_floor_respects_the_minimum_segment_size(demo_cfg):
+    """The floor is best-effort: L5's "several RSUs each" is not traded away for it."""
+    cfg = type(demo_cfg)(
+        **{
+            **demo_cfg.__dict__,
+            "topology": {
+                **demo_cfg.topology,
+                "min_swap_fraction": 0.9,  # unsatisfiable
+                "min_segment_size": 4,
+            },
+        }
+    )
+    topo = build_world(cfg).topology
+    assert topo.segment_sizes().min() >= 4
+    assert set(topo.backhaul_segment_id.tolist()) == set(range(topo.num_segments))
 
 
 # ------------------------------------------------------------------ RSU-RSU edges
@@ -215,14 +295,7 @@ def test_rsu_graph_is_connected(demo_cfg):
     assert len(seen) == topo.num_rsus
 
 
-def test_each_segment_is_internally_connected(demo_cfg):
-    """A segment whose RSUs cannot reach each other cannot share evidence.
-
-    This is the precondition for H2: correlated failure is injected per segment (L5),
-    so the GNN can only exploit it if same-segment RSUs are within k hops of one
-    another along same_segment edges.
-    """
-    topo = build_world(demo_cfg).topology
+def _assert_segments_internally_connected(topo, label: str) -> None:
     adjacency = {i: set() for i in range(topo.num_rsus)}
     for i, j in topo.rsu_edges:
         if topo.backhaul_segment_id[i] == topo.backhaul_segment_id[j]:
@@ -238,7 +311,56 @@ def test_each_segment_is_internally_connected(demo_cfg):
                 continue
             seen.add(node)
             stack.extend((adjacency[node] & members) - seen)
-        assert seen == members, f"segment {segment} is internally disconnected"
+        assert seen == members, f"{label}: segment {segment} is internally disconnected"
+
+
+def test_each_segment_is_internally_connected(demo_cfg):
+    """A segment whose RSUs cannot reach each other cannot share evidence.
+
+    This is the precondition for H2: correlated failure is injected per segment (L5),
+    so the GNN can only exploit it if same-segment RSUs are within k hops of one
+    another along same_segment edges.
+
+    Checked across seeds, not only the default one. An earlier version of this test
+    checked seed 20260903 alone, which happened to be one of the two seeds where the
+    property held by luck while four others were silently split (FINDINGS.md F6).
+    """
+    for seed in [demo_cfg.seed] + list(range(1, 6)):
+        topo = build_world(
+            type(demo_cfg)(**{**demo_cfg.__dict__, "seed": seed})
+        ).topology
+        _assert_segments_internally_connected(topo, f"seed {seed}")
+
+
+def test_swapped_rsus_have_a_link_into_their_new_segment(demo_cfg):
+    """A site cannot be homed to a backhaul link it has no physical path to.
+
+    This is what keeps segments connected when a swap happens: without it the swapped
+    RSU joins its new segment as an isolated node.
+    """
+    for seed in [demo_cfg.seed] + list(range(1, 6)):
+        topo = build_world(
+            type(demo_cfg)(**{**demo_cfg.__dict__, "seed": seed})
+        ).topology
+        geometric = _geometric_topology(demo_cfg, seed)
+        swapped = np.flatnonzero(
+            topo.backhaul_segment_id != geometric.backhaul_segment_id
+        )
+        assert swapped.size >= 3
+
+        adjacency = {i: set() for i in range(topo.num_rsus)}
+        for i, j in topo.rsu_edges:
+            adjacency[int(i)].add(int(j))
+            adjacency[int(j)].add(int(i))
+
+        for r in swapped:
+            neighbours = {
+                int(topo.backhaul_segment_id[n]) for n in adjacency[int(r)]
+            }
+            assert int(topo.backhaul_segment_id[r]) in neighbours, (
+                f"seed {seed}: RSU {r} was homed to segment "
+                f"{topo.backhaul_segment_id[r]} with no link into it"
+            )
 
 
 def test_both_same_segment_and_cross_segment_edges_exist(demo_cfg):

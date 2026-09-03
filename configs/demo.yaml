@@ -39,6 +39,12 @@ topology:
   # A minority of RSUs are homed to a segment other than their geographic one, so
   # same_segment is not recoverable from position alone (see topology.py).
   segment_swap_prob: 0.10
+  # Deterministic floor on the swap count. The probabilistic pass above is a binomial
+  # draw and comes out at zero often enough to matter (seed 4 produced none), which
+  # would make the property silently false for one seed of a multi-seed evaluation.
+  # Below the floor, further RSUs are moved starting from those nearest a segment
+  # boundary. 0.15 x 20 RSUs = 3.
+  min_swap_fraction: 0.15
   min_segment_size: 3
 
 mobility:

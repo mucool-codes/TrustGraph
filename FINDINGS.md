@@ -229,3 +229,49 @@ link near the cell edge pinned to `signal_strength = 0` and maximum latency, and
 two edge features stopped distinguishing a boundary link from one well outside. Found
 by a test asserting monotonicity, not by inspection. A regression test now asserts the
 edge-of-cell signal lies in (0.02, 0.5) for the operating config.
+
+### F6 — Segment swaps were seed-dependent, and split segments on four of six seeds
+Date: 2026-09-03 | Session: S1b | Commit: 15da028 (state measured), fixed in this session
+Config: `configs/demo.yaml` | Seed(s): 1, 2, 3, 4, 5, 20260903
+Command: rebuild the topology per seed with `segment_swap_prob` and `min_swap_fraction`
+varied; diff against the pure-geometry assignment (both disabled), and test each
+segment for connectivity over `same_segment` edges only.
+
+Numbers, **before** the fix (probabilistic swaps only, as merged at 85b54f5):
+```
+seed        swapped RSUs   per-segment components over same_segment edges
+       1               1   [[6], [4], [4, 1], [5]]        SPLIT
+       2               2   [[5], [3], [6], [5, 1]]        SPLIT
+       3               3   [[6, 1], [5], [3, 1], [3, 1]]  SPLIT
+       4               0   [[6], [4], [6], [4]]           ok (no swaps at all)
+       5               3   [[6], [4, 1, 1], [5], [3]]     SPLIT
+20260903               1   [[5], [5], [4], [6]]           ok
+pure geometry (all seeds): every segment a single component
+```
+
+**After** the fix (deterministic floor of 3, plus the admissibility constraint of D27):
+```
+seed   prob pass   final   clears floor   swapped RSU ids   segment sizes   connected
+   1           1       3            yes   [0, 1, 15]        [5, 3, 5, 7]          yes
+   2           1       3            yes   [1, 11, 18]       [6, 5, 5, 4]          yes
+   3           3       3            yes   [10, 11, 15]      [7, 7, 3, 3]          yes
+   4           0       3            yes   [1, 18, 19]       [5, 5, 4, 6]          yes
+   5           2       3            yes   [4, 18, 19]       [6, 4, 5, 5]          yes
+20260903       1       3            yes   [1, 18, 19]       [5, 5, 5, 5]          yes
+
+same_segment RSU-RSU edges: 29-32 of 46 across the six seeds
+scenario statistics unchanged (only segment labels moved, not positions or mobility):
+  coverage 100.0%, 2.436 RSUs in range, 29.55 s mean dwell, 1.960 handoffs/veh/min
+pytest: 88 passed
+```
+
+Interpretation: two separate seed-luck defects, neither of which the S1 exit condition
+would have caught. First, the swap count is a binomial draw and came out zero on seed 4,
+so the off-geometry property that D22 argues for was simply absent for one seed of a
+protocol that averages over five (L12). Second, and worse, a swapped RSU could join a
+segment it had no coordination edge into, splitting that segment into two components
+over `same_segment` edges — true on four of six seeds, and false on seed 20260903, which
+is the only seed S1 checked. The S1 test asserting internal connectivity therefore
+passed while the property was broken for most seeds. Both are now structural rather than
+probabilistic (D27), and the connectivity test runs across six seeds. The lesson worth
+carrying: a structural precondition asserted on the default seed alone is not asserted.

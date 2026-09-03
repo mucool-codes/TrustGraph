@@ -37,6 +37,11 @@ class Topology:
             precomputed because the RSU layout never changes within a run.
         road: the layout the RSUs were placed on, kept so mobility and the plots read
             the same object.
+        num_swapped_rsus: how many RSUs are homed off the segment pure geometry would
+            have given them. Carried on the topology because it is the one property of
+            the segment assignment that cannot be seen in the topology figure - that
+            plot colours by assigned segment, so a swapped RSU looks like any other
+            (DECISIONS.md D22).
     """
 
     positions: np.ndarray
@@ -45,6 +50,7 @@ class Topology:
     rsu_link_radius_m: float
     rsu_edges: np.ndarray
     road: RoadNetwork
+    num_swapped_rsus: int = 0
 
     @property
     def num_rsus(self) -> int:
@@ -153,26 +159,114 @@ def _farthest_point_sample(points: np.ndarray, k: int, first: int) -> np.ndarray
     return np.array(picked, dtype=np.int64)
 
 
+def _adjacency(num_rsus: int, rsu_edges: np.ndarray) -> list[set[int]]:
+    """RSU-RSU neighbour sets, indexed by RSU id."""
+    adjacency: list[set[int]] = [set() for _ in range(num_rsus)]
+    for a, b in rsu_edges:
+        adjacency[int(a)].add(int(b))
+        adjacency[int(b)].add(int(a))
+    return adjacency
+
+
+def _segment_stays_connected(
+    labels: np.ndarray,
+    adjacency: list[set[int]],
+    segment: int,
+    without: int,
+) -> bool:
+    """Would `segment` still be one component over same_segment edges without `without`?"""
+    members = {
+        i for i in np.flatnonzero(labels == segment).tolist() if i != without
+    }
+    if len(members) <= 1:
+        return True
+    seen: set[int] = set()
+    stack = [min(members)]
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend((adjacency[node] & members) - seen)
+    return seen == members
+
+
+def _admissible_swap(
+    i: int,
+    labels: np.ndarray,
+    sizes: np.ndarray,
+    adjacency: list[set[int]],
+    centroids: np.ndarray,
+    position: np.ndarray,
+    min_segment_size: int,
+) -> int | None:
+    """Which segment RSU `i` may be re-homed to, or None.
+
+    Two constraints, both of which exist to keep every segment a single component over
+    same_segment edges - the condition that lets segment-level evidence propagate one
+    hop rather than having to detour through a cross-segment neighbour:
+
+      * `i` must already have an RSU-RSU edge to a member of the target segment. A
+        site cannot be homed to a backhaul link it has no physical path to, and
+        without this the swapped RSU lands in its new segment as an isolated node.
+      * removing `i` must not split its source segment.
+
+    Among the targets that qualify, the nearest centroid wins, so the result stays as
+    close to the geometric assignment as the constraints allow.
+    """
+    source = int(labels[i])
+    if sizes[source] <= min_segment_size:
+        return None
+
+    reachable = {int(labels[n]) for n in adjacency[i]} - {source}
+    if not reachable:
+        return None
+    if not _segment_stays_connected(labels, adjacency, source, without=i):
+        return None
+
+    candidates = sorted(reachable)
+    distances = [float(np.linalg.norm(centroids[s] - position)) for s in candidates]
+    return candidates[int(np.argmin(distances))]
+
+
 def _spatial_segments(
     positions: np.ndarray,
     num_segments: int,
     swap_prob: float,
     min_segment_size: int,
+    min_swap_fraction: float,
+    adjacency: list[set[int]],
     rng: np.random.Generator,
-) -> np.ndarray:
+) -> tuple[np.ndarray, int]:
     """Assign a `backhaul_segment_id` per RSU, spatially coherent.
 
-    Lloyd's algorithm over RSU positions with a farthest-point initialisation, so the
-    segments come out as contiguous geographic regions of comparable size. Then, with
-    probability `swap_prob`, an RSU is reassigned to a different segment.
+    Returns the labels and the number of RSUs homed off their geographic segment.
 
-    The swap noise is deliberate. With perfectly contiguous segments `same_segment` is
-    a function of position alone, and a model could recover it from geometry without
-    ever using the edge feature - which would make an H2 result about that feature
-    unfalsifiable. A minority of off-region RSUs (a spur off a neighbouring backhaul
-    link, a site re-homed during a build-out) keeps the segment id genuinely extra
-    information. A swap is skipped when it would shrink its source segment below
-    `min_segment_size`, so every segment keeps several RSUs as L5 requires.
+    Lloyd clustering over RSU positions with a farthest-point initialisation, so the
+    segments come out as contiguous geographic regions of comparable size. Then two
+    passes reassign a minority of RSUs to a different segment: a probabilistic one at
+    rate `swap_prob`, and a deterministic floor that tops the count up to
+    `min_swap_fraction` of the RSUs if the first pass fell short.
+
+    Why any swaps at all: without them a segment is exactly a region of the map, and
+    the paper's claim under correlated failure reduces to "things that are near each
+    other fail together" - which needs no message passing to exploit and no segment id
+    to express. Off-region RSUs are physically ordinary (a spur off a neighbouring
+    backhaul link, a site re-homed during a build-out) and make segment membership
+    something other than a restatement of position, which is what lets a GNN gain be
+    attributed to shared *infrastructure* rather than to proximity.
+
+    Why a floor rather than a rate: at `swap_prob = 0.1` over 20 RSUs the realised
+    count is a binomial draw, and it comes out zero often enough to matter - seed 4
+    produced no swaps at all, which would have made the property silently false for
+    one seed of an evaluation that averages over seeds (FINDINGS.md F6). The floor
+    makes it a guarantee. Forced swaps take the RSUs nearest their segment boundary
+    first, so the assignment stays as close to the geometric one as the floor allows.
+
+    A swap of either kind is skipped when it would shrink its source segment below
+    `min_segment_size`, so every segment keeps several RSUs as L5 requires. That means
+    the floor is best-effort on layouts too small to satisfy it; the achieved count is
+    returned rather than asserted here, and `Topology.num_swapped_rsus` carries it.
     """
     num_rsus = positions.shape[0]
     if num_segments > num_rsus:
@@ -193,23 +287,48 @@ def _spatial_segments(
             if members.size:
                 centroids[s] = members.mean(axis=0)
 
-    if swap_prob > 0.0 and num_segments > 1:
-        draws = rng.random(num_rsus)
-        alternatives = rng.integers(0, num_segments - 1, size=num_rsus)
-        sizes = np.bincount(labels, minlength=num_segments)
-        for i in np.flatnonzero(draws < swap_prob):
-            source = int(labels[i])
-            if sizes[source] <= min_segment_size:
-                continue
-            # Map into the segments other than the current one.
-            target = int(alternatives[i])
-            if target >= source:
-                target += 1
-            sizes[source] -= 1
-            sizes[target] += 1
-            labels[i] = target
+    geometric = labels.copy()
+    sizes = np.bincount(labels, minlength=num_segments)
 
-    return labels.astype(np.int64)
+    def apply(i: int) -> bool:
+        target = _admissible_swap(
+            i, labels, sizes, adjacency, centroids, positions[i], min_segment_size
+        )
+        if target is None:
+            return False
+        sizes[int(labels[i])] -= 1
+        sizes[target] += 1
+        labels[i] = target
+        return True
+
+    if num_segments > 1 and swap_prob > 0.0:
+        for i in np.flatnonzero(rng.random(num_rsus) < swap_prob):
+            apply(int(i))
+
+    swapped = labels != geometric
+    floor = int(np.ceil(min_swap_fraction * num_rsus))
+
+    if num_segments > 1 and swapped.sum() < floor:
+        # Distance from each RSU to its own segment centroid and to the nearest other
+        # one. The difference is how far inside its region the RSU sits, so the
+        # smallest values are the sites on a boundary - the ones a real operator would
+        # plausibly have homed either way.
+        distance = pairwise_distances(positions, centroids)
+        rows = np.arange(num_rsus)
+        own = distance[rows, geometric]
+        across = distance.copy()
+        across[rows, geometric] = np.inf
+        margin = across.min(axis=1) - own
+
+        for i in np.argsort(margin, kind="stable"):
+            if swapped.sum() >= floor:
+                break
+            if swapped[i]:
+                continue
+            if apply(int(i)):
+                swapped[i] = True
+
+    return labels.astype(np.int64), int(swapped.sum())
 
 
 def build_topology(
@@ -251,19 +370,24 @@ def build_topology(
             positions += rng.uniform(-jitter_m, jitter_m, size=positions.shape)
         positions = np.clip(positions, 0.0, road.extent_m)
 
-    segment_id = _spatial_segments(
-        positions,
-        num_segments=num_segments,
-        swap_prob=float(cfg_topology.get("segment_swap_prob", 0.0)),
-        min_segment_size=int(cfg_topology.get("min_segment_size", 2)),
-        rng=rng,
-    )
-
+    # Coordination edges are computed before segments are assigned, because segment
+    # assignment needs them: an RSU may only be re-homed to a segment it actually has
+    # a link to (see `_admissible_swap`).
     rsu_link_radius_m = float(cfg_topology["rsu_link_radius_m"])
     dist = pairwise_distances(positions, positions)
     i, j = np.triu_indices(positions.shape[0], k=1)
     close = dist[i, j] <= rsu_link_radius_m
     rsu_edges = np.stack([i[close], j[close]], axis=1).astype(np.int64)
+
+    segment_id, num_swapped = _spatial_segments(
+        positions,
+        num_segments=num_segments,
+        swap_prob=float(cfg_topology.get("segment_swap_prob", 0.0)),
+        min_segment_size=int(cfg_topology.get("min_segment_size", 2)),
+        min_swap_fraction=float(cfg_topology.get("min_swap_fraction", 0.15)),
+        adjacency=_adjacency(positions.shape[0], rsu_edges),
+        rng=rng,
+    )
 
     return Topology(
         positions=positions,
@@ -272,4 +396,5 @@ def build_topology(
         rsu_link_radius_m=rsu_link_radius_m,
         rsu_edges=rsu_edges,
         road=road,
+        num_swapped_rsus=num_swapped,
     )
