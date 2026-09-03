@@ -129,3 +129,82 @@ not a bug: 28.8 km of road against 20 RSUs covering ~700 m of road each cannot
 produce redundant coverage. Farthest-point RSU placement also drives sites onto the
 region boundary, leaving the interior thin and the RSU-RSU graph fragmented at 14
 edges over 20 nodes.
+
+### F4 — Calibrated S1 scenario: full coverage, real choice, realistic handoff
+Date: 2026-09-03 | Session: S1 | Commit: 4d09f25 (code) + calibration in this session
+Config: `configs/demo.yaml` (1600 m region, 3x3 blocks, 20 RSUs, coverage 400 m,
+coordination 650 m, 60 vehicles, 300 steps at dt=1 s) | Seed(s): 20260903, and 1/2/3
+Command: `python scripts/generate_trace.py --config configs/demo.yaml --force`
+         `python scripts/s1_report.py --config configs/demo.yaml`
+
+Numbers (seed 20260903):
+```
+backhaul segment sizes     : [5, 5, 4, 6]
+RSU-RSU edges (undirected) : 46      (degree min 3 / mean 4.6 / max 6, one component)
+same_segment RSU-RSU edges : 32/46 = 70%
+mean speed                 : 12.59 m/s (sd 4.14) = 45.3 km/h
+mean vehicles per RSU      : 7.307 (sd 2.952)
+mean vehicle-RSU edges     : 146.14 per step
+vehicle-timesteps covered  : 100.0%
+mean RSUs in range         : 2.436   (>=2 candidates on 96.4% of vehicle-timesteps)
+mean dwell time            : 29.55 s (median 32.00, sd 17.82)
+completed dwell episodes   : 528
+handoffs per veh per min   : 1.960
+total handoffs             : 588
+total coverage gaps        : 0
+directed edges per snapshot: 384.3 (min 362, max 410)
+sequence sha256            : fb35eab950af5915f15646ded0711c12d28e0b9eb1fe8bf176cd5b9f2b5edce8
+   (identical on a second invocation - the graph sequence is reproducible)
+pytest                     : 84 passed in 16.02s
+```
+
+Cross-seed stability (topology and mobility both re-drawn):
+```
+seed  segment sizes   RSUs in range  dwell (s)  handoffs/veh/min  covered
+   1  [6, 4, 5, 5]           2.347      31.16              1.837    100.0%
+   2  [5, 3, 6, 6]           2.419      30.16              1.900    100.0%
+   3  [7, 5, 4, 4]           2.409      28.38              2.000    100.0%
+```
+
+Structural checks: the RSU-RSU graph is a single connected component, and each of the
+four backhaul segments is *internally* connected through same_segment edges alone.
+A distance-threshold predictor recovers `same_segment` from geometry with only 63.0%
+accuracy (seed 20260903 has 1 RSU homed off its geographic segment; across seeds 1-5
+the count is 2, 3, 5, 0, 3).
+
+Interpretation: the scenario is now usable — vehicles are always covered, have 2.4
+candidate RSUs on average so the selection rule of L1 has a genuine choice, and hand
+off about twice a minute with a ~30 s dwell, which is what a 45 km/h urban arterial
+with 400 m cells should produce. The structural preconditions for H2 hold: segment
+members can reach each other over same_segment edges, and `same_segment` is not
+recoverable from position alone. These are scenario properties, not results about
+trust — the behavioural features are still constants (S2/S3).
+
+### F5 — Link model saturated at the cell edge under the -95 dBm sensitivity floor
+Date: 2026-09-03 | Session: S1 | Commit: 4d09f25
+Config: `configs/demo.yaml` | Seed(s): n/a (a property of the model, not a run)
+Command: `pytest tests/test_graph.py::test_signal_strength_falls_with_distance`
+
+Numbers, with the original `rssi_min_dbm: -95.0`:
+```
+distance   RSSI (dBm)   signal_strength
+   300 m       -91.78            0.0585
+   400 m       -95.16            0.0000   <- floor reached exactly at coverage radius
+   500 m       -97.77            0.0000
+```
+After moving the floor to `rssi_min_dbm: -101.0` (a typical 10 MHz C-V2X sensitivity):
+```
+     1 m       -24.90            1.0000   (clipped at the near-field cap)
+   100 m       -78.90            0.3623
+   300 m       -91.78            0.1511
+   400 m       -95.16            0.0958
+   650 m      -100.85            0.0025
+access latency spans 4.00 ms (1 m) to 17.08 ms (400 m); backhaul 2.00 to 5.98 ms.
+```
+
+Interpretation: the receiver sensitivity floor and the coverage radius are not
+independent knobs — with the floor at -95 dBm it landed at exactly 400 m, so every
+link near the cell edge pinned to `signal_strength = 0` and maximum latency, and the
+two edge features stopped distinguishing a boundary link from one well outside. Found
+by a test asserting monotonicity, not by inspection. A regression test now asserts the
+edge-of-cell signal lies in (0.02, 0.5) for the operating config.
