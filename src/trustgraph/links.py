@@ -36,7 +36,11 @@ class LinkModel:
     reference_distance_m: float = 1.0
     path_loss_exponent: float = 2.7
     rssi_max_dbm: float = -40.0
-    rssi_min_dbm: float = -95.0
+    # Receiver sensitivity, and the floor `signal_strength` is measured against. It
+    # must sit far enough below the RSSI at `coverage_radius_m` that links at the edge
+    # of a cell still resolve: with it at -95 dBm the defaults here put the floor at
+    # exactly 400 m, so every boundary link pinned to signal 0 and maximum latency.
+    rssi_min_dbm: float = -101.0
     access_base_ms: float = 4.0
     access_span_ms: float = 16.0
     backhaul_base_ms: float = 2.0

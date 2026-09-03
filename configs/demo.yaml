@@ -16,18 +16,26 @@ scenario:
   tasks_per_step: 3    # vehicles that offload a task each step
 
 # The road layout. A Manhattan grid of arterials: blocks_x + 1 vertical roads
-# crossing blocks_y + 1 horizontal roads over a square region.
+# crossing blocks_y + 1 horizontal roads over a square region. A dense urban
+# district, ~12.8 km of road - sized so that 20 RSUs (L9) can give the redundant
+# coverage the selection rule needs (FINDINGS.md F3, F4).
 road:
-  extent_m: 2400.0
-  blocks_x: 5          # -> 6 vertical roads, 480 m blocks
-  blocks_y: 5          # -> 6 horizontal roads
+  extent_m: 1600.0
+  blocks_x: 3          # -> 4 vertical roads, 533 m blocks
+  blocks_y: 3          # -> 4 horizontal roads
 
 topology:
   num_rsus: 20                # L9: 15-30
   num_backhaul_segments: 4    # L5: degradation later applies per segment
   placement_jitter_m: 25.0    # a mast stands beside the road, not on it
-  coverage_radius_m: 350.0    # vehicle <-> RSU link threshold
-  rsu_link_radius_m: 620.0    # RSU <-> RSU coordination threshold (L6)
+  coverage_radius_m: 400.0    # vehicle <-> RSU link threshold
+  rsu_link_radius_m: 650.0    # RSU <-> RSU coordination threshold (L6)
+  # Siting: greedy maximisation of covered road, discounting road already covered
+  # by `redundancy_decay` per RSU that reaches it. Below 1.0 the RSUs left over
+  # after the road is covered build a second layer, which is what gives a vehicle
+  # more than one candidate to choose between.
+  site_sample_spacing_m: 25.0
+  redundancy_decay: 0.5
   # A minority of RSUs are homed to a segment other than their geographic one, so
   # same_segment is not recoverable from position alone (see topology.py).
   segment_swap_prob: 0.10
@@ -54,7 +62,9 @@ link:
   reference_loss_db: 47.9
   path_loss_exponent: 2.7
   rssi_max_dbm: -40.0
-  rssi_min_dbm: -95.0
+  # Receiver sensitivity. Must sit below the RSSI at coverage_radius_m (-95.2 dBm at
+  # 400 m under these defaults) or every boundary link saturates at signal 0.
+  rssi_min_dbm: -101.0
   access_base_ms: 4.0
   access_span_ms: 16.0
   backhaul_base_ms: 2.0
@@ -63,10 +73,14 @@ link:
 
 # Graph construction (graph.py): the scales that map physical quantities onto the
 # [0, 1] range the model reads.
+# Graph construction (graph.py): the scales that map physical quantities onto the
+# [0, 1] range the model reads. The two _norm_s values are set near the measured
+# mean dwell time (~30 s, FINDINGS.md F4) so link_age and dwell_estimate use the
+# middle of their range rather than saturating at one end.
 graph:
-  rsu_capacity_vehicles: 12.0
-  link_age_norm_s: 60.0
-  dwell_norm_s: 60.0
+  rsu_capacity_vehicles: 10.0
+  link_age_norm_s: 30.0
+  dwell_norm_s: 30.0
   speed_norm_mps: 22.0
 
 model:

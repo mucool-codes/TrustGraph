@@ -75,13 +75,69 @@ def _candidate_sites(road: RoadNetwork) -> np.ndarray:
     return np.vstack([road.intersections, road.segment_midpoints()])
 
 
+def _road_sample_points(road: RoadNetwork, spacing_m: float) -> np.ndarray:
+    """Points along every road, roughly `spacing_m` apart.
+
+    What coverage is measured against. The quantity an operator cares about is the
+    fraction of *road* inside some RSU's radius, not the fraction of the region - the
+    region is mostly buildings, and no vehicle is ever in them.
+    """
+    chunks: list[np.ndarray] = []
+    for a, b in road.segments():
+        pa, pb = road.intersections[a], road.intersections[b]
+        steps = max(int(np.ceil(np.linalg.norm(pb - pa) / max(spacing_m, 1e-6))), 1)
+        fractions = np.linspace(0.0, 1.0, steps + 1)[:-1, None]
+        chunks.append(pa + fractions * (pb - pa))
+    chunks.append(road.intersections)
+    return np.vstack(chunks)
+
+
+def _greedy_coverage_sites(
+    sites: np.ndarray,
+    samples: np.ndarray,
+    radius_m: float,
+    k: int,
+    redundancy_decay: float,
+) -> np.ndarray:
+    """Choose `k` sites, greedily, to cover the most road.
+
+    Each site's gain is the total weight of the road points it reaches, where a point
+    already reached by `c` chosen sites is worth `redundancy_decay ** c`. So the first
+    RSUs go where nothing is covered, and once the road is covered the remaining ones
+    add a second layer over it rather than crowding one spot.
+
+    That second layer is the point. The selection rule of L1 is an argmax over
+    in-range candidates, so a vehicle that can see exactly one RSU produces a decision
+    with nothing to decide - and an evaluation full of them measures coverage, not
+    trust. Maximising bare coverage alone would spread the RSUs to minimise overlap
+    and produce exactly that.
+
+    Deterministic: `argmax` breaks ties to the lowest index, and no RNG is consulted.
+    """
+    if k > sites.shape[0]:
+        raise ValueError(
+            f"cannot place {k} RSUs on {sites.shape[0]} candidate sites; "
+            "increase road.blocks_x / road.blocks_y or lower topology.num_rsus"
+        )
+    within = pairwise_distances(sites, samples) <= radius_m
+    hits = np.zeros(samples.shape[0], dtype=np.int64)
+    picked: list[int] = []
+
+    for _ in range(k):
+        gain = within @ (redundancy_decay**hits)
+        gain[picked] = -np.inf
+        best = int(np.argmax(gain))
+        picked.append(best)
+        hits[within[best]] += 1
+
+    return np.array(picked, dtype=np.int64)
+
+
 def _farthest_point_sample(points: np.ndarray, k: int, first: int) -> np.ndarray:
     """Greedy max-min subset of `points`, starting from index `first`.
 
-    Chosen over sampling sites uniformly at random because uniform sampling clusters,
-    and a cluster of RSUs plus a bare patch would make coverage - and therefore the
-    handoff rate the exit condition reports - an artefact of one seed's luck rather
-    than of the configured radius.
+    Used to seed the segment clustering below, where spreading the initial centroids
+    as far apart as possible is exactly what is wanted.
     """
     if k > points.shape[0]:
         raise ValueError(
@@ -177,7 +233,16 @@ def build_topology(
             raise ValueError("topology.positions length must equal topology.num_rsus")
     else:
         sites = _candidate_sites(road)
-        chosen = _farthest_point_sample(sites, int(cfg_topology["num_rsus"]), first=0)
+        samples = _road_sample_points(
+            road, float(cfg_topology.get("site_sample_spacing_m", 25.0))
+        )
+        chosen = _greedy_coverage_sites(
+            sites,
+            samples,
+            radius_m=float(cfg_topology["coverage_radius_m"]),
+            k=int(cfg_topology["num_rsus"]),
+            redundancy_decay=float(cfg_topology.get("redundancy_decay", 0.5)),
+        )
         positions = sites[chosen].copy()
         if jitter_m > 0:
             # A mast stands beside the carriageway, not on the centreline. The jitter
