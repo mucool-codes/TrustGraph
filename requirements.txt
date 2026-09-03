@@ -1,0 +1,39 @@
+# TrustGraph pinned environment (S0, 2026-09-03)
+#
+# Verified on: Windows 11 (10.0.26200), Python 3.11.9 (AMD64),
+#              NVIDIA GeForce RTX 4050 Laptop GPU (Ada, compute capability 8.9),
+#              driver 581.86.
+# Verify with: python scripts/verify_env.py
+# Measured environment state is recorded in FINDINGS.md F1.
+#
+# torch must come from the PyTorch CUDA 12.4 index, not PyPI:
+#
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+#   pip install -r requirements.txt
+#
+# The Windows cu124 wheel is ~2.5 GB and bundles the CUDA runtime, so there are no
+# separate nvidia-* pins here. On an unreliable link, fetch it with a resumable
+# downloader first and install the local file (see FINDINGS.md F1).
+#
+# torch-scatter / torch-sparse / pyg-lib are deliberately NOT installed: since PyG 2.3
+# they are optional, SAGEConv runs on pure-PyTorch fallbacks, and they are the most
+# common source of version-matrix breakage on Windows (DECISIONS.md D18).
+
+torch==2.6.0+cu124
+torch-geometric==2.8.0.post1
+
+numpy==2.4.6
+PyYAML==6.0.3
+
+# --- torch_geometric runtime dependencies (not declared as hard requirements) ---
+aiohttp==3.14.3
+fsspec==2026.7.0
+Jinja2==3.1.6
+psutil==7.2.2
+pyparsing==3.3.2
+requests==2.34.2
+tqdm==4.70.0
+xxhash==4.0.1
+
+# --- testing ---
+pytest==9.1.1
