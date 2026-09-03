@@ -118,6 +118,7 @@ class ScenarioStats:
     num_vehicles: int
     num_rsus: int
     segment_sizes: tuple[int, ...]
+    num_swapped_rsus: int
     num_rsu_rsu_edges: int
     mean_vehicles_per_rsu: float
     std_vehicles_per_rsu: float
@@ -150,6 +151,7 @@ def scenario_stats(trace: Trace, topology: Topology) -> ScenarioStats:
         num_vehicles=trace.num_vehicles,
         num_rsus=topology.num_rsus,
         segment_sizes=tuple(int(s) for s in topology.segment_sizes()),
+        num_swapped_rsus=int(topology.num_swapped_rsus),
         num_rsu_rsu_edges=int(topology.rsu_edges.shape[0]),
         mean_vehicles_per_rsu=float(series.in_range_count.mean()),
         std_vehicles_per_rsu=float(series.in_range_count.std()),
@@ -179,6 +181,8 @@ def format_stats(stats: ScenarioStats) -> str:
         f"  vehicles                   : {stats.num_vehicles}",
         f"  RSUs                       : {stats.num_rsus}",
         f"  backhaul segment sizes     : {list(stats.segment_sizes)}",
+        f"  RSUs off their geo segment : {stats.num_swapped_rsus} "
+        f"(not visible in the topology figure - DECISIONS.md D22)",
         f"  RSU-RSU edges (undirected) : {stats.num_rsu_rsu_edges}",
         "",
         "mobility",

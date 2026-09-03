@@ -433,7 +433,24 @@ rationale above; the decision itself stands.
    node (RSU 19) also sits on the boundary between the two clusters rather than inside
    the wrong one, leaving nothing visible to spot. A reader looking at that image alone
    will conclude the segments are purely geometric. Verify with the assignment diff, not
-   the figure.
+   the figure — `scripts/s1_report.py` now prints the count.
+
+3. **The stated purpose above is wrong and is corrected here.** The rationale claims the
+   swap protects an H2 result from being "unfalsifiable" because a model could recover
+   `same_segment` from geometry. That cannot happen in the ablation as specified:
+   Variant C is an MLP over a node's *own* feature vector, which contains no position
+   and no neighbour information, so it could not infer segment membership from geometry
+   at any swap rate — and Variant D is handed `same_segment` on the edge regardless. The
+   swap changes nothing about C-vs-D fairness.
+
+   Its real value is narrative, and it is worth keeping for that alone. Without it a
+   backhaul segment is exactly a region of the map, and a reviewer can fairly read any
+   GNN gain under correlated failure as "things that are near each other fail together"
+   — a spatial-smoothing result that needs no notion of shared infrastructure. Because
+   segment membership is *not* purely spatial, the gain can be attributed to the
+   backhaul structure the model was given rather than to proximity it could have
+   inferred anyway. That is a claim about what the result means, not about whether the
+   experiment is sound, and D27 makes it hold on every seed rather than on average.
 
 ### D23 — Mobility sources emit a trace; the pipeline never steps a mobility model
 Date: 2026-09-03 | Session: S1 | Status: active
@@ -515,3 +532,45 @@ not independent, and at the initial values the floor landed at exactly the cover
 radius, saturating every cell-edge link to `signal_strength = 0` (FINDINGS.md F5). That
 was caught by a monotonicity test over the model in isolation, which would have been
 awkward to write against geometry embedded in the graph builder.
+
+### D27 — Swap count is a deterministic floor, and a swap must be physically admissible
+Date: 2026-09-03 | Session: S1b | Status: active
+Amends the mechanism of D22; the decision to have off-geometry segments stands.
+
+**Decision:** Two changes to how `backhaul_segment_id` is perturbed.
+
+1. **Floor, not rate.** After the probabilistic pass at `segment_swap_prob`, if fewer
+   than `min_swap_fraction` of the RSUs (0.15, so 3 of 20) ended up off their geometric
+   segment, further RSUs are moved until the floor is met, taking those nearest a
+   segment boundary first. No randomness is involved in the top-up.
+2. **Admissibility.** A swap of either kind is applied only if the RSU already has an
+   RSU-RSU coordination edge to a member of the target segment, and only if removing it
+   leaves its source segment connected over `same_segment` edges. Among qualifying
+   targets the nearest centroid wins. `Topology.num_swapped_rsus` reports the achieved
+   count, and `scripts/s1_report.py` prints it.
+
+**Alternatives:** (a) leave the swap purely probabilistic and accept the variance;
+(b) raise `segment_swap_prob` until zero-swap seeds become unlikely; (c) drop the
+off-geometry property and rest H2 entirely on segment-level degradation, which does not
+depend on it.
+
+**Rationale:** (a) is what D22 did, and it made the property seed-dependent: at
+`swap_prob = 0.1` over 20 RSUs the realised count is a binomial draw that came out zero
+on seed 4 (FINDINGS.md F6). Under L12 every configuration is averaged over >= 5 seeds,
+so a property that holds on four seeds and silently fails on the fifth is worse than one
+that fails everywhere — the aggregate still looks fine and nothing in the output says
+which seed was different. (b) shifts the distribution without removing the tail and
+costs geometric coherence to do it. (c) is defensible and remains the fallback, but the
+narrative in D22 note 3 is cheap to keep once the mechanism is deterministic.
+
+The admissibility constraint fixes a separate defect the floor exposed rather than
+caused (F6): a swapped RSU was joining its new segment with no `same_segment` edge into
+it, leaving that segment split into two components. Every segment being a single
+component over `same_segment` edges is the condition that lets segment-level evidence
+propagate in one hop instead of detouring through a cross-segment neighbour, and D22 and
+F4 both name it as a precondition for H2. It was true on seed 20260903 by luck and false
+on four of six seeds tested. The constraint also has the better physical reading: a site
+cannot be re-homed onto a backhaul link it has no path to.
+
+The regression test for internal connectivity now runs across six seeds. Checking a
+single default seed is what let both defects hide.
