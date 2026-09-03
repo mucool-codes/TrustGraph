@@ -1,0 +1,34 @@
+# Tiny scenario for the smoke test. Deliberately far below the L9 operating scale -
+# a graph small enough to reason about by hand (DEVELOPMENT_GUIDE.md: "test on small
+# graphs first"). Not a research configuration.
+
+seed: 7
+
+device: cpu
+
+scenario:
+  num_steps: 3
+  tasks_per_step: 2
+
+topology:
+  num_rsus: 4
+  num_backhaul_segments: 2
+  region_extent_m: 600.0
+  placement_jitter_m: 10.0
+  coverage_radius_m: 500.0
+  rsu_link_radius_m: 500.0
+
+mobility:
+  source: synthetic_grid
+  num_vehicles: 5
+  grid_cells: 6
+  cell_size_m: 100.0
+
+model:
+  hidden_dim: 8
+  num_layers: 2
+
+selection:
+  alpha: 1.0
+  beta: 0.5
+  gamma: 0.3

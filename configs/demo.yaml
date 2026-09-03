@@ -1,0 +1,41 @@
+# TrustGraph demo scenario - S0 walking skeleton.
+#
+# Every value that affects the run lives here. A run is reproducible from
+# (this file, seed) alone - Standing Rule 7.
+
+seed: 20260903
+
+# S0 runs on CPU by default. GraphSAGE aggregation on GPU uses non-deterministic
+# scatter reductions, which would break byte-identical output across processes - the
+# S0 exit condition. At the L9 scale (<=30 RSUs) the GPU buys nothing here anyway.
+# GPU availability is verified separately by scripts/verify_env.py.
+device: cpu
+
+scenario:
+  num_steps: 8         # timesteps to simulate
+  tasks_per_step: 3    # vehicles that offload a task each step
+
+topology:
+  num_rsus: 20                # L9: 15-30
+  num_backhaul_segments: 4    # L5: degradation later applies per segment
+  region_extent_m: 2000.0
+  placement_jitter_m: 60.0
+  coverage_radius_m: 400.0    # vehicle <-> RSU link threshold
+  rsu_link_radius_m: 700.0    # RSU <-> RSU link threshold (L6)
+
+mobility:
+  source: synthetic_grid      # L7: synthetic is the default and on the critical path
+  num_vehicles: 60            # L9: 50-100
+  grid_cells: 20
+  cell_size_m: 100.0
+
+model:
+  hidden_dim: 32
+  num_layers: 2               # 2-layer GraphSAGE trust head (L1)
+
+# L1: score(v) = alpha*trust_v - beta*latency_v - gamma*load_v
+# Hand-tuned. Set alpha to 0 for Baseline A (L2).
+selection:
+  alpha: 1.0
+  beta: 0.5
+  gamma: 0.3
