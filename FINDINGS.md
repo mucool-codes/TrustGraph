@@ -483,3 +483,63 @@ only 0.761 concentration, because once one segment is full the remainder spills 
 second — whole-segment degradation cannot hold K fixed and be fully concentrated at the
 same time. Seed 3's smallest segment has 3 RSUs, which is why it realises [3, 1] (0.50)
 at 20% and rho = 1.
+
+### F11 — S2 exit: gradual onset in success_ewma, degradation confined to one segment at rho = 1
+Date: 2026-09-13 | Session: S2 | Commit: 559259f
+Config: `configs/demo.yaml` (fraction 0.20, onset 400, ramp 300) | Seed(s): 20260903
+Command: `python scripts/s2_report.py --config configs/demo.yaml`
+         `python scripts/generate_scenario.py --config configs/demo.yaml [--rho 0] --force`
+Figure: `figures/s2_success_ewma.png` (generated, not committed)
+
+Numbers:
+```
+config configs/demo.yaml   seed 20260903   fraction 0.2   segment sizes [5, 5, 5, 5]
+no-degradation deadline success: 0.9659
+
+--- rho = 0
+  degraded RSUs          : [2, 4, 10, 12]  (segments [3, 2, 0, 3])
+  degraded per segment   : [1, 0, 1, 2] of [5, 5, 5, 5]
+  correlated picks       : 0   pair concentration 0.167
+  success overall        : 0.9211   post-ramp 0.8774   post-ramp on degraded 0.2405
+  mean success_ewma        step   degraded   healthy-same-seg   healthy-other
+    pre-onset               399      0.947              0.968           0.999
+    onset + 10              410      0.947              0.970           1.000
+    ramp 1/4                475      0.930              0.980           1.000
+    ramp 1/2                550      0.865              0.981           0.960
+    ramp end                700      0.562              0.972           0.968
+    end                    1199      0.279              0.971           0.980
+  latency_dev at end     : degraded 0.331   healthy 0.037
+
+--- rho = 1
+  degraded RSUs          : [0, 5, 7, 10]  (segments [0, 0, 0, 0])
+  degraded per segment   : [4, 0, 0, 0] of [5, 5, 5, 5]
+  correlated picks       : 3   pair concentration 1.000
+  success overall        : 0.8886   post-ramp 0.8096   post-ramp on degraded 0.2632
+  mean success_ewma        step   degraded   healthy-same-seg   healthy-other
+    pre-onset               399      0.975              0.909           0.975
+    onset + 10              410      0.981              0.918           0.974
+    ramp 1/4                475      0.918              0.998           0.990
+    ramp 1/2                550      0.783              0.957           0.977
+    ramp end                700      0.586              0.995           0.962
+    end                    1199      0.299              0.875           0.969
+  latency_dev at end     : degraded 0.327   healthy 0.037
+
+graph sequence sha256 (on-disk scenario, rebuilt from the observable file):
+  rho 1.00: f3f247ac6c9becb1d2ddf859bf0b635a3c0d4778076ff028e46cfc0c97130de7  (identical on two runs)
+  rho 0.00: a3af5951e1b12d00bc67d0953625a851aa78ec327a9339589cf6daf35fe27100
+run.py on the stored rho=1 scenario: 6957 decisions, 20 distinct RSUs, 2.4091 mean candidates
+pytest: 137 passed
+```
+
+Interpretation: onset is gradual in the observable feature at both rho — the degraded
+mean is unchanged 10 s after onset and still 0.93/0.92 a quarter into the ramp, then lags
+the true fault by roughly 100-150 s — and at rho = 1 the four degraded RSUs sit in one
+segment while the rest of the network stays near 0.97, so the correlated structure H2
+needs is present in the data.
+
+Noted, not acted on: the "healthy, same segment" group at rho = 1 is a single RSU (16),
+and its line swings between 0.75 and 1.0 *before* onset as well as after, so it is EWMA
+scatter on one node rather than leakage; at a feature weight of 0.1 a single RSU's
+`success_ewma` is noisy enough that per-node pre-onset dips of 0.2 occur with no
+degradation at all. That noise floor is what any detection-latency threshold in S4 has
+to sit above.
