@@ -947,3 +947,27 @@ Date: 2026-09-13 | Session: S2b | Status: active
 **Rationale:** Recorded so later sessions inherit the answers from this file rather than
 from the conversation that produced them; the reasoning for each lives in D29, D31, D33,
 D38 and D39 and in the review answer quoted in D38.
+
+### D42 — S4 must report infeasible cold-start draws explicitly, never drop them silently
+Date: 2026-09-13 | Session: S2b (post-merge review) | Status: active
+Confirms D38 as implemented (test nodes are degraded RSUs specifically; no third
+"healthy member of a degraded segment" placement unless a later session needs to
+separate the misleading-prior question).
+
+**Decision:** Wherever S4 (or any later session) aggregates results for the cold-start
+conditions, it reports, per condition and per rho, the number of draws attempted, the
+number infeasible, and the number aggregated — alongside the metric, not in a footnote.
+Infeasible draws are never silently excluded. At minimum S4 also reports the control-vs-
+test comparison restricted to draws where *both* conditions were feasible, so the two
+samples are drawn from the same set of scenarios.
+
+**Alternatives:** (a) drop infeasible draws and aggregate the rest; (b) substitute a
+different pool when the requested one is empty.
+
+**Rationale:** F12 measured the control condition as infeasible on 11.6% of draws at
+rho = 0 (29 of 250) and on none at rho = 1. The infeasible draws are not random: they are
+the ones where degradation touched every segment. Dropping them (a) skews the control
+sample toward scenarios where degradation happened to be concentrated, which is exactly
+the property the rho axis is meant to vary, and would make the control condition's
+rho = 0 result quietly less "rho = 0" than the test condition's. (b) is the silent mixing
+of conditions D38 already rejects.
