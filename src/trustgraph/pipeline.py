@@ -1,12 +1,16 @@
 """End-to-end scenario run.
 
-Wires the pieces together: a mobility trace read from disk (L7) -> dynamic graph
-sequence (L6) -> untrained trust head (L1) -> analytic selection rule (L1/L2) ->
-printed decision sequence.
+Wires the pieces together: a mobility trace and an observable scenario, both read from
+disk (L7, D23) -> dynamic graph sequence (L6) -> untrained trust head (L1) -> analytic
+selection rule (L1/L2) -> printed decision sequence.
 
-There is still no training, no degradation injection, and no explanation rendering -
-those are later sessions. As of S1 the topology, mobility, geometry, and link
-features are real; the behavioural features are the placeholders named in `graph.py`.
+As of S2 the graph carries real advertised load and real discrepancy features, and the
+vehicles that decide at each step are the ones that generated a task in the scenario.
+There is still no training and no explanation. Note what the printed decisions are and
+are not: each is what the L1 rule *with the untrained trust head* would pick for that
+task. The scenario's own outcomes were produced by dispatching with the trust-agnostic
+Baseline A rule (DECISIONS.md D33), so a printed decision is not the RSU that task
+actually ran on. Closing that loop is the offloading engine's job (S6).
 """
 
 from __future__ import annotations
@@ -17,41 +21,51 @@ import torch
 from .config import Config
 from .features import RSU_COL
 from .model import build_trust_head
+from .observed import ObservedScenario
 from .scenario import World, build_snapshot_builder, build_world
 from .selection import Decision, select
 from .trace import Trace
 
-# How many decision rows `format_decisions` prints in full. A five-minute scenario
-# produces hundreds; the exit condition needs the run to be inspectable and
-# byte-reproducible, not exhaustively listed.
+# How many decision rows `format_decisions` prints in full. A scenario produces
+# thousands; the exit condition needs the run to be inspectable and byte-reproducible,
+# not exhaustively listed.
 MAX_PRINTED_DECISIONS = 30
 
 
-def run_pipeline(cfg: Config, trace: Trace, world: World | None = None) -> list[Decision]:
-    """Run the scenario over a trace and return the decision sequence.
+def run_pipeline(
+    cfg: Config,
+    trace: Trace,
+    observed: ObservedScenario,
+    world: World | None = None,
+) -> list[Decision]:
+    """Run the trust head and selection rule over the scenario's graph sequence.
 
-    All randomness is drawn from per-purpose generators derived from `cfg.seed`
-    (DECISIONS.md D17), and the trace is read rather than regenerated, so two runs
-    with the same config and trace produce identical output.
+    Deterministic: the model is seeded from the seed chain (DECISIONS.md D17), and the
+    trace and scenario are read rather than regenerated.
     """
     world = world or build_world(cfg)
     topology = world.topology
     device = torch.device(cfg.device)
 
     model = build_trust_head(cfg.model, cfg.seeds.torch_seed("model_init"), cfg.device)
-    builder = build_snapshot_builder(cfg, world, trace)
-    task_rng = cfg.seeds.generator("tasks")
+    builder = build_snapshot_builder(cfg, world, trace, observed)
 
-    tasks_per_step = int(cfg.scenario["tasks_per_step"])
     alpha = float(cfg.selection["alpha"])
     beta = float(cfg.selection["beta"])
     gamma = float(cfg.selection["gamma"])
     num_rsus = topology.num_rsus
 
+    # Tasks are stored in generation order, so each step's offloaders are one slice.
+    steps = observed.tasks.step
+    bounds = np.searchsorted(steps, np.arange(trace.num_steps + 1))
+
     decisions: list[Decision] = []
 
     for data in builder.snapshots():
         t = int(data.timestep)
+        offloaders = observed.tasks.vehicle[bounds[t] : bounds[t + 1]]
+        if offloaders.size == 0:
+            continue
         graph = data.to(device)
 
         with torch.no_grad():
@@ -61,6 +75,7 @@ def run_pipeline(cfg: Config, trace: Trace, world: World | None = None) -> list[
         # no parallel array to drift out of sync with the features.
         load_all = graph.x[:num_rsus, RSU_COL["load"]].cpu().numpy()
         distances = graph.vehicle_rsu_distance.cpu().numpy()
+        active = graph.rsu_active.cpu().numpy()
         # Latency is scaled onto the same [0, 1] range as trust and load so the
         # hand-tuned alpha/beta/gamma of L1 stay commensurable.
         latency = np.clip(
@@ -70,17 +85,9 @@ def run_pipeline(cfg: Config, trace: Trace, world: World | None = None) -> list[
             1.0,
         )
 
-        # Which vehicles offload this step. Sampling without replacement from a
-        # dedicated stream keeps the choice independent of how many draws mobility or
-        # feature generation happened to take.
-        n_tasks = min(tasks_per_step, trace.num_vehicles)
-        offloaders = np.sort(
-            task_rng.choice(trace.num_vehicles, size=n_tasks, replace=False)
-        )
-
         for vehicle in offloaders:
             in_range = np.flatnonzero(
-                distances[vehicle] <= topology.coverage_radius_m
+                (distances[vehicle] <= topology.coverage_radius_m) & active
             )
             if in_range.size == 0:
                 continue
@@ -109,7 +116,7 @@ def format_decisions(cfg: Config, decisions: list[Decision], trace: Trace) -> st
     """
     lines: list[str] = []
     lines.append("=" * 78)
-    lines.append("TrustGraph - S1 (real topology and mobility, UNTRAINED model)")
+    lines.append("TrustGraph - S2 (real advertised/discrepancy features, UNTRAINED model)")
     lines.append("=" * 78)
     lines.append(f"seed                 : {cfg.seed}")
     lines.append(f"device               : {cfg.device}")
@@ -121,6 +128,9 @@ def format_decisions(cfg: Config, decisions: list[Decision], trace: Trace) -> st
         f"at dt={trace.dt_s:g}s)"
     )
     lines.append(f"mobility source      : {trace.source}")
+    lines.append(
+        f"degradation          : fraction={cfg.degraded_fraction:g} rho={cfg.rho:g}"
+    )
     lines.append(
         "selection weights    : "
         f"alpha={cfg.selection['alpha']} beta={cfg.selection['beta']} "

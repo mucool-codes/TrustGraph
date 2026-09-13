@@ -5,6 +5,10 @@ backhaul segments, link model - and where a mobility trace is generated. Everyth
 else (the pipeline, the statistics, the plots, the scripts) builds its world through
 here, so there is exactly one construction order and one set of RNG streams, and no
 two consumers can disagree about what seed 20260903 means.
+
+This module is on the training path and must stay free of the sealed ground truth:
+the simulator that injects degradation lives in `simulator.py`, which imports this
+module, never the other way round (L4, `tests/test_sealing.py`).
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from .config import Config
 from .graph import SnapshotBuilder
 from .links import LinkModel, build_link_model
 from .mobility import build_mobility
+from .observed import ObservedScenario
 from .roads import RoadNetwork, build_road_network
 from .topology import Topology, build_topology
 from .trace import Trace
@@ -53,13 +58,20 @@ def generate_trace(cfg: Config, world: World | None = None) -> Trace:
 
 
 def build_snapshot_builder(
-    cfg: Config, world: World, trace: Trace
+    cfg: Config, world: World, trace: Trace, observed: ObservedScenario
 ) -> SnapshotBuilder:
-    """The graph constructor for a (world, trace) pair."""
+    """The graph constructor for a (world, trace, observable scenario) triple."""
+    if observed.num_steps != trace.num_steps:
+        raise ValueError(
+            f"scenario has {observed.num_steps} steps but the trace has "
+            f"{trace.num_steps}; they were generated from different configs"
+        )
     return SnapshotBuilder(
         topology=world.topology,
         trace=trace,
         link_model=world.link_model,
         cfg_graph=cfg.graph,
-        rng=cfg.seeds.generator("features"),
+        rsu_features=observed.rsu_features,
+        rsu_active=observed.rsu_active,
+        vehicle_task_demand=observed.vehicle_task_demand,
     )

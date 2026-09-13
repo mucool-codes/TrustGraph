@@ -5,23 +5,24 @@ covering both vehicle-RSU and RSU-RSU links, carrying a `same_segment` boolean e
 feature - no HeteroData (L6). Node features are a single matrix with a zero-padded RSU
 block and vehicle block (DECISIONS.md D16).
 
-What is real as of S1 and what is not
--------------------------------------
-Real, derived from the trace and the geometry:
-  `load`, `queue_depth`  - coverage demand at each RSU
+Where each feature comes from as of S2
+--------------------------------------
+From the observable scenario (`observed.py`), produced by the simulator:
+  `load`, `queue_depth` - what each RSU *advertises* (L8). Equal to the true coverage
+    demand for an honest or degraded node, below it for a colluder. The true values
+    are sealed ground truth and never reach this module.
+  `success_ewma`, `latency_dev` - advertised-vs-observed discrepancy from the tracker
+    (`tracking.py`), updated only by outcomes already observed at that step.
+  `cert_valid`, `uptime_stability` - still the constants named in `tracking.py`; no
+    revocation or restart process exists yet (FINDINGS.md F8).
+  `task_demand` - the offloading vehicle's task size, 0 for a vehicle with no task.
+  which RSUs are present - a cold-start RSU has no edges until it joins.
+
+From the trace and the geometry:
   `speed`, `dwell_estimate` - from the vehicle's recorded motion
   `link_latency`, `signal_strength` - from the link model (`links.py`)
   `link_age`     - tracked across timesteps as links form and break
   `same_segment` - from `backhaul_segment_id` (L5/L6)
-
-Placeholder, pending later sessions:
-  `success_ewma`, `latency_dev`, `uptime_stability` - the behavioural features. They
-    are constants here, not random values, so a result that depends on them is
-    obviously degenerate rather than plausibly noisy. Real values need observed task
-    outcomes and the advertised-vs-observed discrepancy of L8, which arrive with the
-    task and degradation model.
-  `cert_valid` - 1.0 everywhere. No revocation or compromise is modelled yet.
-  `task_demand` - a fixed per-vehicle draw. Needs the task model.
 
 Because `link_age` is a function of history rather than of the current timestep,
 snapshots are produced by a stateful `SnapshotBuilder` walked forward in time, not by
@@ -38,24 +39,12 @@ from .features import (
     EDGE_COL,
     EDGE_FEATURE_DIM,
     NODE_FEATURE_DIM,
-    RSU_COL,
+    RSU_FEATURES,
     VEHICLE_FEATURES,
 )
 from .links import LinkModel
 from .topology import Topology, pairwise_distances
 from .trace import Trace
-
-# Neutral values for the behavioural features until S2/S3 make them real. Under L8
-# these are discrepancy quantities, so "no evidence of misbehaviour" is the identity:
-# every task succeeded, observed latency matched what was advertised, no restarts.
-PLACEHOLDER_SUCCESS_EWMA = 1.0
-PLACEHOLDER_LATENCY_DEV = 0.0
-PLACEHOLDER_UPTIME_STABILITY = 1.0
-
-# No SCMS revocation is modelled yet, so every certificate is valid. Variant B reads
-# this column as its entire trust term, and a constant is the honest value for a
-# session with no compromised nodes in it.
-PLACEHOLDER_CERT_VALID = 1.0
 
 
 def dwell_estimate_s(
@@ -86,12 +75,17 @@ def dwell_estimate_s(
 
 
 class SnapshotBuilder:
-    """Turns a mobility trace into a sequence of PyG graphs.
+    """Turns a mobility trace plus an observable scenario into a sequence of PyG graphs.
 
     Holds the only state graph construction needs: when each currently-present link
     first appeared, which is what `link_age` measures. Timesteps must therefore be
     visited in order - `build(t)` accepts `t = 0` or one past the previous call, and
     `reset()` rewinds. `snapshots()` is the normal way in.
+
+    Args:
+        rsu_features: (num_steps, num_rsus, len(RSU_FEATURES)) the RSU block per step.
+        rsu_active: (num_steps, num_rsus) which RSUs are present.
+        vehicle_task_demand: (num_steps, num_vehicles) in [0, 1].
     """
 
     def __init__(
@@ -100,21 +94,31 @@ class SnapshotBuilder:
         trace: Trace,
         link_model: LinkModel,
         cfg_graph: dict,
-        rng: np.random.Generator,
+        rsu_features: np.ndarray,
+        rsu_active: np.ndarray,
+        vehicle_task_demand: np.ndarray,
     ) -> None:
         self.topology = topology
         self.trace = trace
         self.link_model = link_model
 
-        self.rsu_capacity = float(cfg_graph.get("rsu_capacity_vehicles", 12.0))
+        expected = (trace.num_steps, topology.num_rsus, len(RSU_FEATURES))
+        if rsu_features.shape != expected:
+            raise ValueError(f"rsu_features has shape {rsu_features.shape}, want {expected}")
+        if rsu_active.shape != expected[:2]:
+            raise ValueError(f"rsu_active has shape {rsu_active.shape}, want {expected[:2]}")
+        if vehicle_task_demand.shape != (trace.num_steps, trace.num_vehicles):
+            raise ValueError(
+                f"vehicle_task_demand has shape {vehicle_task_demand.shape}, want "
+                f"{(trace.num_steps, trace.num_vehicles)}"
+            )
+        self.rsu_features = rsu_features
+        self.rsu_active = rsu_active.astype(bool)
+        self.vehicle_task_demand = vehicle_task_demand
+
         self.link_age_norm_s = float(cfg_graph.get("link_age_norm_s", 60.0))
         self.dwell_norm_s = float(cfg_graph.get("dwell_norm_s", 60.0))
         self.speed_norm_mps = float(cfg_graph.get("speed_norm_mps", 22.0))
-
-        # Static per-vehicle placeholder, drawn once so vehicles are not identical.
-        self._task_demand = rng.uniform(
-            0.2, 1.0, size=trace.num_vehicles
-        ).astype(np.float32)
 
         self._rsu_rsu_distance = np.linalg.norm(
             topology.positions[topology.rsu_edges[:, 0]]
@@ -135,31 +139,17 @@ class SnapshotBuilder:
         self._veh_first_seen = np.full(
             (self.trace.num_vehicles, self.topology.num_rsus), -1, dtype=np.int64
         )
+        # When each RSU first became present. RSU-RSU links are static between present
+        # RSUs, so a link's age runs from the later of its two endpoints' arrivals -
+        # which is t=0 for every link unless a cold-start RSU is involved.
+        self._rsu_first_active = np.full(self.topology.num_rsus, -1, dtype=np.int64)
         self._last_t: int | None = None
 
     # ------------------------------------------------------------------- internals
 
-    def _rsu_features(self, in_range_count: np.ndarray) -> np.ndarray:
-        """The RSU block of `x`, one row per RSU.
-
-        `load` and `queue_depth` are both driven by coverage demand but are not the
-        same quantity: load saturates at capacity, queue_depth is only the excess
-        beyond it. A fully loaded RSU with nothing queued and one with a backlog are
-        distinguishable, which is what the pair is for.
-        """
-        num_rsus = self.topology.num_rsus
-        block = np.zeros((num_rsus, len(RSU_COL)), dtype=np.float32)
-        demand = in_range_count / max(self.rsu_capacity, 1e-9)
-        block[:, RSU_COL["load"]] = np.clip(demand, 0.0, 1.0)
-        block[:, RSU_COL["queue_depth"]] = np.clip(demand - 1.0, 0.0, 1.0)
-        block[:, RSU_COL["cert_valid"]] = PLACEHOLDER_CERT_VALID
-        block[:, RSU_COL["success_ewma"]] = PLACEHOLDER_SUCCESS_EWMA
-        block[:, RSU_COL["latency_dev"]] = PLACEHOLDER_LATENCY_DEV
-        block[:, RSU_COL["uptime_stability"]] = PLACEHOLDER_UPTIME_STABILITY
-        return block
-
     def _vehicle_features(
         self,
+        t: int,
         positions: np.ndarray,
         velocities: np.ndarray,
         serving: np.ndarray,
@@ -169,7 +159,7 @@ class SnapshotBuilder:
         block = np.zeros((num_vehicles, len(VEHICLE_FEATURES)), dtype=np.float32)
         col = {name: i for i, name in enumerate(VEHICLE_FEATURES)}
 
-        block[:, col["task_demand"]] = self._task_demand
+        block[:, col["task_demand"]] = self.vehicle_task_demand[t]
         speed = np.linalg.norm(velocities, axis=1)
         block[:, col["speed"]] = np.clip(speed / self.speed_norm_mps, 0.0, 1.0)
 
@@ -193,7 +183,9 @@ class SnapshotBuilder:
 
         Node ordering is RSUs first (indices `0 .. num_rsus-1`), then vehicles. This
         is relied on throughout: `data.is_rsu` marks the split and the selection rule
-        indexes RSUs by their global node index.
+        indexes RSUs by their global node index. An RSU that has not joined yet keeps
+        its row (so indices never shift) but has no edges and is marked inactive in
+        `data.rsu_active`.
 
         Edges are stored in both directions, so the single `edge_index` is effectively
         undirected and `SAGEConv` aggregates over true neighbourhoods.
@@ -216,13 +208,14 @@ class SnapshotBuilder:
         num_vehicles = positions.shape[0]
         num_nodes = num_rsus + num_vehicles
         dt = self.trace.dt_s
+        active = self.rsu_active[t]
 
         # --- coverage geometry ---------------------------------------------------
         veh_dist = pairwise_distances(positions, topo.positions)
-        covered = veh_dist <= topo.coverage_radius_m
+        covered = (veh_dist <= topo.coverage_radius_m) & active[None, :]
 
-        # Serving RSU: the nearest one in range, -1 when the vehicle has no coverage.
-        # Ties break to the lowest index so the choice is deterministic.
+        # Serving RSU: the nearest present one in range, -1 when the vehicle has no
+        # coverage. Ties break to the lowest index so the choice is deterministic.
         masked = np.where(covered, veh_dist, np.inf)
         nearest = np.argmin(masked, axis=1)
         serving = np.where(covered.any(axis=1), nearest, -1).astype(np.int64)
@@ -234,21 +227,27 @@ class SnapshotBuilder:
         appeared = covered & (self._veh_first_seen < 0)
         self._veh_first_seen[appeared] = t
         self._veh_first_seen[~covered] = -1
+        self._rsu_first_active[active & (self._rsu_first_active < 0)] = t
 
         # --- node features -------------------------------------------------------
         x = np.zeros((num_nodes, NODE_FEATURE_DIM), dtype=np.float32)
-        x[:num_rsus, : len(RSU_COL)] = self._rsu_features(covered.sum(axis=0))
-        x[num_rsus:, len(RSU_COL) :] = self._vehicle_features(
-            positions, velocities, serving
+        x[:num_rsus, : len(RSU_FEATURES)] = self.rsu_features[t]
+        x[num_rsus:, len(RSU_FEATURES) :] = self._vehicle_features(
+            t, positions, velocities, serving
         )
 
         # --- edges ---------------------------------------------------------------
-        # RSU <-> RSU (L6: required; without them segment evidence cannot propagate).
-        rr_src = topo.rsu_edges[:, 0]
-        rr_dst = topo.rsu_edges[:, 1]
-        rr_dist = self._rsu_rsu_distance
-        rr_age_s = np.full(rr_dist.shape, t * dt)  # static links, up since t=0
-        rr_same = self._same_segment
+        # RSU <-> RSU (L6: required; without them segment evidence cannot propagate),
+        # between present RSUs only.
+        rr_keep = active[topo.rsu_edges[:, 0]] & active[topo.rsu_edges[:, 1]]
+        rr_src = topo.rsu_edges[rr_keep, 0]
+        rr_dst = topo.rsu_edges[rr_keep, 1]
+        rr_dist = self._rsu_rsu_distance[rr_keep]
+        rr_since = np.maximum(
+            self._rsu_first_active[rr_src], self._rsu_first_active[rr_dst]
+        )
+        rr_age_s = (t - rr_since) * dt
+        rr_same = self._same_segment[rr_keep]
         rr_backhaul = np.ones(rr_dist.shape, dtype=bool)
 
         # vehicle <-> RSU coverage links.
@@ -309,6 +308,7 @@ class SnapshotBuilder:
             num_nodes=num_nodes,
         )
         data.is_rsu = is_rsu
+        data.rsu_active = torch.from_numpy(active.copy())
         data.num_rsus = num_rsus
         data.timestep = t
         data.backhaul_segment_id = torch.from_numpy(topo.backhaul_segment_id)

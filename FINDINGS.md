@@ -275,3 +275,271 @@ is the only seed S1 checked. The S1 test asserting internal connectivity therefo
 passed while the property was broken for most seeds. Both are now structural rather than
 probabilistic (D27), and the connectivity test runs across six seeds. The lesson worth
 carrying: a structural precondition asserted on the default seed alone is not asserted.
+
+### F7 — First S2 calibration: baseline success 96.6%, inside the target untuned
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: `configs/demo.yaml` as committed at 17ab365 (1200 steps; tasks, execution,
+tracking and degradation blocks at their committed values) | Seed(s): 20260903
+Command: `python scripts/s2_calibration.py --config configs/demo.yaml`
+(run first from a byte-identical copy in the session scratchpad, before the script was
+committed; the trace was regenerated at 1200 steps with `generate_trace.py --force`)
+
+This is the first measurement of the task and execution model. Every parameter was set
+a priori from the physical reasoning in `tasks.py` / `execution.py` before anything was
+run; nothing has been tuned against these numbers.
+
+Numbers:
+```
+== no degradation  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.9659
+   success light          0.9920  (n=3490, mean deadline 0.110s)
+   success medium         0.9487  (n=2454, mean deadline 0.351s)
+   success heavy          0.9181  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.9659
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.968  degraded nan
+== 20% rho=0  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.9211
+   success light          0.9521  (n=3490, mean deadline 0.110s)
+   success medium         0.8969  (n=2454, mean deadline 0.351s)
+   success heavy          0.8727  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.8774
+   post-ramp on degraded  0.2405  (n=370)
+   post-ramp on healthy   0.9672
+   degraded per segment   [1, 0, 1, 2]  correlated picks 0
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.974  degraded 0.279
+== 20% rho=1  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.8886
+   success light          0.9295  (n=3490, mean deadline 0.110s)
+   success medium         0.8549  (n=2454, mean deadline 0.351s)
+   success heavy          0.8292  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.8096
+   post-ramp on degraded  0.2632  (n=665)
+   post-ramp on healthy   0.9657
+   degraded per segment   [4, 0, 0, 0]  correlated picks 3
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.963  degraded 0.299
+```
+("pre-onset" / "post-ramp" in the no-degradation block use the default config's onset
+step 400 and ramp 300 as time windows only; nothing degrades in that run.)
+
+Interpretation: the first measurement already meets the S2 target — 96.6% success with no
+degradation (inside 90-97%, failures concentrated in heavy tasks on loaded nodes), falling
+to 24-26% on degraded nodes once the ramp completes and to 81-88% network-wide — so the
+calibration is recorded as landed without a tuning round.
+
+Two things in these numbers are worth carrying forward, neither acted on here. First,
+the rho=1 degraded set received 665 post-ramp tasks against 370 at rho=0: the degraded
+segment happens to be a lightly loaded region that Baseline A dispatch favours, so the
+network-wide success drop at a sweep point depends on *where* degradation lands relative
+to demand, not only on how much of it there is. Second, post-ramp success on healthy
+nodes (96.6-96.7%) is unchanged from baseline, confirming degradation does not leak into
+healthy nodes' outcomes — including the one healthy RSU sharing the degraded segment at
+rho=1 (4 of that segment's 5 RSUs are degraded, see F10).
+
+### F8 — cert_valid and uptime_stability remain documented placeholders after S2
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: n/a | Seed(s): n/a (a property of the code, not a run)
+Command: `grep -n PLACEHOLDER src/trustgraph/tracking.py src/trustgraph/simulator.py`
+
+Numbers:
+```
+cert_valid        = PLACEHOLDER_CERT_VALID       = 1.0 for every RSU at every step
+uptime_stability  = PLACEHOLDER_UPTIME_STABILITY = 1.0 for every RSU at every step
+success_ewma, latency_dev: REAL as of 17ab365 (tracker, L8) - no longer constants
+load, queue_depth: REAL advertised values as of 17ab365
+task_demand: REAL (offloading vehicle's task size) as of 17ab365
+```
+
+Interpretation: no revocation/compromise model is in S2's scope, so `cert_valid` is still
+the constant 1.0 — and would be even with one, since SCMS CRL propagation (hours to days)
+exceeds the 20-minute horizon and a compromised node's certificate stays valid throughout.
+The consequence for later sessions is exact, not approximate: Variant B's trust term is
+the same constant for every candidate, so B's decisions are identical to Baseline A's in
+every scenario this generator produces. `uptime_stability` is constant because no restart
+or dropped-session process exists to observe.
+
+### F9 — Observed outcomes depend on the dispatch policy that generated them
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: `configs/demo.yaml` | Seed(s): 20260903
+Command: `python scripts/s2_calibration.py configs/demo.yaml` (numbers below are
+extracted from the F7 output, not a separate run)
+
+Numbers:
+```
+dispatch policy for every S2 scenario : baseline_a  (L1 rule, alpha = 0, advertised load)
+post-ramp tasks landing on degraded RSUs, 20% degraded:
+  rho = 0   n = 370   (degraded set spread over segments [1, 0, 1, 2])
+  rho = 1   n = 665   (degraded set = 4 of segment 0's 5 RSUs)
+tasks per RSU over the run (both rho): min 185, median 366, max 495
+```
+
+Interpretation: every observable the trust model will learn from — each RSU's outcome
+count, its `success_ewma` trajectory, and the L3 "did the next task meet its deadline"
+labels — is a function of which RSUs the dispatcher chose, so S2's trust-agnostic
+dispatch is an experimental choice, not a neutral default.
+
+This is the tension S2 was asked to flag rather than resolve (DECISIONS.md D33). Under
+Baseline A a degraded node keeps receiving tasks after onset, so its features keep
+updating and its failures stay visible. Under trust-aware dispatch (Variants C-E) the
+same node is avoided as its trust falls, stops producing outcomes, and its
+`success_ewma` freezes at whatever value it had when traffic stopped: the training
+distribution generated here would differ from the distribution a deployed trust model
+creates for itself. H1 ("tasks dispatched to a degraded node before effective
+avoidance") and H3 are only meaningful in closed loop, where dispatch reads trust. The
+simulator is structured so that a second policy is one more entry in
+`DISPATCH_POLICIES`, but whether S3 trains on open-loop Baseline A data, and whether
+S4/S5 re-run the generator closed-loop, is left to a decision request.
+
+### F10 — rho is coarsely quantised at the L12 operating points
+Date: 2026-09-13 | Session: S2 | Commit: 6295c04
+Config: `configs/demo.yaml` (20 RSUs, 4 segments, min_segment_size 3) | Seed(s): 1..200
+(each seed re-draws topology and degraded set), evaluation seeds 1..5 shown separately
+Command: `python scripts/s2_rho_quantization.py --config configs/demo.yaml`
+
+Numbers:
+```
+config configs/demo.yaml   RSUs 20   seeds 1..200
+concentration of two independently chosen RSUs (segment geometry only): 0.221
+
+=== fraction 0.05  ->  K = 1 degraded RSUs
+  rho   E[conc]  distinct           [1]
+  0.00      nan         1         1.000
+  0.25      nan         1         1.000
+  0.50      nan         1         1.000
+  0.75      nan         1         1.000
+  1.00      nan         1         1.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.25:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.50:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.75:   nan   nan   nan   nan   nan   distinct 0
+    rho 1.00:   nan   nan   nan   nan   nan   distinct 0
+
+=== fraction 0.10  ->  K = 2 degraded RSUs
+  rho   E[conc]  distinct           [2]        [1, 1]
+  0.00    0.220         2         0.220         0.780
+  0.25    0.375         2         0.375         0.625
+  0.50    0.600         2         0.600         0.400
+  0.75    0.800         2         0.800         0.200
+  1.00    1.000         1         1.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.00  0.00  0.00  0.00  0.00   distinct 1
+    rho 0.25:  0.00  0.00  0.00  0.00  0.00   distinct 1
+    rho 0.50:  0.00  1.00  0.00  0.00  0.00   distinct 2
+    rho 0.75:  0.00  1.00  0.00  1.00  1.00   distinct 2
+    rho 1.00:  1.00  1.00  1.00  1.00  1.00   distinct 1
+
+=== fraction 0.20  ->  K = 4 degraded RSUs
+  rho   E[conc]  distinct           [4]        [3, 1]        [2, 2]     [2, 1, 1]  [1, 1, 1, 1]
+  0.00    0.217         4         0.000         0.155         0.115         0.610         0.120
+  0.25    0.310         5         0.045         0.235         0.240         0.405         0.075
+  0.50    0.483         5         0.235         0.260         0.240         0.230         0.035
+  0.75    0.735         5         0.565         0.220         0.155         0.050         0.010
+  1.00    0.985         2         0.970         0.030         0.000         0.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.00  0.17  0.00  0.17  0.17   distinct 2
+    rho 0.25:  0.00  0.33  0.33  0.17  0.17   distinct 3
+    rho 0.50:  0.17  1.00  0.33  0.17  0.17   distinct 3
+    rho 0.75:  0.17  1.00  0.33  0.50  1.00   distinct 4
+    rho 1.00:  1.00  1.00  0.50  1.00  1.00   distinct 2
+
+=== fraction 0.30  ->  K = 6 degraded RSUs
+  rho   E[conc]  distinct           [6]        [5, 1]        [4, 2]     [4, 1, 1]        [3, 3]     [3, 2, 1]  [3, 1, 1, 1]     [2, 2, 2]  [2, 2, 1, 1]
+  0.00    0.217         7         0.000         0.000         0.010         0.070         0.015         0.325         0.105         0.105         0.370
+  0.25    0.279         9         0.005         0.005         0.100         0.080         0.100         0.350         0.075         0.080         0.205
+  0.50    0.372         9         0.020         0.105         0.165         0.120         0.130         0.290         0.020         0.060         0.090
+  0.75    0.551         9         0.175         0.205         0.260         0.070         0.130         0.110         0.005         0.030         0.015
+  1.00    0.761         4         0.420         0.360         0.190         0.000         0.030         0.000         0.000         0.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.13  0.13  0.13  0.13  0.27   distinct 2
+    rho 0.25:  0.13  0.27  0.40  0.13  0.27   distinct 3
+    rho 0.50:  0.27  0.47  0.40  0.27  0.27   distinct 3
+    rho 0.75:  0.27  0.47  0.40  0.40  0.67   distinct 4
+    rho 1.00:  0.67  0.47  0.40  0.67  0.67   distinct 3
+```
+
+Interpretation: at the L12 correlation-sweep operating point (20%, K = 4) the degraded set
+can take only five segment shapes, and five evaluation seeds realise just 2-4 distinct
+correlation values per rho — the expected concentration rises smoothly with rho
+(0.217 -> 0.310 -> 0.483 -> 0.735 -> 0.985) but a single seed samples it very coarsely,
+so a gap-vs-rho curve over 5 seeds would be dominated by which shape each seed drew.
+
+Three further facts in the table, stated without remedy (raised as a decision request):
+at 5% (K = 1) rho has no effect whatsoever, so the fraction sweep's lowest point contains
+no correlated failure even at "high" rho; at 10% (K = 2) every seed is binary, either
+both degraded RSUs share a segment or they do not; and at 30% (K = 6) rho = 1 reaches
+only 0.761 concentration, because once one segment is full the remainder spills into a
+second — whole-segment degradation cannot hold K fixed and be fully concentrated at the
+same time. Seed 3's smallest segment has 3 RSUs, which is why it realises [3, 1] (0.50)
+at 20% and rho = 1.
+
+### F11 — S2 exit: gradual onset in success_ewma, degradation confined to one segment at rho = 1
+Date: 2026-09-13 | Session: S2 | Commit: 559259f
+Config: `configs/demo.yaml` (fraction 0.20, onset 400, ramp 300) | Seed(s): 20260903
+Command: `python scripts/s2_report.py --config configs/demo.yaml`
+         `python scripts/generate_scenario.py --config configs/demo.yaml [--rho 0] --force`
+Figure: `figures/s2_success_ewma.png` (generated, not committed)
+
+Numbers:
+```
+config configs/demo.yaml   seed 20260903   fraction 0.2   segment sizes [5, 5, 5, 5]
+no-degradation deadline success: 0.9659
+
+--- rho = 0
+  degraded RSUs          : [2, 4, 10, 12]  (segments [3, 2, 0, 3])
+  degraded per segment   : [1, 0, 1, 2] of [5, 5, 5, 5]
+  correlated picks       : 0   pair concentration 0.167
+  success overall        : 0.9211   post-ramp 0.8774   post-ramp on degraded 0.2405
+  mean success_ewma        step   degraded   healthy-same-seg   healthy-other
+    pre-onset               399      0.947              0.968           0.999
+    onset + 10              410      0.947              0.970           1.000
+    ramp 1/4                475      0.930              0.980           1.000
+    ramp 1/2                550      0.865              0.981           0.960
+    ramp end                700      0.562              0.972           0.968
+    end                    1199      0.279              0.971           0.980
+  latency_dev at end     : degraded 0.331   healthy 0.037
+
+--- rho = 1
+  degraded RSUs          : [0, 5, 7, 10]  (segments [0, 0, 0, 0])
+  degraded per segment   : [4, 0, 0, 0] of [5, 5, 5, 5]
+  correlated picks       : 3   pair concentration 1.000
+  success overall        : 0.8886   post-ramp 0.8096   post-ramp on degraded 0.2632
+  mean success_ewma        step   degraded   healthy-same-seg   healthy-other
+    pre-onset               399      0.975              0.909           0.975
+    onset + 10              410      0.981              0.918           0.974
+    ramp 1/4                475      0.918              0.998           0.990
+    ramp 1/2                550      0.783              0.957           0.977
+    ramp end                700      0.586              0.995           0.962
+    end                    1199      0.299              0.875           0.969
+  latency_dev at end     : degraded 0.327   healthy 0.037
+
+graph sequence sha256 (on-disk scenario, rebuilt from the observable file):
+  rho 1.00: f3f247ac6c9becb1d2ddf859bf0b635a3c0d4778076ff028e46cfc0c97130de7  (identical on two runs)
+  rho 0.00: a3af5951e1b12d00bc67d0953625a851aa78ec327a9339589cf6daf35fe27100
+run.py on the stored rho=1 scenario: 6957 decisions, 20 distinct RSUs, 2.4091 mean candidates
+pytest: 137 passed
+```
+
+Interpretation: onset is gradual in the observable feature at both rho — the degraded
+mean is unchanged 10 s after onset and still 0.93/0.92 a quarter into the ramp, then lags
+the true fault by roughly 100-150 s — and at rho = 1 the four degraded RSUs sit in one
+segment while the rest of the network stays near 0.97, so the correlated structure H2
+needs is present in the data.
+
+Noted, not acted on: the "healthy, same segment" group at rho = 1 is a single RSU (16),
+and its line swings between 0.75 and 1.0 *before* onset as well as after, so it is EWMA
+scatter on one node rather than leakage; at a feature weight of 0.1 a single RSU's
+`success_ewma` is noisy enough that per-node pre-onset dips of 0.2 occur with no
+degradation at all. That noise floor is what any detection-latency threshold in S4 has
+to sit above.

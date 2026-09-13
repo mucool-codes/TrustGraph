@@ -27,6 +27,8 @@ ENV/
 # ---- Generated data (never commit) ----
 # Mobility traces / simulation rollouts
 traces/
+# Generated scenarios: observable task streams and SEALED ground truth (L4)
+scenarios/
 data/traces/
 *.trace
 *.trace.npz

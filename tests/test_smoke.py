@@ -1,8 +1,8 @@
 """Smoke test: the whole pipeline on a tiny graph, plus the locked decisions.
 
-Asserts end-to-end determinism from (config, seed, trace) and pins the parts of the
-locked decisions that are cheap to check structurally, so a later session that breaks
-one gets a failing test rather than a quietly wrong result.
+Asserts end-to-end determinism from (config, seed, trace, scenario) and pins the parts
+of the locked decisions that are cheap to check structurally, so a later session that
+breaks one gets a failing test rather than a quietly wrong result.
 """
 
 from __future__ import annotations
@@ -14,11 +14,12 @@ import numpy as np
 import pytest
 import torch
 
-from trustgraph.config import SeedChain, _validate
+from trustgraph.config import SeedChain, _validate, with_overrides
 from trustgraph.model import build_trust_head
 from trustgraph.pipeline import format_decisions, run_pipeline
 from trustgraph.scenario import build_snapshot_builder, build_world, generate_trace
 from trustgraph.selection import score_candidates, select
+from trustgraph.simulator import generate_scenario
 
 from conftest import DEMO_CONFIG, REPO_ROOT
 
@@ -26,8 +27,8 @@ from conftest import DEMO_CONFIG, REPO_ROOT
 # --------------------------------------------------------------------------- model
 
 
-def test_trust_head_output_shape_and_range(cfg, world, trace):
-    data = build_snapshot_builder(cfg, world, trace).build(0)
+def test_trust_head_output_shape_and_range(cfg, world, trace, observed):
+    data = build_snapshot_builder(cfg, world, trace, observed).build(0)
     model = build_trust_head(cfg.model, cfg.seeds.torch_seed("model_init"), cfg.device)
 
     with torch.no_grad():
@@ -41,10 +42,10 @@ def test_trust_head_output_shape_and_range(cfg, world, trace):
 # ---------------------------------------------------------------------- determinism
 
 
-def test_pipeline_deterministic_same_seed(cfg, world, trace):
-    """Two runs, same seed and trace, identical decisions."""
-    first = run_pipeline(cfg, trace, world)
-    second = run_pipeline(cfg, trace, world)
+def test_pipeline_deterministic_same_seed(cfg, world, trace, observed):
+    """Two runs, same seed, trace and scenario: identical decisions."""
+    first = run_pipeline(cfg, trace, observed, world)
+    second = run_pipeline(cfg, trace, observed, world)
 
     assert len(first) > 0, "scenario produced no decisions; the test proves nothing"
     assert first == second
@@ -53,10 +54,13 @@ def test_pipeline_deterministic_same_seed(cfg, world, trace):
 
 def test_pipeline_differs_across_seeds(cfg):
     """Guards against the determinism test passing on constant output."""
-    other = type(cfg)(**{**cfg.__dict__, "seed": cfg.seed + 1})
-    assert run_pipeline(cfg, generate_trace(cfg)) != run_pipeline(
-        other, generate_trace(other)
-    )
+
+    def decisions(c):
+        world = build_world(c)
+        trace = generate_trace(c, world)
+        return run_pipeline(c, trace, generate_scenario(c, world, trace).observed, world)
+
+    assert decisions(cfg) != decisions(with_overrides(cfg, seed=cfg.seed + 1))
 
 
 def test_seed_chain_is_order_independent():
@@ -78,21 +82,28 @@ def test_seed_chain_streams_are_distinct():
 
 
 def test_run_py_byte_identical_across_processes(tmp_path):
-    """Run it twice against one trace on disk, compare stdout byte-for-byte.
+    """Generate a trace and a scenario to disk, run twice, compare stdout byte-for-byte.
 
-    Uses a subprocess so this also catches anything that depends on interpreter state
+    Uses subprocesses so this also catches anything that depends on interpreter state
     surviving between runs (a global RNG, a module-level cache).
     """
     trace_path = tmp_path / "demo.npz"
-    generate = [
-        sys.executable,
-        "scripts/generate_trace.py",
-        "--config",
-        str(DEMO_CONFIG),
-        "--out",
-        str(trace_path),
-    ]
-    subprocess.run(generate, cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+    scenario_path = tmp_path / "demo.observed.npz"
+    for cmd in (
+        ["scripts/generate_trace.py", "--config", str(DEMO_CONFIG), "--out", str(trace_path)],
+        [
+            "scripts/generate_scenario.py",
+            "--config",
+            str(DEMO_CONFIG),
+            "--trace",
+            str(trace_path),
+            "--out",
+            str(scenario_path),
+        ],
+    ):
+        subprocess.run(
+            [sys.executable, *cmd], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+        )
 
     cmd = [
         sys.executable,
@@ -101,13 +112,11 @@ def test_run_py_byte_identical_across_processes(tmp_path):
         str(DEMO_CONFIG),
         "--trace",
         str(trace_path),
+        "--scenario",
+        str(scenario_path),
     ]
-    first = subprocess.run(
-        cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=True
-    )
-    second = subprocess.run(
-        cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=True
-    )
+    first = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=True)
+    second = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, check=True)
     assert first.stdout == second.stdout
     assert "total decisions" in first.stdout
 
@@ -129,6 +138,23 @@ def test_run_py_refuses_to_invent_a_trace(tmp_path):
     )
     assert result.returncode != 0
     assert "generate_trace.py" in result.stderr
+
+
+def test_run_py_refuses_to_invent_a_scenario(tmp_path):
+    """Likewise for the scenario: it is generated once and read back (D23 pattern)."""
+    trace_path = tmp_path / "demo.npz"
+    subprocess.run(
+        [sys.executable, "scripts/generate_trace.py", "--config", str(DEMO_CONFIG),
+         "--out", str(trace_path)],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+    result = subprocess.run(
+        [sys.executable, "run.py", "--config", str(DEMO_CONFIG), "--trace", str(trace_path),
+         "--scenario", str(tmp_path / "absent.observed.npz")],
+        cwd=REPO_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "generate_scenario.py" in result.stderr
 
 
 # ----------------------------------------------------------------- locked decisions
@@ -205,14 +231,15 @@ def test_no_candidates_returns_none():
     )
 
 
-def test_decisions_have_a_real_choice_to_make(demo_cfg):
+def test_decisions_have_a_real_choice_to_make(demo_bundle):
     """The selection rule must usually see more than one candidate.
 
     Otherwise every decision is forced and an evaluation of the trust term measures
     coverage rather than trust - the failure recorded in FINDINGS.md F3.
     """
-    world = build_world(demo_cfg)
-    decisions = run_pipeline(demo_cfg, generate_trace(demo_cfg, world), world)
+    cfg, world, trace = demo_bundle
+    observed = generate_scenario(cfg, world, trace).observed
+    decisions = run_pipeline(cfg, trace, observed, world)
     contested = [d for d in decisions if len(d.candidates) > 1]
     assert len(contested) / len(decisions) > 0.9
 

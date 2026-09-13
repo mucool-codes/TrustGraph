@@ -476,6 +476,9 @@ nothing downstream changes.
 
 ### D24 — Placeholder features are named constants, never random values
 Date: 2026-09-03 | Session: S1 | Status: active
+SUPERSEDED BY D37 for `success_ewma`, `latency_dev`, `load`, `queue_depth` and
+`task_demand`, which are real as of S2. Still active for `cert_valid` and
+`uptime_stability` (FINDINGS.md F8).
 
 **Decision:** The behavioural features (`success_ewma`, `latency_dev`,
 `uptime_stability`) and `cert_valid` are module-level constants in `graph.py` with the
@@ -574,3 +577,264 @@ cannot be re-homed onto a backhaul link it has no path to.
 
 The regression test for internal connectivity now runs across six seeds. Checking a
 single default seed is what let both defects hide.
+
+### D28 — Scenario horizon extended from 300 to 1200 steps
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** `scenario.num_steps` is 1200 (20 minutes at dt = 1 s). Degradation onset is
+at step 400 and the ramp lasts 300 steps, leaving a 400-step pre-onset baseline and a
+500-step post-ramp plateau. `simulator.check_trace_matches` refuses a trace whose steps,
+vehicles, dt or seed differ from the config.
+
+**Alternatives:** (a) keep S1's 300 steps and compress onset and ramp into them; (b) a
+longer horizon still (e.g. 3600 steps).
+
+**Rationale:** Each RSU sees roughly one task every three seconds (F7: median 366 tasks
+over 1200 s), and the EWMA weight of 0.1 means a feature integrates about ten outcomes.
+In 300 steps a ramp long enough to be gradual would leave no stable baseline before it
+and no plateau after it, and neither detection latency nor the no-collapse property could
+be measured. (b) buys nothing S2's exit condition or S3's training needs, and triples
+generation time for every sweep cell. S1's F4 statistics were measured at 300 steps and
+remain valid as a statement about that horizon; the stale-trace check exists because
+`generate_trace.py` never overwrites without `--force`, so a 300-step trace left on disk
+would otherwise have been read silently.
+
+### D29 — rho interpolates by sequential picks with a per-pick segment branch
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** `K = floor(fraction * num_rsus + 0.5)` RSUs degrade. They are picked one at
+a time. The first pick is uniform over RSUs. Each later pick, with probability `rho`,
+is *correlated* — uniform over the healthy members of segments that already contain a
+degraded RSU, or, if none remain, uniform over healthy RSUs in untouched segments (which
+opens a new segment) — and otherwise *independent*, uniform over all healthy RSUs. All
+random numbers are drawn up front as fixed blocks of `num_rsus` uniforms; pick `i` reads
+element `i` only.
+
+So `rho = 0` is uniform sampling without replacement, and `rho = 1` fills one whole
+segment before opening the next, giving whole segments plus at most one partial segment.
+In between, the expected fraction of degraded pairs sharing a segment rises monotonically
+with rho (F10, and a test). The realised number of correlated picks and the pair
+concentration are recorded in the sealed ground truth, because the realised correlation
+is what an evaluation should be plotted against.
+
+**Alternatives:** (a) mixture at the set level: with probability rho degrade whole
+segments, otherwise independent nodes — binary per seed, so intermediate rho would only
+change how often each extreme occurs; (b) a latent-Gaussian copula over nodes with
+within-segment correlation rho — continuous, but it is exactly the statistical
+correlation L5 rejects, and it cannot hold K fixed; (c) degrade whole segments at every
+rho and scale severity by rho — confounds correlation with severity; (d) round K up to
+whole segments at high rho — lets the realised fraction vary per seed with segment sizes,
+confounding the fraction sweep.
+
+**Rationale:** The sequential rule keeps K exact at every rho, so the correlation sweep
+changes *which* nodes degrade and nothing else, and it reaches L5's "degradation applied
+to a segment" exactly at rho = 1 using the segments S1 built, including the off-geometry
+swaps of D27. Fixed-size draws give two properties worth having for free: at one seed,
+changing rho alters the set only through the rule, never through a reshuffled stream
+(D17), and the degraded set for a smaller fraction is a subset of the set for a larger
+one, so the fraction sweep degrades nested sets rather than unrelated ones. Its cost is
+quantisation at small K, measured in F10 and raised as a decision request rather than
+worked around. The halves-up rounding avoids Python's banker's rounding sending 2.5 to 2.
+
+### D30 — Task model: three types, deadline = allowance + slack x idle compute time, capped
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** Light / medium / heavy tasks of 0.2 / 1.0 / 3.0 GHz-seconds of compute
+(20 / 100 / 300 ms on an idle 10 GHz reference node), shares 0.50 / 0.35 / 0.15, arriving
+as a per-vehicle Poisson process at 0.1 Hz thinned to one per step. Deadline =
+`min(1.0 s, 0.05 s + slack * idle_time)` with slack uniform in [2, 4] per task. All
+parameters were set a priori and not tuned (F7).
+
+**Alternatives:** (a) deadline proportional to compute with no cap; (b) a fixed deadline
+per type; (c) deadlines tied to the vehicle's dwell time in coverage.
+
+**Rationale:** A proportional deadline makes a heavy task exactly as easy to meet as a
+light one, so degradation would fail every type at the same rate and task type would
+carry no information. The cap is the physical statement that a late perception result is
+worthless however expensive it was; it makes heavy tasks the tightest in relative terms,
+which is why their baseline success (91.8%) sits below light (99.2%). Per-task slack
+rather than (b) gives the deadline a distribution, so "met the deadline" is not a
+deterministic function of node state and type — without it, the L3 target would be
+learnable from load alone. (c) ties outcomes to handoff mid-task, which is S6's scope; S2
+does not model a vehicle leaving coverage before its result returns, and says so.
+
+### D31 — Degradation onset is shared by all degraded RSUs and ramps linearly
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** Every degraded RSU begins degrading at `onset_step` and reaches full
+severity `ramp_steps` later, linearly: capacity factor `1 - severity * level` and silent
+drop probability `drop_prob * level`, with `level` rising from 0 to 1. Severity 0.6 and
+drop probability 0.15 at full degradation. The onset is the same at every rho.
+
+**Alternatives:** (a) instantaneous onset; (b) per-node random onsets; (c) onset shared
+within a segment but staggered across segments, or staggered within a segment as a fault
+spreads.
+
+**Rationale:** (a) is ruled out by the S2 brief: if a node's own evidence collapses the
+instant it degrades there is nothing for neighbourhood evidence to anticipate, and D
+cannot beat C by construction. A regression test asserts the degraded mean
+`success_ewma` has not fallen 0.1 below its pre-onset value 10 s after onset and is still
+above its pre/post midpoint a quarter of the way into the ramp. (b) and (c) would make
+rho change *when* nodes fail as well as *which* nodes fail — temporal correlation would
+move with spatial correlation, and a gap-vs-rho curve could not say which of the two the
+GNN exploited. A shared onset keeps rho a purely structural knob. It also means any
+D-over-C advantage at high rho comes from pooling weak simultaneous evidence across
+segment neighbours rather than from neighbours failing first — the weaker and more
+defensible version of the claim. Staggering (c) is the obvious next lever if pooling
+alone proves insufficient, and would be a decision of its own.
+
+### D32 — Execution model is closed-form; true load is coverage demand and ignores dispatch
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** Completion time = round-trip access latency + `cycles / (C * capacity_factor
+* (1 - 0.6 * load))` times a mean-one lognormal (sigma 0.25). True load is S1's coverage
+demand (`in-range vehicles / 10`, clipped), unchanged in meaning, moved from `graph.py`
+into `execution.py`. No discrete-event queue; dispatched tasks do not add to load.
+
+**Alternatives:** (a) a discrete-event FCFS queue per RSU in which offloaded tasks consume
+capacity; (b) an M/M/1 sojourn time with its pole at load 1; (c) true load as coverage
+demand plus in-flight offloaded work.
+
+**Rationale:** At about 0.3 tasks per second per RSU and 20-300 ms of compute each,
+offloaded work is a few percent of a 10 GHz node's capacity, so (a) and (c) change load
+by a small amount while making the world's behaviour a function of the dispatch policy
+under test — every variant would then face a different world, confounding the ablation.
+(b)'s pole makes every saturated node infinitely slow, and since coverage demand
+routinely saturates it would turn load into a binary. The load sensitivity of 0.6 keeps a
+fully loaded node at 40% speed. The noise is mean-one so an honest node's advertised
+completion time is an unbiased estimate of its true one, and the latency deviation of an
+honest node is pure scatter (F7: 0.037 at the end of the run). This is revisited only if
+the simple version is shown to fail (Standing Rule 3).
+
+### D33 — S2 dispatches trust-agnostically with the Baseline A rule (provisional)
+Date: 2026-09-13 | Session: S2 | Status: active, pending decision request
+
+**Decision:** Every task in an S2 scenario is dispatched by the L1 rule with alpha = 0 over
+the vehicle's in-range present RSUs, using advertised load and normalised access latency
+with the configured beta and gamma. The policy name is recorded in the observable file.
+`baseline_a` is the only policy implemented; any other value is refused.
+
+**Alternatives:** (a) nearest RSU; (b) uniform random over candidates; (c) closed-loop
+trust-aware dispatch with a model in the loop.
+
+**Rationale:** Something has to choose an RSU for an outcome to exist. Of the
+trust-agnostic options, Baseline A is already a locked part of the project (L2), so it
+introduces no new policy, and because it reads advertised load it is the policy a
+colluder's lie actually works against. (a) ignores load and would let colluders go
+unexploited. (b) gives the most even coverage of node behaviour and is a real candidate
+for training data. (c) needs a trained model, which does not exist until S3, and whether
+to use it is exactly the choice the S2 brief reserves: outcome statistics, feature
+trajectories and L3 labels all depend on the dispatcher (F9). This entry records what S2
+did, not a settled answer.
+
+### D34 — success_ewma counts broken promises; latency_dev is relative excess over the promise
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** A node advertises its load. Its promised completion time for a task is the
+nominal model at that load plus the vehicle's measured round-trip latency. After the
+outcome, `success_ewma` is updated with 0 if the promise was inside the deadline and the
+task missed it, and 1 otherwise. `latency_dev` is updated with `max(observed - promised, 0)
+/ promised`, capped at 2 and rescaled to [0, 1]; a timeout uses the deadline as its
+observed time. Both are EWMAs with weight 0.1, neutral at 1 and 0 before any observation,
+and a feature row at step t contains only outcomes observed by time t * dt.
+
+**Alternatives:** (a) `success_ewma` as the EWMA of raw deadline success; (b) signed
+latency deviation; (c) a timeout counted at the maximum deviation; (d) a tolerance band
+around the promise before it counts as broken.
+
+**Rationale:** (a) is the reading of the glossary's "EWMA of recent task completions"
+that L8 explicitly forbids — it penalises an honest node that says it is busy, and it
+would duplicate the L3 target as an input. Counting only promises made and broken is the
+direct statement of D8. A degraded node advertises nominal capacity because it does not
+know it is degraded, and a colluder advertises a low load deliberately; both break promises,
+an honest busy node does not. (b) would let an honest node's fast tasks cancel a slow
+node's lateness in an average of scatter. (c) invents information: the vehicle knows only
+that the task took at least until the deadline, so the lower bound is the honest value.
+(d) adds a parameter the discrete promise/deadline comparison does not need; runtime
+scatter already makes an honest node's `success_ewma` sit near 0.97 rather than 1, which
+the model has to learn around either way. The causal ordering is verified by a test that
+replays the task stream through a fresh tracker and reproduces every feature row exactly.
+
+### D35 — Ground truth is sealed by a separate package, a separate file, and a default-deny import test
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** Behaviour class, degradation onset and level, per-segment degradation,
+collusion membership, cold-start plan, true load, and true task completion times live in
+`trustgraph.sealed` (`GroundTruth`, and the injector that creates it). The simulator
+writes two files per scenario: `<stem>.observed.npz`, whose loader rejects any key it
+does not expect, and `<stem>.SEALED.npz`. `tests/test_sealing.py` builds the package's
+import graph with `ast` — relative imports, imports inside functions, submodules imported
+by `from x import y`, and implicit parent packages — and asserts that no package module
+outside the allowlist `{trustgraph.simulator}`, and no script outside
+`{generate_scenario, s2_calibration, s2_report, s2_rho_quantization}`, can reach
+`trustgraph.sealed` directly or transitively. A subprocess then imports every
+non-allowlisted module and asserts nothing under `trustgraph.sealed` was loaded, with a
+control import proving the check can fail. `config.py` deliberately does not validate the
+degradation sections, because importing the injector there would put the seal on the
+training path.
+
+**Alternatives:** (a) a single scenario object with a "do not use" field; (b) a runtime
+assertion at the loss boundary; (c) an allowlist of forbidden importers (e.g. modules
+named `train*`) rather than an allowlist of permitted ones.
+
+**Rationale:** D4 requires the barrier to be structural. (a) is one attribute access from
+a leak. (b) catches a leak into the loss but not into a feature. (c) protects only modules
+someone remembered to name; default-deny covers S3's trainer the moment it is created, and
+the only way to give a module ground truth is a visible edit to the allowlist. True load
+and true completion times are sealed along with the class because they leak it: a
+colluder is exactly a node whose true load differs from its advertised load, and a
+dropped task is exactly one with infinite true completion time. `true_load` is not a
+behaviour label, but storing it observably would let a stray join recover collusion
+membership.
+
+### D36 — Colluders are drawn from healthy RSUs anywhere; cold-start RSUs are uniform
+Date: 2026-09-13 | Session: S2 | Status: active
+
+**Decision:** Collusion: `num_groups` groups of `group_size` RSUs, taken in a fixed random
+permutation order from the RSUs not already degraded, each advertising `(1 - under_report)`
+times its true load and queue depth for the whole run, and executing honestly. Class
+`compromised`. A node is never both degraded and colluding. Cold start: `num_nodes` RSUs
+chosen uniformly (independent of class), absent — no edges, no tasks — until `join_step`,
+then present with neutral features. Both mechanisms are off in the demo config; each has
+its own RNG stream.
+
+**Alternatives:** (a) colluding groups aligned with a backhaul segment (a compromised
+software build); (b) colluders that also execute badly; (c) cold-start nodes placed
+preferentially on degraded segments; (d) keeping absent RSUs out of the graph entirely.
+
+**Rationale:** TECHNICAL_AND_NOVELTY.md 3.2 describes collusion as "individually
+plausible but structurally anomalous relative to their neighbourhood", which requires
+colluders to sit among honest neighbours whose advertisements they undercut; (a) would
+surround each colluder with others telling the same lie. Keeping execution honest (not
+(b)) makes the advertisement the only thing wrong, so collusion is detectable only
+through L8's discrepancy, and it stays separable from degradation in the evaluation.
+Uniform cold-start placement (not (c)) is the neutral default for the generator; whether
+S4's cold-start condition should place joiners on degraded segments — the case where a
+propagated prior can help — is a question for the decision request. (d) would shift every
+RSU index when a node joins, breaking the RSUs-first layout D16 and the selection path
+rely on; an absent RSU keeps its row and simply has no edges. A cold-start RSU joins with
+the same neutral features as a node with a perfect record, because the locked feature set
+has no observation count; the decision request raises this too.
+
+### D37 — The graph reads the observable scenario; graph.py no longer derives node state
+Date: 2026-09-13 | Session: S2 | Status: active
+Supersedes D24 for the features listed there.
+
+**Decision:** `SnapshotBuilder` takes the observable scenario's per-step RSU feature block,
+RSU presence mask, and per-vehicle task demand, and writes them into `x` verbatim. It no
+longer computes `load` or `queue_depth` from coverage and no longer holds placeholder
+constants; the two remaining placeholders (`cert_valid`, `uptime_stability`) are defined
+in `tracking.py` and written by the simulator. RSU-RSU edges exist only between present
+RSUs, and their `link_age` counts from the later endpoint's arrival. `run.py` reads the
+scenario from disk and fails with an actionable error if it is missing, as it does for
+the trace (D23).
+
+**Alternatives:** (a) keep computing true load in `graph.py` and add advertised values as
+extra columns; (b) have the graph builder call the simulator.
+
+**Rationale:** Under L8 the `load` feature *is* the advertised value (PROJECT_SPEC.md 5.1),
+so there is no column for true load to occupy, and adding one would put collusion
+membership in the feature matrix (D35). (b) would make the graph builder — which training
+imports — import the sealed ground truth. With the builder reading only the observable
+file, the graph a model sees is by construction something a deployment could have
+produced, and a test asserts each graph's RSU block equals the stored row exactly.
