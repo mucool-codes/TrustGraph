@@ -543,3 +543,42 @@ scatter on one node rather than leakage; at a feature weight of 0.1 a single RSU
 `success_ewma` is noisy enough that per-node pre-onset dips of 0.2 occur with no
 degradation at all. That noise floor is what any detection-latency threshold in S4 has
 to sit above.
+
+### F12 — Cold-start control and test conditions: both place cleanly; control is not always feasible
+Date: 2026-09-13 | Session: S2b | Commit: e0d1a15
+Config: `configs/demo.yaml`, fraction 0.20, one cold-start RSU joining at step 600 |
+Seed(s): 1..5, injection draws 0..49 per seed (250 draws per cell)
+Command: `python scripts/s2b_cold_start_conditions.py --config configs/demo.yaml`
+
+Numbers:
+```
+config configs/demo.yaml   seeds 1..5   draws 0..49   fraction 0.2   cold-start nodes 1
+
+=== rho 0
+  placement          feasible   classes                         degraded nbrs (mean)   any same-seg   distinct/seed
+  healthy_segment       0.884   {'reliable': 221}                              0.000          1.000   [15, 18, 14, 17, 17]
+  degraded_segment      1.000   {'degraded': 250}                              0.500          1.000   [18, 18, 17, 19, 19]
+
+=== rho 1
+  placement          feasible   classes                         degraded nbrs (mean)   any same-seg   distinct/seed
+  healthy_segment       1.000   {'reliable': 250}                              0.000          1.000   [20, 19, 19, 19, 18]
+  degraded_segment      1.000   {'degraded': 250}                              2.052          1.000   [17, 19, 19, 18, 18]
+
+regression: default demo scenario (draw 0, uniform) graph sequence sha256 unchanged,
+  f3f247ac6c9becb1d2ddf859bf0b635a3c0d4778076ff028e46cfc0c97130de7 (as in F11)
+pytest: 147 passed
+```
+
+Interpretation: both conditions are pure by construction — every control node is
+reliable on a degradation-free segment, and every test node is degraded — and draws place
+the new node on 14-20 distinct RSUs per seed, so cold start does not share F10's
+quantisation problem.
+
+Two facts S4 will have to handle, recorded without remedy. First, the control condition
+is infeasible on 11.6% of draws at rho = 0 (29 of 250), because four independently chosen
+degraded RSUs sometimes touch all four segments; the feasible draws are therefore not a
+random sample of all draws at rho = 0, while at rho = 1 every draw is feasible. Second, at
+rho = 0 the test node has on average only 0.5 degraded same-segment coordination
+neighbours, against 2.05 at rho = 1: at low rho the "test" condition mostly offers the
+GNN no degraded neighbour to propagate from, so the cold-start test condition only probes
+the claim it is meant to probe at high rho.

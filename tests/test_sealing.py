@@ -36,7 +36,13 @@ GROUND_TRUTH_MODULES = frozenset({"trustgraph.simulator"})
 # Scripts allowed to hold ground truth: they generate scenarios or evaluate against
 # the sealed state (PROJECT_SPEC.md 4.4 - evaluation code may hold both).
 GROUND_TRUTH_SCRIPTS = frozenset(
-    {"generate_scenario.py", "s2_calibration.py", "s2_report.py", "s2_rho_quantization.py"}
+    {
+        "generate_scenario.py",
+        "s2_calibration.py",
+        "s2_report.py",
+        "s2_rho_quantization.py",
+        "s2b_cold_start_conditions.py",
+    }
 )
 
 

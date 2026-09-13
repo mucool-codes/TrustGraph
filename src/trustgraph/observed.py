@@ -23,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .config import Config
 from .features import RSU_FEATURES
 
 OBSERVED_FORMAT_VERSION = 1
@@ -173,16 +174,21 @@ def load_observed(path: str | Path) -> ObservedScenario:
         )
 
 
-def scenario_stem(config_path: str | Path, seed: int, rho: float, fraction: float) -> str:
-    """File stem for a scenario: config, seed, and the two swept parameters (L12)."""
-    return (
-        f"{Path(config_path).stem}-seed{int(seed)}"
-        f"-rho{rho:.2f}-frac{fraction:.2f}"
+def scenario_stem(config_path: str | Path, cfg: Config) -> str:
+    """File stem for a scenario: config, seed, the two swept parameters (L12), and -
+    only when they differ from the default - the injection draw and the cold-start
+    condition. Default scenarios keep the stem they had before either existed."""
+    stem = (
+        f"{Path(config_path).stem}-seed{int(cfg.seed)}"
+        f"-rho{cfg.rho:.2f}-frac{cfg.degraded_fraction:.2f}"
     )
+    if cfg.injection_draw:
+        stem += f"-draw{cfg.injection_draw}"
+    if cfg.cold_start_nodes > 0:
+        stem += f"-cold{cfg.cold_start_nodes}-{cfg.cold_start_placement}"
+    return stem
 
 
-def default_observed_path(
-    config_path: str | Path, seed: int, rho: float, fraction: float
-) -> Path:
+def default_observed_path(config_path: str | Path, cfg: Config) -> Path:
     """Where the observable scenario lives. `scenarios/` is gitignored."""
-    return Path("scenarios") / f"{scenario_stem(config_path, seed, rho, fraction)}.observed.npz"
+    return Path("scenarios") / f"{scenario_stem(config_path, cfg)}.observed.npz"

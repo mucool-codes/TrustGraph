@@ -39,7 +39,7 @@ from .features import RSU_COL, RSU_FEATURES
 from .observed import ObservedScenario, TaskStream
 from .scenario import World
 from .sealed.ground_truth import GroundTruth
-from .sealed.injector import inject
+from .sealed.injector import INJECTION_PURPOSES, inject, injection_stream_name
 from .selection import select
 from .tasks import build_task_model
 from .topology import pairwise_distances
@@ -108,9 +108,8 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
         cfg.collusion,
         cfg.cold_start,
         rngs={
-            "degradation": seeds.generator("degradation"),
-            "collusion": seeds.generator("collusion"),
-            "cold_start": seeds.generator("cold_start"),
+            purpose: seeds.generator(injection_stream_name(purpose, cfg.injection_draw))
+            for purpose in INJECTION_PURPOSES
         },
     )
     task_rng = seeds.generator("tasks")
