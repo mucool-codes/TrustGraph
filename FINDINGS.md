@@ -275,3 +275,96 @@ is the only seed S1 checked. The S1 test asserting internal connectivity therefo
 passed while the property was broken for most seeds. Both are now structural rather than
 probabilistic (D27), and the connectivity test runs across six seeds. The lesson worth
 carrying: a structural precondition asserted on the default seed alone is not asserted.
+
+### F7 — First S2 calibration: baseline success 96.6%, inside the target untuned
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: `configs/demo.yaml` as committed at 17ab365 (1200 steps; tasks, execution,
+tracking and degradation blocks at their committed values) | Seed(s): 20260903
+Command: `python scripts/s2_calibration.py --config configs/demo.yaml`
+(run first from a byte-identical copy in the session scratchpad, before the script was
+committed; the trace was regenerated at 1200 steps with `generate_trace.py --force`)
+
+This is the first measurement of the task and execution model. Every parameter was set
+a priori from the physical reasoning in `tasks.py` / `execution.py` before anything was
+run; nothing has been tuned against these numbers.
+
+Numbers:
+```
+== no degradation  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.9659
+   success light          0.9920  (n=3490, mean deadline 0.110s)
+   success medium         0.9487  (n=2454, mean deadline 0.351s)
+   success heavy          0.9181  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.9659
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.968  degraded nan
+== 20% rho=0  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.9211
+   success light          0.9521  (n=3490, mean deadline 0.110s)
+   success medium         0.8969  (n=2454, mean deadline 0.351s)
+   success heavy          0.8727  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.8774
+   post-ramp on degraded  0.2405  (n=370)
+   post-ramp on healthy   0.9672
+   degraded per segment   [1, 0, 1, 2]  correlated picks 0
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.974  degraded 0.279
+== 20% rho=1  (0.3s)
+   tasks 6957  dispatched 6957  unserved 0
+   success overall        0.8886
+   success light          0.9295  (n=3490, mean deadline 0.110s)
+   success medium         0.8549  (n=2454, mean deadline 0.351s)
+   success heavy          0.8292  (n=1013, mean deadline 0.896s)
+   success pre-onset      0.9696
+   success post-ramp      0.8096
+   post-ramp on degraded  0.2632  (n=665)
+   post-ramp on healthy   0.9657
+   degraded per segment   [4, 0, 0, 0]  correlated picks 3
+   tasks per RSU          min 185 median 366 max 495
+   true load mean         0.700
+   success_ewma end       healthy 0.963  degraded 0.299
+```
+("pre-onset" / "post-ramp" in the no-degradation block use the default config's onset
+step 400 and ramp 300 as time windows only; nothing degrades in that run.)
+
+Interpretation: the first measurement already meets the S2 target — 96.6% success with no
+degradation (inside 90-97%, failures concentrated in heavy tasks on loaded nodes), falling
+to 24-26% on degraded nodes once the ramp completes and to 81-88% network-wide — so the
+calibration is recorded as landed without a tuning round.
+
+Two things in these numbers are worth carrying forward, neither acted on here. First,
+the rho=1 degraded set received 665 post-ramp tasks against 370 at rho=0: the degraded
+segment happens to be a lightly loaded region that Baseline A dispatch favours, so the
+network-wide success drop at a sweep point depends on *where* degradation lands relative
+to demand, not only on how much of it there is. Second, post-ramp success on healthy
+nodes (96.6-96.7%) is unchanged from baseline, confirming degradation does not leak into
+healthy nodes' outcomes — including the one healthy RSU sharing the degraded segment at
+rho=1 (4 of that segment's 5 RSUs are degraded, see F10).
+
+### F8 — cert_valid and uptime_stability remain documented placeholders after S2
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: n/a | Seed(s): n/a (a property of the code, not a run)
+Command: `grep -n PLACEHOLDER src/trustgraph/tracking.py src/trustgraph/simulator.py`
+
+Numbers:
+```
+cert_valid        = PLACEHOLDER_CERT_VALID       = 1.0 for every RSU at every step
+uptime_stability  = PLACEHOLDER_UPTIME_STABILITY = 1.0 for every RSU at every step
+success_ewma, latency_dev: REAL as of 17ab365 (tracker, L8) - no longer constants
+load, queue_depth: REAL advertised values as of 17ab365
+task_demand: REAL (offloading vehicle's task size) as of 17ab365
+```
+
+Interpretation: no revocation/compromise model is in S2's scope, so `cert_valid` is still
+the constant 1.0 — and would be even with one, since SCMS CRL propagation (hours to days)
+exceeds the 20-minute horizon and a compromised node's certificate stays valid throughout.
+The consequence for later sessions is exact, not approximate: Variant B's trust term is
+the same constant for every candidate, so B's decisions are identical to Baseline A's in
+every scenario this generator produces. `uptime_stability` is constant because no restart
+or dropped-session process exists to observe.
