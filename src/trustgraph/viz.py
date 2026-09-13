@@ -16,6 +16,7 @@ way headless as on a desktop.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib
@@ -46,6 +47,197 @@ SEGMENT_COLOURS = (
 
 def _segment_colour(segment_id: int) -> str:
     return SEGMENT_COLOURS[int(segment_id) % len(SEGMENT_COLOURS)]
+
+
+# --- S2 figure palette -------------------------------------------------------------
+# Categorical slots 1-3 of the reference data-viz palette, in fixed order. The first
+# three slots validate on *all* pairs (not just adjacent ones), which matters here
+# because the three group means cross each other during the onset ramp.
+HEALTHY_COLOUR = "#2a78d6"       # slot 1: healthy RSUs on untouched segments
+DEGRADED_COLOUR = "#eb6834"      # slot 2: degraded RSUs
+SEGMENT_MATE_COLOUR = "#1baf7a"  # slot 3: healthy RSUs sharing a degraded segment
+INK_PRIMARY = "#0b0b0b"
+INK_SECONDARY = "#52514e"
+INK_MUTED = "#898781"
+GRIDLINE = "#e1e0d9"
+BASELINE = "#c3c2b7"
+SURFACE = "#fcfcfb"
+RAMP_WASH = "#f0efec"
+# Sequential single-hue blue ramp, light -> dark, for the heatmap: success_ewma is a
+# magnitude, so one hue - never a rainbow.
+BLUE_RAMP = (
+    "#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
+    "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b",
+)
+
+
+@dataclass(frozen=True)
+class EwmaPanel:
+    """One column of the S2 exit figure. Plain arrays only - this module never imports
+    the sealed ground truth; the calling script unseals and passes masks in (L4).
+
+    Attributes:
+        title: column heading.
+        success_ewma: (num_steps, num_rsus) the observable feature.
+        degraded: (num_rsus,) bool, from the sealed ground truth.
+        segment_id: (num_rsus,) backhaul segment per RSU.
+        fault_progress: (num_steps,) mean true degradation level over degraded RSUs.
+        onset_step, ramp_steps, dt_s: the ramp window, for shading.
+    """
+
+    title: str
+    success_ewma: np.ndarray
+    degraded: np.ndarray
+    segment_id: np.ndarray
+    fault_progress: np.ndarray
+    onset_step: int
+    ramp_steps: int
+    dt_s: float
+
+
+def _style_axis(ax) -> None:
+    ax.set_facecolor(SURFACE)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(BASELINE)
+    ax.tick_params(colors=INK_MUTED, labelcolor=INK_SECONDARY, labelsize=8)
+    ax.xaxis.label.set_color(INK_SECONDARY)
+    ax.yaxis.label.set_color(INK_SECONDARY)
+
+
+def plot_success_ewma_over_time(
+    panels: list[EwmaPanel], path: str | Path, dpi: int = 150
+) -> Path:
+    """Mean success_ewma over time, degraded vs healthy, one column per scenario.
+
+    Top row: the group means. Healthy RSUs are split into those sharing a segment with
+    a degraded RSU and those on untouched segments, so correlated (segment-level)
+    degradation is visible as a difference between the two healthy lines and between
+    columns. Thin lines are the individual degraded RSUs; the dotted grey line is the
+    sealed ground truth `1 - fault progress`, so the feature's lag behind the true
+    onset can be read directly. The shaded band is the onset ramp.
+
+    Bottom row: success_ewma for every RSU, rows grouped by backhaul segment with a
+    surface-coloured gap between segments. Degraded RSUs carry an orange marker at the
+    left edge. At high rho the degraded rows sit together inside one segment block;
+    at rho = 0 they are scattered across blocks.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    from matplotlib.colors import LinearSegmentedColormap
+    from matplotlib.transforms import blended_transform_factory
+
+    cmap = LinearSegmentedColormap.from_list("seq_blue", BLUE_RAMP)
+    ncol = len(panels)
+    fig, axes = plt.subplots(
+        2,
+        ncol,
+        figsize=(6.8 * ncol, 10.0),
+        height_ratios=[1.0, 1.15],
+        squeeze=False,
+        facecolor=SURFACE,
+    )
+    image = None
+
+    for col, p in enumerate(panels):
+        top, bottom = axes[0, col], axes[1, col]
+        num_steps, num_rsus = p.success_ewma.shape
+        times = np.arange(num_steps) * p.dt_s
+        onset_s = p.onset_step * p.dt_s
+        full_s = (p.onset_step + p.ramp_steps) * p.dt_s
+
+        touched = np.isin(p.segment_id, p.segment_id[p.degraded])
+        groups = (
+            ("healthy, untouched segments", ~touched, HEALTHY_COLOUR),
+            ("healthy, same segment as a degraded RSU", touched & ~p.degraded, SEGMENT_MATE_COLOUR),
+            ("degraded (mean)", p.degraded, DEGRADED_COLOUR),
+        )
+
+        # --- top: group means -------------------------------------------------
+        _style_axis(top)
+        top.axvspan(onset_s, full_s, color=RAMP_WASH, lw=0, zorder=0)
+        top.text(
+            (onset_s + full_s) / 2, 1.06, "onset ramp", ha="center", va="bottom",
+            fontsize=8, color=INK_SECONDARY,
+        )
+        top.grid(True, axis="y", color=GRIDLINE, linewidth=0.6)
+        top.set_axisbelow(True)
+        for r in np.flatnonzero(p.degraded):
+            top.plot(times, p.success_ewma[:, r], color=DEGRADED_COLOUR, lw=0.8, alpha=0.3, zorder=2)
+        top.plot(
+            times, 1.0 - p.fault_progress, color=INK_MUTED, lw=1.3, ls=":",
+            label="1 - true fault progress (sealed)", zorder=3,
+        )
+        end_values: list[float] = []
+        for label, mask, colour in groups:
+            if not mask.any():
+                continue
+            mean = p.success_ewma[:, mask].mean(axis=1)
+            top.plot(times, mean, color=colour, lw=2.0, label=f"{label}, n={int(mask.sum())}", zorder=4)
+            end_values.append(float(mean[-1]))
+        # End-of-run value labels, spread apart vertically so near-equal means (the two
+        # healthy groups usually are) do not print on top of each other.
+        order_idx = np.argsort(end_values)
+        placed: list[float] = []
+        for i in order_idx:
+            y = end_values[i]
+            if placed and y - placed[-1] < 0.05:
+                y = placed[-1] + 0.05
+            placed.append(y)
+            top.annotate(
+                f"{end_values[i]:.2f}", (times[-1], y), xytext=(5, 0),
+                textcoords="offset points", va="center", fontsize=8,
+                color=INK_SECONDARY, annotation_clip=False,
+            )
+        top.set_ylim(0.0, 1.12)
+        top.set_xlim(0, times[-1])
+        top.set_ylabel("mean success_ewma")
+        top.set_title(p.title, fontsize=11, color=INK_PRIMARY, loc="left")
+        top.legend(loc="lower left", fontsize=8, frameon=False, labelcolor=INK_SECONDARY)
+
+        # --- bottom: per-RSU heatmap, grouped by segment ------------------------
+        _style_axis(bottom)
+        order = np.lexsort((np.arange(num_rsus), p.segment_id))
+        image = bottom.imshow(
+            p.success_ewma[:, order].T,
+            aspect="auto",
+            cmap=cmap,
+            vmin=0.0,
+            vmax=1.0,
+            interpolation="nearest",
+            extent=(0.0, num_steps * p.dt_s, num_rsus - 0.5, -0.5),
+        )
+        seg_sorted = p.segment_id[order]
+        for i in np.flatnonzero(np.diff(seg_sorted)) + 1:
+            bottom.axhline(i - 0.5, color=SURFACE, lw=2.5)
+        for x in (onset_s, full_s):
+            bottom.axvline(x, color=INK_PRIMARY, lw=0.8, ls=(0, (4, 3)), alpha=0.6)
+        bottom.set_yticks(np.arange(num_rsus))
+        bottom.set_yticklabels(
+            [f"s{int(p.segment_id[r])}  RSU {int(r):02d}" for r in order], fontsize=7
+        )
+        rows = np.flatnonzero(p.degraded[order])
+        bottom.scatter(
+            np.full(rows.size, -0.012), rows, marker="s", s=26, color=DEGRADED_COLOUR,
+            transform=blended_transform_factory(bottom.transAxes, bottom.transData),
+            clip_on=False, zorder=5,
+        )
+        bottom.set_xlabel("time (s)")
+        bottom.set_title(
+            "success_ewma per RSU, grouped by backhaul segment  (square = degraded)",
+            fontsize=9, color=INK_SECONDARY, loc="left",
+        )
+
+    if image is not None:
+        bar = fig.colorbar(image, ax=axes[1, :].tolist(), fraction=0.025, pad=0.02)
+        bar.set_label("success_ewma", color=INK_SECONDARY)
+        bar.ax.tick_params(colors=INK_MUTED, labelcolor=INK_SECONDARY, labelsize=8)
+        bar.outline.set_visible(False)
+
+    fig.savefig(path, dpi=dpi, bbox_inches="tight", facecolor=SURFACE)
+    plt.close(fig)
+    return path
 
 
 def plot_topology(
