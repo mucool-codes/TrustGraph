@@ -58,19 +58,45 @@ class CollusionConfig:
             raise ValueError("collusion.under_report must lie in (0, 1)")
 
 
+# Where cold-start RSUs are placed (DECISIONS.md D38). S4 runs the two non-uniform
+# placements as separate conditions, so that "does message passing give a new node a
+# useful prior" is not confounded with "did this segment happen to be degrading":
+#   uniform           - any RSU, independent of class. The generator's neutral default.
+#   healthy_segment   - CONTROL. An RSU on a segment with no degraded RSU, and not a
+#                       colluder: its neighbourhood evidence says "healthy", correctly.
+#   degraded_segment  - TEST. One of a degraded segment's degraded RSUs: its
+#                       neighbourhood evidence says "degrading", correctly.
+COLD_START_PLACEMENTS: tuple[str, ...] = ("uniform", "healthy_segment", "degraded_segment")
+
+
 @dataclass(frozen=True)
 class ColdStartConfig:
     num_nodes: int = 0
     join_step: int = 0
+    placement: str = "uniform"
 
     def __post_init__(self) -> None:
         if self.num_nodes < 0:
             raise ValueError("cold_start.num_nodes must be >= 0")
         if self.num_nodes > 0 and self.join_step < 1:
             raise ValueError("cold_start.join_step must be >= 1 when nodes cold-start")
+        if self.placement not in COLD_START_PLACEMENTS:
+            raise ValueError(
+                f"cold_start.placement must be one of {COLD_START_PLACEMENTS}, "
+                f"got {self.placement!r}"
+            )
 
 
 _INT_FIELDS = {"onset_step", "ramp_steps", "num_groups", "group_size", "num_nodes", "join_step"}
+_STR_FIELDS = {"placement"}
+
+
+def _coerce(key: str, value):
+    if key in _INT_FIELDS:
+        return int(value)
+    if key in _STR_FIELDS:
+        return str(value)
+    return float(value)
 
 
 def _build(cls, raw: dict | None, section: str):
@@ -80,9 +106,41 @@ def _build(cls, raw: dict | None, section: str):
     unknown = set(raw) - known
     if unknown:
         raise ValueError(f"unknown {section} config keys: {sorted(unknown)}")
-    return cls(
-        **{k: (int(v) if k in _INT_FIELDS else float(v)) for k, v in raw.items()}
-    )
+    return cls(**{k: _coerce(k, v) for k, v in raw.items()})
+
+
+INJECTION_PURPOSES: tuple[str, ...] = ("degradation", "collusion", "cold_start")
+
+
+def injection_stream_name(purpose: str, draw: int) -> str:
+    """Seed-chain purpose name for one injection draw (DECISIONS.md D39).
+
+    Draw 0 is the bare purpose name, so every scenario generated before draws existed
+    reproduces unchanged. Draw k > 0 gets its own independent stream. Only the three
+    injection streams are drawn this way: task arrivals, execution noise and mobility
+    keep their seed-level streams, so all draws of one seed share the same traffic and
+    differ only in which RSUs misbehave - the frozen-model evaluation stays paired.
+    """
+    if draw < 0:
+        raise ValueError("injection draw must be >= 0")
+    return purpose if draw == 0 else f"{purpose}#draw{int(draw)}"
+
+
+def cold_start_pool(
+    placement: str,
+    segment_id: np.ndarray,
+    degraded: np.ndarray,
+    colluding: np.ndarray,
+) -> np.ndarray:
+    """(num_rsus,) bool: the RSUs a cold-start node may be drawn from."""
+    if placement == "uniform":
+        return np.ones(segment_id.shape[0], dtype=bool)
+    touched = np.isin(segment_id, segment_id[degraded])
+    if placement == "healthy_segment":
+        return ~touched & ~colluding
+    if placement == "degraded_segment":
+        return degraded.copy()
+    raise ValueError(f"unknown cold_start.placement {placement!r}")
 
 
 def degraded_count(num_rsus: int, fraction: float) -> int:
@@ -177,8 +235,19 @@ def inject(
 
     if cold.num_nodes > n:
         raise ValueError(f"cold_start.num_nodes={cold.num_nodes} exceeds {n} RSUs")
+    # One fixed permutation, filtered by the placement's pool. Under `uniform` the pool
+    # is every RSU, so this is exactly the pre-S2b rule and old scenarios reproduce.
+    pool = cold_start_pool(cold.placement, segment_id, degraded, collusion_group >= 0)
+    order = rngs["cold_start"].permutation(n)
+    joiners = [int(i) for i in order if pool[i]][: cold.num_nodes]
+    if len(joiners) < cold.num_nodes:
+        raise ValueError(
+            f"cold_start.placement={cold.placement!r} needs {cold.num_nodes} eligible "
+            f"RSUs but this draw has only {int(pool.sum())} (degraded per segment "
+            f"{np.bincount(segment_id[degraded], minlength=int(segment_id.max()) + 1).tolist()}); "
+            "the condition is infeasible for this draw"
+        )
     join_step = np.zeros(n, dtype=np.int64)
-    joiners = rngs["cold_start"].permutation(n)[: cold.num_nodes]
     join_step[joiners] = cold.join_step
 
     behavior_class = np.full(n, RELIABLE, dtype=np.int64)

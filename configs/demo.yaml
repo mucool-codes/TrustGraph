@@ -16,6 +16,10 @@ scenario:
   # pre-onset baseline, a gradual onset ramp, and a post-ramp plateau, each long
   # enough for the EWMA features to settle (DECISIONS.md D28).
   num_steps: 1200
+  # Which injection draw of this seed (DECISIONS.md D39). A frozen model is evaluated
+  # over many draws per seed: each redraws which RSUs degrade, collude, or cold-start,
+  # while traffic and execution noise stay fixed. 0 is the default scenario.
+  injection_draw: 0
 
 # The road layout. A Manhattan grid of arterials: blocks_x + 1 vertical roads
 # crossing blocks_y + 1 horizontal roads over a square region. A dense urban
@@ -138,10 +142,13 @@ collusion:
   under_report: 0.5
 
 # Cold-start RSUs are absent until join_step and join with no history. Off by default,
-# for the same reason.
+# for the same reason. S4 runs two separate conditions (DECISIONS.md D38):
+#   placement: healthy_segment   CONTROL - joins a segment with no degraded RSU
+#   placement: degraded_segment  TEST    - is one of a degraded segment's degraded RSUs
 cold_start:
   num_nodes: 0
   join_step: 600
+  placement: uniform
 
 model:
   hidden_dim: 32

@@ -90,23 +90,50 @@ class Config:
     def degraded_fraction(self) -> float:
         return float(self.degradation.get("fraction", 0.0))
 
+    @property
+    def injection_draw(self) -> int:
+        """Which injection draw of this seed (DECISIONS.md D39). 0 is the default."""
+        return int(self.scenario.get("injection_draw", 0))
+
+    @property
+    def cold_start_nodes(self) -> int:
+        return int(self.cold_start.get("num_nodes", 0))
+
+    @property
+    def cold_start_placement(self) -> str:
+        return str(self.cold_start.get("placement", "uniform"))
+
 
 def with_overrides(
     cfg: Config,
     seed: int | None = None,
     rho: float | None = None,
     fraction: float | None = None,
+    draw: int | None = None,
+    cold_start_nodes: int | None = None,
+    cold_start_placement: str | None = None,
 ) -> Config:
-    """A copy of `cfg` with the seed and/or the two swept parameters (L12) replaced."""
+    """A copy of `cfg` with the seed, the two swept parameters (L12), the injection
+    draw, and/or the cold-start condition replaced."""
     degradation = dict(cfg.degradation)
     if rho is not None:
         degradation["rho"] = float(rho)
     if fraction is not None:
         degradation["fraction"] = float(fraction)
+    scenario = dict(cfg.scenario)
+    if draw is not None:
+        scenario["injection_draw"] = int(draw)
+    cold_start = dict(cfg.cold_start)
+    if cold_start_nodes is not None:
+        cold_start["num_nodes"] = int(cold_start_nodes)
+    if cold_start_placement is not None:
+        cold_start["placement"] = str(cold_start_placement)
     return replace(
         cfg,
         seed=cfg.seed if seed is None else int(seed),
+        scenario=scenario,
         degradation=degradation,
+        cold_start=cold_start,
     )
 
 
@@ -170,6 +197,8 @@ def _validate(cfg: Config) -> None:
         raise ValueError("mobility.dt_s must be positive")
     if int(cfg.scenario["num_steps"]) < 1:
         raise ValueError("scenario.num_steps must be >= 1")
+    if int(cfg.scenario.get("injection_draw", 0)) < 0:
+        raise ValueError("scenario.injection_draw must be >= 0")
 
     for weight in ("alpha", "beta", "gamma"):
         if float(cfg.selection[weight]) < 0:

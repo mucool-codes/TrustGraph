@@ -21,6 +21,8 @@ import hashlib
 import sys
 from pathlib import Path
 
+import numpy as np
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
@@ -49,13 +51,27 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--rho", type=float, default=None)
     parser.add_argument("--fraction", type=float, default=None)
+    parser.add_argument("--draw", type=int, default=None, help="injection draw (D39)")
+    parser.add_argument("--cold-start-nodes", type=int, default=None)
+    parser.add_argument(
+        "--cold-start-placement",
+        default=None,
+        choices=("uniform", "healthy_segment", "degraded_segment"),
+        help="healthy_segment = control, degraded_segment = test (D38)",
+    )
     parser.add_argument("--trace", default=None)
     parser.add_argument("--out", default=None, help="observable .npz path")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
     cfg = with_overrides(
-        load_config(args.config), seed=args.seed, rho=args.rho, fraction=args.fraction
+        load_config(args.config),
+        seed=args.seed,
+        rho=args.rho,
+        fraction=args.fraction,
+        draw=args.draw,
+        cold_start_nodes=args.cold_start_nodes,
+        cold_start_placement=args.cold_start_placement,
     )
     trace_path = (
         Path(args.trace) if args.trace else default_trace_path(args.config, cfg.seed)
@@ -63,7 +79,7 @@ def main() -> int:
     out = (
         Path(args.out)
         if args.out
-        else default_observed_path(args.config, cfg.seed, cfg.rho, cfg.degraded_fraction)
+        else default_observed_path(args.config, cfg)
     )
     sealed = sealed_path_for(out)
     if out.exists() and sealed.exists() and not args.force:
@@ -83,7 +99,17 @@ def main() -> int:
 
     print(f"wrote {out}")
     print(f"wrote {sealed}   (SEALED - evaluation only)")
-    print(f"  seed={cfg.seed}  rho={cfg.rho:g}  fraction={cfg.degraded_fraction:g}")
+    print(
+        f"  seed={cfg.seed}  rho={cfg.rho:g}  fraction={cfg.degraded_fraction:g}  "
+        f"draw={cfg.injection_draw}"
+    )
+    if gt.cold_start.any():
+        cold = np.flatnonzero(gt.cold_start)
+        print(
+            f"  cold start             : {cfg.cold_start_placement}, RSUs {cold.tolist()} "
+            f"join step {int(gt.join_step[cold[0]])}, classes "
+            f"{[BEHAVIOR_CLASSES[c] for c in gt.behavior_class[cold]]}"
+        )
     print(f"  dispatch policy        : {observed.dispatch_policy}")
     print(f"  tasks generated        : {len(tasks)} ({int(tasks.dispatched.sum())} dispatched)")
     print(f"  deadline success       : {tasks.success_rate():.4f}")

@@ -39,6 +39,13 @@ def main() -> int:
     parser.add_argument(
         "--fraction", type=float, default=None, help="override degradation.fraction"
     )
+    parser.add_argument("--draw", type=int, default=None, help="injection draw (D39)")
+    parser.add_argument("--cold-start-nodes", type=int, default=None)
+    parser.add_argument(
+        "--cold-start-placement",
+        default=None,
+        choices=("uniform", "healthy_segment", "degraded_segment"),
+    )
     parser.add_argument(
         "--trace",
         default=None,
@@ -53,7 +60,13 @@ def main() -> int:
     args = parser.parse_args()
 
     cfg = with_overrides(
-        load_config(args.config), seed=args.seed, rho=args.rho, fraction=args.fraction
+        load_config(args.config),
+        seed=args.seed,
+        rho=args.rho,
+        fraction=args.fraction,
+        draw=args.draw,
+        cold_start_nodes=args.cold_start_nodes,
+        cold_start_placement=args.cold_start_placement,
     )
 
     trace_path = (
@@ -63,9 +76,7 @@ def main() -> int:
     scenario_path = (
         Path(args.scenario)
         if args.scenario
-        else default_observed_path(
-            args.config, cfg.seed, cfg.rho, cfg.degraded_fraction
-        )
+        else default_observed_path(args.config, cfg)
     )
     observed = load_observed(scenario_path)
     world = build_world(cfg)
