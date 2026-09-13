@@ -368,3 +368,118 @@ The consequence for later sessions is exact, not approximate: Variant B's trust 
 the same constant for every candidate, so B's decisions are identical to Baseline A's in
 every scenario this generator produces. `uptime_stability` is constant because no restart
 or dropped-session process exists to observe.
+
+### F9 — Observed outcomes depend on the dispatch policy that generated them
+Date: 2026-09-13 | Session: S2 | Commit: 17ab365
+Config: `configs/demo.yaml` | Seed(s): 20260903
+Command: `python scripts/s2_calibration.py configs/demo.yaml` (numbers below are
+extracted from the F7 output, not a separate run)
+
+Numbers:
+```
+dispatch policy for every S2 scenario : baseline_a  (L1 rule, alpha = 0, advertised load)
+post-ramp tasks landing on degraded RSUs, 20% degraded:
+  rho = 0   n = 370   (degraded set spread over segments [1, 0, 1, 2])
+  rho = 1   n = 665   (degraded set = 4 of segment 0's 5 RSUs)
+tasks per RSU over the run (both rho): min 185, median 366, max 495
+```
+
+Interpretation: every observable the trust model will learn from — each RSU's outcome
+count, its `success_ewma` trajectory, and the L3 "did the next task meet its deadline"
+labels — is a function of which RSUs the dispatcher chose, so S2's trust-agnostic
+dispatch is an experimental choice, not a neutral default.
+
+This is the tension S2 was asked to flag rather than resolve (DECISIONS.md D33). Under
+Baseline A a degraded node keeps receiving tasks after onset, so its features keep
+updating and its failures stay visible. Under trust-aware dispatch (Variants C-E) the
+same node is avoided as its trust falls, stops producing outcomes, and its
+`success_ewma` freezes at whatever value it had when traffic stopped: the training
+distribution generated here would differ from the distribution a deployed trust model
+creates for itself. H1 ("tasks dispatched to a degraded node before effective
+avoidance") and H3 are only meaningful in closed loop, where dispatch reads trust. The
+simulator is structured so that a second policy is one more entry in
+`DISPATCH_POLICIES`, but whether S3 trains on open-loop Baseline A data, and whether
+S4/S5 re-run the generator closed-loop, is left to a decision request.
+
+### F10 — rho is coarsely quantised at the L12 operating points
+Date: 2026-09-13 | Session: S2 | Commit: 6295c04
+Config: `configs/demo.yaml` (20 RSUs, 4 segments, min_segment_size 3) | Seed(s): 1..200
+(each seed re-draws topology and degraded set), evaluation seeds 1..5 shown separately
+Command: `python scripts/s2_rho_quantization.py --config configs/demo.yaml`
+
+Numbers:
+```
+config configs/demo.yaml   RSUs 20   seeds 1..200
+concentration of two independently chosen RSUs (segment geometry only): 0.221
+
+=== fraction 0.05  ->  K = 1 degraded RSUs
+  rho   E[conc]  distinct           [1]
+  0.00      nan         1         1.000
+  0.25      nan         1         1.000
+  0.50      nan         1         1.000
+  0.75      nan         1         1.000
+  1.00      nan         1         1.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.25:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.50:   nan   nan   nan   nan   nan   distinct 0
+    rho 0.75:   nan   nan   nan   nan   nan   distinct 0
+    rho 1.00:   nan   nan   nan   nan   nan   distinct 0
+
+=== fraction 0.10  ->  K = 2 degraded RSUs
+  rho   E[conc]  distinct           [2]        [1, 1]
+  0.00    0.220         2         0.220         0.780
+  0.25    0.375         2         0.375         0.625
+  0.50    0.600         2         0.600         0.400
+  0.75    0.800         2         0.800         0.200
+  1.00    1.000         1         1.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.00  0.00  0.00  0.00  0.00   distinct 1
+    rho 0.25:  0.00  0.00  0.00  0.00  0.00   distinct 1
+    rho 0.50:  0.00  1.00  0.00  0.00  0.00   distinct 2
+    rho 0.75:  0.00  1.00  0.00  1.00  1.00   distinct 2
+    rho 1.00:  1.00  1.00  1.00  1.00  1.00   distinct 1
+
+=== fraction 0.20  ->  K = 4 degraded RSUs
+  rho   E[conc]  distinct           [4]        [3, 1]        [2, 2]     [2, 1, 1]  [1, 1, 1, 1]
+  0.00    0.217         4         0.000         0.155         0.115         0.610         0.120
+  0.25    0.310         5         0.045         0.235         0.240         0.405         0.075
+  0.50    0.483         5         0.235         0.260         0.240         0.230         0.035
+  0.75    0.735         5         0.565         0.220         0.155         0.050         0.010
+  1.00    0.985         2         0.970         0.030         0.000         0.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.00  0.17  0.00  0.17  0.17   distinct 2
+    rho 0.25:  0.00  0.33  0.33  0.17  0.17   distinct 3
+    rho 0.50:  0.17  1.00  0.33  0.17  0.17   distinct 3
+    rho 0.75:  0.17  1.00  0.33  0.50  1.00   distinct 4
+    rho 1.00:  1.00  1.00  0.50  1.00  1.00   distinct 2
+
+=== fraction 0.30  ->  K = 6 degraded RSUs
+  rho   E[conc]  distinct           [6]        [5, 1]        [4, 2]     [4, 1, 1]        [3, 3]     [3, 2, 1]  [3, 1, 1, 1]     [2, 2, 2]  [2, 2, 1, 1]
+  0.00    0.217         7         0.000         0.000         0.010         0.070         0.015         0.325         0.105         0.105         0.370
+  0.25    0.279         9         0.005         0.005         0.100         0.080         0.100         0.350         0.075         0.080         0.205
+  0.50    0.372         9         0.020         0.105         0.165         0.120         0.130         0.290         0.020         0.060         0.090
+  0.75    0.551         9         0.175         0.205         0.260         0.070         0.130         0.110         0.005         0.030         0.015
+  1.00    0.761         4         0.420         0.360         0.190         0.000         0.030         0.000         0.000         0.000         0.000
+  evaluation seeds 1..5: realised concentration per rho
+    rho 0.00:  0.13  0.13  0.13  0.13  0.27   distinct 2
+    rho 0.25:  0.13  0.27  0.40  0.13  0.27   distinct 3
+    rho 0.50:  0.27  0.47  0.40  0.27  0.27   distinct 3
+    rho 0.75:  0.27  0.47  0.40  0.40  0.67   distinct 4
+    rho 1.00:  0.67  0.47  0.40  0.67  0.67   distinct 3
+```
+
+Interpretation: at the L12 correlation-sweep operating point (20%, K = 4) the degraded set
+can take only five segment shapes, and five evaluation seeds realise just 2-4 distinct
+correlation values per rho — the expected concentration rises smoothly with rho
+(0.217 -> 0.310 -> 0.483 -> 0.735 -> 0.985) but a single seed samples it very coarsely,
+so a gap-vs-rho curve over 5 seeds would be dominated by which shape each seed drew.
+
+Three further facts in the table, stated without remedy (raised as a decision request):
+at 5% (K = 1) rho has no effect whatsoever, so the fraction sweep's lowest point contains
+no correlated failure even at "high" rho; at 10% (K = 2) every seed is binary, either
+both degraded RSUs share a segment or they do not; and at 30% (K = 6) rho = 1 reaches
+only 0.761 concentration, because once one segment is full the remainder spills into a
+second — whole-segment degradation cannot hold K fixed and be fully concentrated at the
+same time. Seed 3's smallest segment has 3 RSUs, which is why it realises [3, 1] (0.50)
+at 20% and rho = 1.
