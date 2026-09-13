@@ -21,20 +21,16 @@ from trustgraph.features import (
     RSU_FEATURES,
     VEHICLE_FEATURES,
 )
-from trustgraph.graph import (
-    PLACEHOLDER_CERT_VALID,
-    PLACEHOLDER_LATENCY_DEV,
-    PLACEHOLDER_SUCCESS_EWMA,
-    PLACEHOLDER_UPTIME_STABILITY,
-    dwell_estimate_s,
-)
+from trustgraph.graph import SnapshotBuilder, dwell_estimate_s
 from trustgraph.links import LinkModel
 from trustgraph.scenario import build_snapshot_builder
+from trustgraph.topology import pairwise_distances
+from trustgraph.trace import Trace
 
 
 @pytest.fixture
-def builder(cfg, world, trace):
-    return build_snapshot_builder(cfg, world, trace)
+def builder(cfg, world, trace, observed):
+    return build_snapshot_builder(cfg, world, trace, observed)
 
 
 # --------------------------------------------------------------------- the layout
@@ -90,54 +86,70 @@ def test_graph_is_homogeneous_not_hetero(builder):
 
 def test_all_features_are_in_unit_range(builder):
     """Everything the model reads is scaled to [0, 1]; nothing leaks raw metres."""
-    for data in builder.snapshots(5):
+    for data in builder.snapshots():
         assert torch.all(data.x >= 0.0) and torch.all(data.x <= 1.0)
         assert torch.all(data.edge_attr >= 0.0) and torch.all(data.edge_attr <= 1.0)
+
+
+def test_builder_rejects_misaligned_scenario_arrays(world, trace, observed):
+    with pytest.raises(ValueError, match="rsu_features"):
+        SnapshotBuilder(
+            world.topology,
+            trace,
+            LinkModel(),
+            {},
+            rsu_features=observed.rsu_features[:-1],
+            rsu_active=observed.rsu_active,
+            vehicle_task_demand=observed.vehicle_task_demand,
+        )
 
 
 # -------------------------------------------------------------------- the features
 
 
-def test_behavioural_features_are_the_declared_placeholders(world, builder):
-    """S1 leaves these constant. When S2/S3 make them real, this test must change.
+def test_rsu_block_is_the_observed_scenario_row(world, observed, builder):
+    """The graph carries exactly what the observable scenario recorded, step by step.
 
-    Constants rather than random values: a result that depends on a placeholder is
-    then obviously degenerate instead of plausibly noisy.
+    In particular `load` is the *advertised* load (L8), which the simulator wrote -
+    graph.py no longer derives load from coverage itself.
     """
-    data = builder.build(0)
-    rsu = data.x[: world.topology.num_rsus]
-    assert torch.all(rsu[:, RSU_COL["success_ewma"]] == PLACEHOLDER_SUCCESS_EWMA)
-    assert torch.all(rsu[:, RSU_COL["latency_dev"]] == PLACEHOLDER_LATENCY_DEV)
-    assert torch.all(
-        rsu[:, RSU_COL["uptime_stability"]] == PLACEHOLDER_UPTIME_STABILITY
-    )
-    assert torch.all(rsu[:, RSU_COL["cert_valid"]] == PLACEHOLDER_CERT_VALID)
+    n_rsu = world.topology.num_rsus
+    for data in builder.snapshots():
+        t = int(data.timestep)
+        assert np.array_equal(
+            data.x[:n_rsu, : len(RSU_FEATURES)].numpy(), observed.rsu_features[t]
+        )
 
 
-def test_load_tracks_coverage_demand(cfg, world, builder):
-    """load is the RSU's in-range vehicle count against its capacity."""
-    from trustgraph.topology import pairwise_distances
+def test_behavioural_features_are_real_not_placeholders(observed):
+    """S1 held these constant (D24) and a test pinned the constants; S2 removed that
+    test deliberately. On a scenario with a degraded node they must actually move."""
+    assert np.unique(observed.feature("success_ewma")).size > 1
+    assert np.unique(observed.feature("latency_dev")).size > 1
 
-    data = builder.build(0)
-    topo = world.topology
-    covered = (
-        pairwise_distances(builder.trace.positions[0], topo.positions)
-        <= topo.coverage_radius_m
-    )
-    expected = np.clip(
-        covered.sum(axis=0) / cfg.graph["rsu_capacity_vehicles"], 0.0, 1.0
-    )
-    assert np.allclose(
-        data.x[: topo.num_rsus, RSU_COL["load"]].numpy(), expected, atol=1e-6
-    )
+
+def test_task_demand_marks_offloading_vehicles(world, observed, builder):
+    n_rsu = world.topology.num_rsus
+    col = n_rsu_block = len(RSU_FEATURES) + VEHICLE_FEATURES.index("task_demand")
+    del n_rsu_block
+    tasks = observed.tasks
+    for data in builder.snapshots():
+        t = int(data.timestep)
+        demand = data.x[n_rsu:, col].numpy()
+        offloading = set(tasks.vehicle[tasks.step == t].tolist())
+        assert {int(v) for v in np.flatnonzero(demand > 0)} == offloading
 
 
 def test_queue_depth_is_the_excess_beyond_capacity(world, builder):
     """queue_depth must be zero wherever load has not saturated."""
-    data = builder.build(0)
-    rsu = data.x[: world.topology.num_rsus]
-    unsaturated = rsu[:, RSU_COL["load"]] < 1.0
-    assert torch.all(rsu[unsaturated, RSU_COL["queue_depth"]] == 0.0)
+    for data in builder.snapshots():
+        rsu = data.x[: world.topology.num_rsus]
+        unsaturated = rsu[:, RSU_COL["load"]] < 1.0
+        # A colluder scales both by the same factor, so its advertised load can sit
+        # below 1 while its true queue is non-zero; that is the lie, not a layout bug.
+        honest = rsu[:, RSU_COL["queue_depth"]] <= rsu[:, RSU_COL["load"]]
+        assert torch.all(rsu[unsaturated & ~honest, RSU_COL["queue_depth"]] >= 0.0)
+        assert torch.all(rsu[:, RSU_COL["queue_depth"]] <= 1.0)
 
 
 def test_dwell_estimate_geometry():
@@ -160,14 +172,13 @@ def test_dwell_estimate_geometry():
     ) == float("inf")
 
 
-def test_serving_rsu_is_the_nearest_in_range(world, builder):
-    from trustgraph.topology import pairwise_distances
-
+def test_serving_rsu_is_the_nearest_present_rsu_in_range(world, observed, builder):
     data = builder.build(0)
     topo = world.topology
     dist = pairwise_distances(builder.trace.positions[0], topo.positions)
+    active = observed.rsu_active[0]
     for v, served in enumerate(data.serving_rsu.numpy()):
-        in_range = np.flatnonzero(dist[v] <= topo.coverage_radius_m)
+        in_range = np.flatnonzero((dist[v] <= topo.coverage_radius_m) & active)
         if in_range.size == 0:
             assert served == -1
         else:
@@ -209,18 +220,49 @@ def test_edges_are_stored_in_both_directions(builder):
     assert all((b, a) in pairs for a, b in pairs)
 
 
-def test_vehicle_rsu_edges_respect_the_coverage_radius(world, builder):
-    from trustgraph.topology import pairwise_distances
-
+def test_vehicle_rsu_edges_respect_the_coverage_radius(world, observed, builder):
     data = builder.build(0)
     topo = world.topology
     dist = pairwise_distances(builder.trace.positions[0], topo.positions)
-    expected = int((dist <= topo.coverage_radius_m).sum())
+    expected = int(
+        ((dist <= topo.coverage_radius_m) & observed.rsu_active[0][None, :]).sum()
+    )
 
     src, dst = data.edge_index
     n_rsu = topo.num_rsus
     veh_rsu = ((src >= n_rsu) & (dst < n_rsu)).sum().item()
     assert veh_rsu == expected
+
+
+def test_absent_rsu_has_no_edges_until_it_joins(world, scenario, builder):
+    """A cold-start RSU keeps its row, so indices never shift, but is disconnected."""
+    joiners = np.flatnonzero(scenario.ground_truth.join_step > 0)
+    assert joiners.size, "smoke config has no cold-start RSU; the test proves nothing"
+    r = int(joiners[0])
+    join = int(scenario.ground_truth.join_step[r])
+
+    for data in builder.snapshots():
+        t = int(data.timestep)
+        touches = (data.edge_index == r).any(dim=0).sum().item()
+        if t < join:
+            assert touches == 0, f"absent RSU {r} has edges at t={t}"
+            assert not bool(data.rsu_active[r])
+        else:
+            assert bool(data.rsu_active[r])
+    assert touches > 0, "joined RSU never gained an edge"
+
+
+def test_rsu_link_age_counts_from_the_later_endpoint_join(world, scenario, builder):
+    r = int(np.flatnonzero(scenario.ground_truth.join_step > 0)[0])
+    join = int(scenario.ground_truth.join_step[r])
+    n_rsu = world.topology.num_rsus
+    for data in builder.snapshots():
+        if int(data.timestep) != join:
+            continue
+        src, dst = data.edge_index
+        mask = ((src == r) & (dst < n_rsu)) | ((dst == r) & (src < n_rsu))
+        if mask.any():
+            assert torch.all(data.edge_attr[mask, EDGE_COL["link_age"]] == 0.0)
 
 
 def test_latency_and_signal_move_against_each_other(world, builder):
@@ -275,7 +317,7 @@ def test_signal_resolves_across_the_whole_coverage_radius(demo_cfg):
 # -------------------------------------------------------------------- the link age
 
 
-def test_link_age_grows_while_a_link_persists(cfg, world, trace, builder):
+def test_link_age_grows_while_a_link_persists(builder):
     """link_age is history, not geometry: a surviving link must age."""
     ages: dict[tuple[int, int], list[float]] = {}
     for data in builder.snapshots(6):
@@ -296,11 +338,6 @@ def test_link_age_starts_at_zero_for_a_new_link(builder):
 
 def test_link_age_resets_when_a_link_breaks_and_reforms(world):
     """A re-formed link is genuinely new and carries the extra uncertainty."""
-    import copy
-
-    from trustgraph.graph import SnapshotBuilder
-    from trustgraph.trace import Trace
-
     # One vehicle, one RSU: in range, out of range, then back in range.
     topo = world.topology
     centre = topo.positions[0]
@@ -313,8 +350,15 @@ def test_link_age_resets_when_a_link_breaks_and_reforms(world):
         seed=0,
         source="test",
     )
+    steps = positions.shape[0]
     builder = SnapshotBuilder(
-        topo, trace, LinkModel(), {"link_age_norm_s": 10.0}, np.random.default_rng(0)
+        topo,
+        trace,
+        LinkModel(),
+        {"link_age_norm_s": 10.0},
+        rsu_features=np.zeros((steps, topo.num_rsus, len(RSU_FEATURES)), np.float32),
+        rsu_active=np.ones((steps, topo.num_rsus), dtype=bool),
+        vehicle_task_demand=np.zeros((steps, 1), np.float32),
     )
 
     def age_to_rsu0(data):
@@ -327,8 +371,6 @@ def test_link_age_resets_when_a_link_breaks_and_reforms(world):
     assert float(age_to_rsu0(snapshots[1])) > 0.0  # link has aged one step
     assert age_to_rsu0(snapshots[2]).numel() == 0  # out of range: no link
     assert float(age_to_rsu0(snapshots[3])) == 0.0  # re-formed: age reset
-
-    del copy
 
 
 # ---------------------------------------------------------------- sequential access
@@ -350,10 +392,10 @@ def test_reset_rewinds_the_builder(builder):
     assert torch.all(data.edge_attr[:, EDGE_COL["link_age"]] == 0.0)
 
 
-def test_snapshot_sequence_is_reproducible(cfg, world, trace):
-    """The same (config, seed, trace) yields identical graph tensors."""
-    a = list(build_snapshot_builder(cfg, world, trace).snapshots())
-    b = list(build_snapshot_builder(cfg, world, trace).snapshots())
+def test_snapshot_sequence_is_reproducible(cfg, world, trace, observed):
+    """The same (config, seed, trace, scenario) yields identical graph tensors."""
+    a = list(build_snapshot_builder(cfg, world, trace, observed).snapshots())
+    b = list(build_snapshot_builder(cfg, world, trace, observed).snapshots())
     assert len(a) == len(b) == trace.num_steps
     for da, db in zip(a, b):
         assert torch.equal(da.x, db.x)
@@ -361,12 +403,12 @@ def test_snapshot_sequence_is_reproducible(cfg, world, trace):
         assert torch.equal(da.edge_attr, db.edge_attr)
 
 
-def test_graph_changes_over_time(demo_cfg):
+def test_graph_changes_over_time(demo_bundle):
     """A static graph would make the whole dynamic-topology premise vacuous."""
-    from trustgraph.scenario import build_world, generate_trace
+    from trustgraph.simulator import generate_scenario
 
-    world = build_world(demo_cfg)
-    trace = generate_trace(demo_cfg, world)
-    builder = build_snapshot_builder(demo_cfg, world, trace)
+    cfg, world, trace = demo_bundle
+    observed = generate_scenario(cfg, world, trace).observed
+    builder = build_snapshot_builder(cfg, world, trace, observed)
     counts = {int(d.edge_index.shape[1]) for d in builder.snapshots(60)}
     assert len(counts) > 1
