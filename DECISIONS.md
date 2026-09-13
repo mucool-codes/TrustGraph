@@ -708,6 +708,7 @@ the simple version is shown to fail (Standing Rule 3).
 
 ### D33 — S2 dispatches trust-agnostically with the Baseline A rule (provisional)
 Date: 2026-09-13 | Session: S2 | Status: active, pending decision request
+Status resolved by D41 (Q2): confirmed for S3 training data; closed loop for H1/H3.
 
 **Decision:** Every task in an S2 scenario is dispatched by the L1 rule with alpha = 0 over
 the vehicle's in-range present RSUs, using advertised load and normalised access latency
@@ -789,6 +790,8 @@ membership.
 
 ### D36 — Colluders are drawn from healthy RSUs anywhere; cold-start RSUs are uniform
 Date: 2026-09-13 | Session: S2 | Status: active
+SUPERSEDED BY D38 for cold-start placement in S4's conditions (uniform remains the
+generator default). The collusion half of this entry stands.
 
 **Decision:** Collusion: `num_groups` groups of `group_size` RSUs, taken in a fixed random
 permutation order from the RSUs not already degraded, each advertising `(1 - under_report)`
@@ -838,3 +841,109 @@ membership in the feature matrix (D35). (b) would make the graph builder — whi
 imports — import the sealed ground truth. With the builder reading only the observable
 file, the graph a model sees is by construction something a deployment could have
 produced, and a test asserts each graph's RSU block equals the stored row exactly.
+
+### D38 — Cold start is evaluated as two conditions: control on healthy segments, test on degraded ones
+Date: 2026-09-13 | Session: S2b | Status: active
+Supersedes the cold-start half of D36 for S4. Adjusts the lean of S2 decision request Q5.
+
+**Decision:** `cold_start.placement` selects the pool cold-start RSUs are drawn from, in a
+fixed permutation order per draw:
+`healthy_segment` (CONTROL) — RSUs on segments containing no degraded RSU, excluding
+colluders, so the node is reliable and its segment neighbourhood is healthy;
+`degraded_segment` (TEST) — the degraded RSUs themselves, so the node is degraded and
+shares its segment with the degradation.
+`uniform` stays the default and reproduces S2 bit-for-bit. A draw where the pool is too
+small is refused with an "infeasible" error rather than falling back to another pool.
+S4 runs control and test as separate conditions under the frozen model, each over many
+injection draws (D39). No observation-count feature is added.
+
+**Alternatives:** (a) place cold-start nodes only on degraded segments (the S2 lean);
+(b) `degraded_segment` drawing from *every* member of a degraded segment, including its
+healthy members; (c) fall back to a different pool when the requested one is empty;
+(d) add an observation-count feature so a new node is distinguishable from a perfect one.
+
+**Rationale:** (a) was rejected in review: with every cold-start node on a degraded
+segment, "message passing gives a new node a useful prior" is confounded with "this
+segment happened to be under test", and a D-over-C gap could not say which it measured.
+A control where the propagated prior should say "healthy" and a test where it should say
+"degrading" make the two separable — the effect is the difference between them. (b) was
+considered and not chosen: under exact-count degradation (D29, Q3) a degraded segment
+often still has healthy members, most of them at low rho (F11: 11 healthy RSUs share a
+segment with degradation at rho = 0), so (b) would make the test condition mostly a
+*false*-prior condition — a real question, but a different one from the one S4 asks.
+Under L5 a node on a degrading backhaul shares its fate, which is what drawing from the
+degraded RSUs encodes; a healthy-member "misleading prior" condition can be added later
+as a third pool if wanted. (c) would silently mix conditions, the confound this decision
+exists to remove. (d) stays deferred as instructed: revisit only if C and D fail to
+separate on these conditions once measured. F12 records how often each condition is
+feasible and how much segment evidence the test node actually has.
+
+### D39 — Injection draws: many degraded/cold-start/collusion realisations per seed, traffic fixed
+Date: 2026-09-13 | Session: S2b | Status: active
+Implements S2 decision request Q1 (b).
+
+**Decision:** `scenario.injection_draw = k` seeds the three injection streams
+(degradation, collusion, cold start) from `"<purpose>#draw<k>"` instead of `"<purpose>"`.
+Draw 0 uses the bare names, so every existing scenario reproduces unchanged (verified:
+the default demo graph-sequence hash is still `f3f247ac...`). Mobility, task arrivals and
+execution noise keep their seed-level streams. Scenario file stems gain `-draw<k>` and
+`-cold<n>-<placement>` only when those differ from the default.
+
+**Alternatives:** (a) more seeds instead of draws; (b) redraw traffic along with the
+injection; (c) a draw index folded into the master seed.
+
+**Rationale:** F10 showed a seed samples rho's structure very coarsely. Under train-once
+(L12) a frozen model can be evaluated on many draws of one seed for the cost of
+generation alone, whereas (a) multiplies training too. Keeping traffic fixed across draws
+(not (b)) makes draws paired — two draws differ only in which RSUs misbehave — which is
+the same property D29's fixed-size draws give across rho. (c) would change mobility and
+topology with the draw, turning a draw into a new seed and discarding exactly that
+pairing.
+
+### D40 — cert_valid and uptime_stability stay placeholders until S6; S4 is unaffected
+Date: 2026-09-13 | Session: S2b | Status: active
+
+**Decision:** The two placeholders of F8 are deliberately deferred, not forgotten. No
+revocation/compromise model and no restart process are built before S4. The question is
+reopened as the first task of S6 (the session that makes Variants A-E selectable), which
+must decide before any A-E comparison is run whether Variant B keeps constant
+certificates or gains a revocation model.
+
+**Alternatives:** (a) build a revocation model in S2b or S3, before S4; (b) defer
+indefinitely and report B identical to A.
+
+**Rationale:** S4 compares C and D only (CLAUDE_CODE_SESSIONS.md S4); Variant B first
+matters for H1 and H3, which are measured in closed loop in S6 and S9. Both C and D
+receive the same constant `cert_valid` and `uptime_stability` columns, so the placeholders
+cannot favour either side of the H2 comparison — a zero-variance input is ignored equally
+by both. (a) would add a mechanism before the simple version is shown to be insufficient
+(Standing Rule 3) and before S6 has settled dispatch in closed loop (D41 Q2), which a
+revocation model's effect depends on. (b) is not acceptable silently: with every
+certificate valid, B's trust term is the same constant for every candidate and B's
+decisions are identical to Baseline A's in every scenario (F8). That may even be the
+faithful model — CRL revocation takes hours to days, longer than the 20-minute horizon —
+but it makes "behavioural trust beats certificate trust" a comparison against A under
+another name, and that has to be a stated choice, which is why S6 must make it
+explicitly rather than inherit it.
+
+### D41 — Resolution of the S2 decision request
+Date: 2026-09-13 | Session: S2b | Status: active
+
+**Decision:** As answered in design review:
+- **Q1 (rho quantisation, F10):** adopt (b) + (a). S4 evaluates the frozen models over
+  many injection draws per seed (D39), and plots against realised segment concentration
+  as well as nominal rho. The 5% fraction point is reported as containing no correlated
+  failure.
+- **Q2 (dispatch, F9):** adopt (a). S3 trains on open-loop Baseline A data as generated;
+  H1 and H3 are measured closed-loop when dispatch reads trust (S6/S9). D33 confirmed.
+- **Q3 (whole segments vs exact count):** exact K with a possible partial segment, as in
+  D29.
+- **Q4 (onset):** shared onset for every degraded RSU at every rho, as in D31.
+- **Q5 (cold start):** adjusted, not approved as proposed — two conditions, control and
+  test (D38); no observation-count feature unless C and D fail to separate on them.
+
+**Alternatives:** the options listed in the decision request itself.
+
+**Rationale:** Recorded so later sessions inherit the answers from this file rather than
+from the conversation that produced them; the reasoning for each lives in D29, D31, D33,
+D38 and D39 and in the review answer quoted in D38.
