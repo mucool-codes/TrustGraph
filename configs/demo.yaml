@@ -12,8 +12,10 @@ seed: 20260903
 device: cpu
 
 scenario:
-  num_steps: 300       # timesteps; 300 x dt = 5 minutes of traffic
-  tasks_per_step: 3    # vehicles that offload a task each step
+  # 1200 x dt = 20 minutes of traffic. S1 used 300 steps; S2 needs room for a
+  # pre-onset baseline, a gradual onset ramp, and a post-ramp plateau, each long
+  # enough for the EWMA features to settle (DECISIONS.md D28).
+  num_steps: 1200
 
 # The road layout. A Manhattan grid of arterials: blocks_x + 1 vertical roads
 # crossing blocks_y + 1 horizontal roads over a square region. A dense urban
@@ -26,7 +28,7 @@ road:
 
 topology:
   num_rsus: 20                # L9: 15-30
-  num_backhaul_segments: 4    # L5: degradation later applies per segment
+  num_backhaul_segments: 4    # L5: degradation applies per segment
   placement_jitter_m: 25.0    # a mast stands beside the road, not on it
   coverage_radius_m: 400.0    # vehicle <-> RSU link threshold
   rsu_link_radius_m: 650.0    # RSU <-> RSU coordination threshold (L6)
@@ -78,16 +80,68 @@ link:
   latency_norm_ms: 25.0       # divisor putting latency on the [0, 1] feature scale
 
 # Graph construction (graph.py): the scales that map physical quantities onto the
-# [0, 1] range the model reads.
-# Graph construction (graph.py): the scales that map physical quantities onto the
 # [0, 1] range the model reads. The two _norm_s values are set near the measured
 # mean dwell time (~30 s, FINDINGS.md F4) so link_age and dwell_estimate use the
 # middle of their range rather than saturating at one end.
 graph:
-  rsu_capacity_vehicles: 10.0
   link_age_norm_s: 30.0
   dwell_norm_s: 30.0
   speed_norm_mps: 22.0
+
+# ---------------------------------------------------------------- S2: the scenario
+
+# Task model (tasks.py). Three types; deadline = comm_allowance + slack x (compute
+# time on an idle reference node), capped - heavier tasks get longer deadlines, but
+# not unlimited ones (DECISIONS.md D30).
+tasks:
+  rate_per_vehicle_hz: 0.1              # 60 vehicles -> ~6 tasks/s network-wide
+  cycles: [2.0e+8, 1.0e+9, 3.0e+9]      # light / medium / heavy
+  shares: [0.5, 0.35, 0.15]
+  reference_capacity_cycles_per_s: 1.0e+10
+  comm_allowance_s: 0.05
+  slack_min: 2.0
+  slack_max: 4.0
+  deadline_cap_s: 1.0
+
+# Node execution model (execution.py).
+execution:
+  capacity_cycles_per_s: 1.0e+10        # ~4 cores x 2.5 GHz roadside edge server
+  rsu_capacity_vehicles: 10.0           # coverage demand at which true load = 1
+  load_sensitivity: 0.6                 # a fully loaded node runs at 40% speed
+  noise_sigma: 0.25                     # mean-one lognormal runtime scatter
+
+# Advertised-vs-observed tracking (tracking.py, L8).
+tracking:
+  ewma_weight: 0.1
+  latency_dev_cap: 2.0
+
+# Which rule dispatched the scenario's tasks. baseline_a = the L1 rule with alpha=0,
+# trust-agnostic. The only policy S2 implements (DECISIONS.md D33, FINDINGS.md F9).
+dispatch:
+  policy: baseline_a
+
+# Degradation injector (sealed/injector.py). Defaults are the operating point shared
+# by both L12 sweeps: 20% degraded at high rho.
+degradation:
+  fraction: 0.20
+  rho: 1.0
+  onset_step: 400        # shared by every degraded node (DECISIONS.md D31)
+  ramp_steps: 300        # linear ramp to full severity - gradual, not instantaneous
+  severity: 0.6          # compute capacity lost at full degradation
+  drop_prob: 0.15        # silent drop probability at full degradation
+
+# Colluding groups advertise (1 - under_report) x their true load. Off by default:
+# S4 reports the collusion condition separately from the L12 sweeps.
+collusion:
+  num_groups: 0
+  group_size: 3
+  under_report: 0.5
+
+# Cold-start RSUs are absent until join_step and join with no history. Off by default,
+# for the same reason.
+cold_start:
+  num_nodes: 0
+  join_step: 600
 
 model:
   hidden_dim: 32

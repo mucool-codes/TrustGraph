@@ -3,9 +3,10 @@
 Prints the offloading decision sequence for the configured scenario. Two runs with the
 same config produce byte-identical output (Standing Rule 7).
 
-Requires a mobility trace on disk - generate one first with:
+Requires a mobility trace and a generated scenario on disk:
 
-    python scripts/generate_trace.py --config configs/demo.yaml
+    python scripts/generate_trace.py    --config configs/demo.yaml
+    python scripts/generate_scenario.py --config configs/demo.yaml
 """
 
 from __future__ import annotations
@@ -16,7 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from trustgraph.config import load_config  # noqa: E402
+from trustgraph.config import load_config, with_overrides  # noqa: E402
+from trustgraph.observed import default_observed_path, load_observed  # noqa: E402
 from trustgraph.pipeline import format_decisions, run_pipeline  # noqa: E402
 from trustgraph.scenario import build_world  # noqa: E402
 from trustgraph.trace import default_trace_path, load_trace  # noqa: E402
@@ -33,25 +35,42 @@ def main() -> int:
         default=None,
         help="override the config's seed (everything else is unchanged)",
     )
+    parser.add_argument("--rho", type=float, default=None, help="override degradation.rho")
+    parser.add_argument(
+        "--fraction", type=float, default=None, help="override degradation.fraction"
+    )
     parser.add_argument(
         "--trace",
         default=None,
         help="path to the mobility trace .npz "
         "(default: traces/<config stem>-seed<seed>.npz)",
     )
+    parser.add_argument(
+        "--scenario",
+        default=None,
+        help="path to the observable scenario .npz (default: scenarios/<stem>...)",
+    )
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
-    if args.seed is not None:
-        cfg = type(cfg)(**{**cfg.__dict__, "seed": args.seed})
+    cfg = with_overrides(
+        load_config(args.config), seed=args.seed, rho=args.rho, fraction=args.fraction
+    )
 
     trace_path = (
         Path(args.trace) if args.trace else default_trace_path(args.config, cfg.seed)
     )
     trace = load_trace(trace_path)
+    scenario_path = (
+        Path(args.scenario)
+        if args.scenario
+        else default_observed_path(
+            args.config, cfg.seed, cfg.rho, cfg.degraded_fraction
+        )
+    )
+    observed = load_observed(scenario_path)
     world = build_world(cfg)
 
-    decisions = run_pipeline(cfg, trace, world)
+    decisions = run_pipeline(cfg, trace, observed, world)
     print(format_decisions(cfg, decisions, trace))
     return 0
 

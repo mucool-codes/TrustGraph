@@ -9,7 +9,7 @@ RNG, so adding a draw in one place cannot shift the streams anywhere else
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -66,10 +66,48 @@ class Config:
     graph: dict[str, Any]
     model: dict[str, Any]
     selection: dict[str, Any]
+    # S2 scenario sections. All optional: every field has a documented default in the
+    # module that reads it (tasks.py, execution.py, tracking.py, simulator.py,
+    # sealed/injector.py). They are validated there rather than here, because config
+    # is imported by the training path and must not import the sealed injector (L4).
+    tasks: dict[str, Any] = field(default_factory=dict)
+    execution: dict[str, Any] = field(default_factory=dict)
+    tracking: dict[str, Any] = field(default_factory=dict)
+    dispatch: dict[str, Any] = field(default_factory=dict)
+    degradation: dict[str, Any] = field(default_factory=dict)
+    collusion: dict[str, Any] = field(default_factory=dict)
+    cold_start: dict[str, Any] = field(default_factory=dict)
 
     @property
     def seeds(self) -> SeedChain:
         return SeedChain(self.seed)
+
+    @property
+    def rho(self) -> float:
+        return float(self.degradation.get("rho", 0.0))
+
+    @property
+    def degraded_fraction(self) -> float:
+        return float(self.degradation.get("fraction", 0.0))
+
+
+def with_overrides(
+    cfg: Config,
+    seed: int | None = None,
+    rho: float | None = None,
+    fraction: float | None = None,
+) -> Config:
+    """A copy of `cfg` with the seed and/or the two swept parameters (L12) replaced."""
+    degradation = dict(cfg.degradation)
+    if rho is not None:
+        degradation["rho"] = float(rho)
+    if fraction is not None:
+        degradation["fraction"] = float(fraction)
+    return replace(
+        cfg,
+        seed=cfg.seed if seed is None else int(seed),
+        degradation=degradation,
+    )
 
 
 def load_config(path: str | Path) -> Config:
@@ -91,6 +129,13 @@ def load_config(path: str | Path) -> Config:
         graph=raw.get("graph") or {},
         model=raw["model"],
         selection=raw["selection"],
+        tasks=raw.get("tasks") or {},
+        execution=raw.get("execution") or {},
+        tracking=raw.get("tracking") or {},
+        dispatch=raw.get("dispatch") or {},
+        degradation=raw.get("degradation") or {},
+        collusion=raw.get("collusion") or {},
+        cold_start=raw.get("cold_start") or {},
     )
     _validate(cfg)
     return cfg
