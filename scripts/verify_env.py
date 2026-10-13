@@ -1,7 +1,7 @@
 """Environment verification (S0 task 7).
 
 Confirms the pinned stack actually works: imports torch_geometric, reports CUDA
-availability, and runs one GraphSAGE forward pass on the GPU (falling back to CPU and
+availability, and runs one GINEConv forward pass on the GPU (falling back to CPU and
 saying so if CUDA is unavailable).
 
 Run:  python scripts/verify_env.py
@@ -45,7 +45,7 @@ def main() -> int:
     device = "cuda" if cuda_ok else "cpu"
     print(f"forward-pass device: {device}")
 
-    # One real GraphSAGE forward pass through the project's own trust head, so this
+    # One real GINEConv forward pass through the project's own trust head, so this
     # verifies the model as built rather than a stand-in.
     from trustgraph.features import NODE_FEATURE_DIM
     from trustgraph.model import TrustHead
@@ -60,11 +60,12 @@ def main() -> int:
         device=device,
     )
     with torch.no_grad():
-        trust = model(x, edge_index)
+        edge_attr = torch.rand(edge_index.shape[1], 4, device=device)
+        trust = model.eval()(x, edge_index, edge_attr)
 
     assert trust.shape == (12,), f"unexpected trust shape {tuple(trust.shape)}"
     assert torch.all(trust >= 0) and torch.all(trust <= 1), "trust outside [0, 1]"
-    print(f"GraphSAGE forward : OK - shape {tuple(trust.shape)}, "
+    print(f"GINEConv forward : OK - shape {tuple(trust.shape)}, "
           f"range [{trust.min():.4f}, {trust.max():.4f}]")
 
     print("=" * 70)
