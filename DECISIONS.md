@@ -1152,3 +1152,23 @@ slower-learning model, not a convergence criterion. The change uses only the tra
 BCE curves (F13), not any AUC or C-vs-D comparison, and the patience rule that actually decides
 when each model stops is untouched - C stopped at epoch 24 by patience and will do so again, so
 the larger cap only releases D. The F13 numbers are not edited.
+
+### D46 — S4 implementation choices D43 left open, and training of the missing seeds
+Date: 2026-10-14 | Session: S4 | Status: active
+D43 is untouched; these fill gaps in it and were fixed before any C-vs-D number was computed.
+
+**Decision:** (1) Seeds 2-5 had no S3 checkpoints, so each was trained once with `s3_train.py` and
+unchanged D45 settings (F15); seed 1's frozen S3 checkpoints are used as they are. (2) The
+detection threshold tau is the 1st percentile of a model's trust over [100,400) pooled over the
+seed's 250 sweep-condition draws (no collusion, no cold start). (3) A never-detected RSU has latency
+399; a draw's latency is the mean over its degraded RSUs. (4) Collusion AUC uses compromised vs
+reliable with degraded RSUs excluded; cold-start AUC pools control and test draws feasible in both,
+per seed. (5) Evaluation scenarios live under `scenarios/s4/` (collusion files carry `-coll1`).
+
+**Alternatives:** (1) halt and ask before training; (2) tau per scenario or per cell; (3) censor
+at the end of the horizon (1199).
+
+**Rationale:** (1) D43 section 2 requires one model per seed and training is deterministic from
+(config, seed); the cost of asking was a stalled session, and the choice is reported rather than
+hidden. (2) per-scenario tau would let a degraded RSU's own history set its threshold.
+(3) matches D43's "censored at 799".

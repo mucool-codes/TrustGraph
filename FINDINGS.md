@@ -663,3 +663,141 @@ predicting the next outcome, not about H2. The held-out diagnostic AUC is 1.0 fo
 scenario with 4 degraded RSUs - a ceiling that cannot separate C from D - while the same metric
 on the draw-40 validation scenario sits at ~0.78 for both, so a one-scenario AUC mostly reflects
 which RSUs degraded; the D43 multi-draw protocol in S4 is what measures the comparison.
+
+### F15 — S4 preparation: per-seed C and D for seeds 2-5 trained with the unchanged S3 protocol
+Date: 2026-10-14 | Session: S4 | Commit: 548c6d6
+Config: `configs/demo.yaml`, seeds 2, 3, 4, 5; `TrainSettings` exactly as D45 (lr 1e-3, Adam, batch 32,
+max 200, patience 8, min_delta 1e-4), no setting touched | Data: as F13/F14 per seed
+Command: `python scripts/s3_train.py --config configs/demo.yaml --seed <n>` (4 runs in parallel, OMP/MKL
+threads 3 each; seed 1 was trained earlier at default threads - thread count not equalised)
+
+Why this run exists: S3 trained and checkpointed seed 1 only (`checkpoints/` held s3-seed1-{C,D}.pt),
+but D43 section 2 requires one frozen model per seed per variant for seeds 1-5. The seed-1 checkpoints
+are used as they are; seeds 2-5 were trained once each, no re-runs, no selection among runs. The
+traces for seeds 2 and 3 on disk were stale 300-step S1 traces and were regenerated (gitignored,
+reproducible from config + seed); seeds 4 and 5 traces were generated new.
+
+Numbers (stopped = epoch, all by patience; BCE = validation next-task BCE at the best epoch):
+```
+seed  variant  best_ep stopped  untrained_val  best_val   held-out BCE  held-out AUC[450,650)
+1     C           16     24       0.6838        0.16614    0.16804       1.0000
+1     D          135    143       0.9334        0.13845    0.15568       1.0000
+2     C           47     48       0.7527        0.14829    0.16773       1.0000
+2     D           44     52       3.8947        0.20394    0.20472       0.9062
+3     C           24     24       0.7988        0.16789    0.18315       1.0000
+3     D           78     86       2.5810        0.17090    0.21488       0.9375
+4     C           16     21       0.6671        0.18668    0.17118       1.0000
+4     D          133    141       0.3448        0.16280    0.15460       1.0000
+5     C           21     22       0.6422        0.18586    0.17221       1.0000
+5     D          118    126       0.5050        0.16622    0.15965       1.0000
+parameters C 1313, D 1614 (1.23x) for every seed
+D44 fallback checks (validation): edge probe |dtrust| same_segment->0 / RSU-RSU ->1:
+  seed 1 0.0571/0.0405  seed 2 0.1330/0.0353  seed 3 0.0632/0.0358  seed 4 0.1172/0.0474  seed 5 0.0677/0.0573
+  all >= 0.01: PASS.  best val BCE below untrained val BCE: PASS on all five seeds.
+```
+Interpretation: all ten models converged by patience and D passes both pre-committed checks on every
+seed, so the architecture stays GINEConv (D44). D on seeds 2 and 3 stopped early (epochs 52, 86) at a
+worse validation BCE than C (0.204 vs 0.148; 0.171 vs 0.168) - a property of those D runs recorded
+here, not corrected (D43 section 5: no model or hyperparameter change between seeds).
+
+### F16 — S4 raw results: frozen C and D, D43 conditions, seeds 1-5 (RAW - no verdict recorded here)
+Date: 2026-10-14 | Session: S4 | Commit: 548c6d6
+Config: `configs/demo.yaml`, seeds 1-5, injection draws 100-149 (50 per seed per cell), fraction 0.20 (K=4) |
+Checkpoints: `checkpoints/s3-seed{1..5}-{C,D}.pt` (F14, F15), frozen, no retraining
+Commands: `python scripts/s4_eval.py --config configs/demo.yaml --seeds 1..5` ;
+          `python scripts/s4_analyse.py --seeds 1 2 3 4 5` (full text: results/s4/report-5seeds.txt, not committed)
+Figures (not committed): figures/s4_gap_vs_correlation.png, s4_cold_start.png, s4_collusion.png
+Conventions as D43 section 3. Intervals: Student-t over the 5 per-seed values (t=2.776). Two
+implementation choices D43 left open, made before any C-vs-D number: (i) detection threshold tau is the
+1st percentile of a model's trust over [100,400) for all RSUs of that seed's 250 sweep-condition draws
+(no collusion/cold start, so it depends on no injected fault); (ii) a never-detected RSU has latency 399
+(censored at step 799), per-draw latency is the mean over that draw's 4 degraded RSUs.
+D = AUC_D - AUC_C throughout (paired per draw, averaged within seed).
+
+A. Correlation sweep, diagnostic AUC [450,650), degraded vs reliable:
+```
+rho   c(real.)  AUC_C mean sd         AUC_D mean sd         D-C mean   sd      95% CI              sep. CIs overlap
+0.00  0.216     0.9803 0.0338         0.9286 0.0145         -0.0517    0.0310  [-0.0902, -0.0131]  yes
+0.25  0.333     0.9801 0.0345         0.9320 0.0129         -0.0481    0.0273  [-0.0821, -0.0142]  yes
+0.50  0.500     0.9806 0.0306         0.9366 0.0156         -0.0440    0.0289  [-0.0798, -0.0082]  yes
+0.75  0.717     0.9836 0.0228         0.9427 0.0116         -0.0409    0.0246  [-0.0714, -0.0104]  yes
+1.00  0.956     0.9852 0.0195         0.9555 0.0122         -0.0297    0.0198  [-0.0542, -0.0051]  yes
+per-seed D-C (seeds 1..5):
+0.00 [+0.0016 -0.0625 -0.0578 -0.0597 -0.0800]   0.25 [-0.0003 -0.0591 -0.0512 -0.0631 -0.0669]
+0.50 [+0.0034 -0.0494 -0.0456 -0.0750 -0.0534]   0.75 [-0.0016 -0.0522 -0.0441 -0.0678 -0.0391]
+1.00 [-0.0025 -0.0394 -0.0338 -0.0541 -0.0188]
+per-seed AUC_C at rho 1.0 [0.9528 1.0 1.0 0.9906 0.9825]; AUC_D [0.9503 0.9606 0.9662 0.9366 0.9638]
+plateau [1100,1200) (secondary) D-C: rho0 -0.0129 CI[-0.0297,+0.0038]; .25 -0.0123 [-0.0283,+0.0037];
+  .5 -0.0111 [-0.0242,+0.0021]; .75 -0.0136 [-0.0277,+0.0004]; 1.0 -0.0123 [-0.0257,+0.0010]
+  (AUC_C plateau 1.0000 in every cell; AUC_D plateau 0.9864-0.9889)
+W3 per-seed slope of per-draw D-C on realised c (250 draws/seed): [-0.0020 +0.0191 +0.0488 +0.0219 +0.0622]
+  mean +0.0300 sd 0.0255, 95% CI [-0.0017, +0.0617]
+D-C by realised c (all rho pooled; draws total; mean of per-seed means; CI over 5 seeds):
+  c=0     32 draws  -0.0586 [-0.1237,+0.0064]    c=1/6  331  -0.0438 [-0.0783,-0.0093]
+  c=1/3  193        -0.0655 [-0.1181,-0.0130]    c=1/2  266  -0.0470 [-0.0843,-0.0098]
+  c=1    428        -0.0271 [-0.0523,-0.0020]
+```
+B. Detection latency, steps after onset (400), mean over seeds; detected fraction in brackets:
+```
+rho   C latency sd   (detected)    D latency sd    (detected)    D-C latency  95% CI            sep. CIs overlap
+0.00  137.7 10.2 (1.000)           234.1 22.2 (0.974)           +96.5   [+64.0,+129.0]    no
+0.25  137.2  9.5 (1.000)           230.2 23.4 (0.973)           +93.0   [+61.9,+124.2]    no
+0.50  137.8  9.3 (1.000)           224.9 23.2 (0.976)           +87.1   [+55.8,+118.4]    no
+0.75  136.5  5.7 (1.000)           220.9 23.3 (0.976)           +84.4   [+55.7,+113.0]    no
+1.00  135.3  5.5 (1.000)           212.0 24.4 (0.982)           +76.7   [+48.2,+105.2]    no
+tau (1st pct of pre-onset trust) per seed: C [0.8393 0.8396 0.8396 0.8580 0.8577]  D [0.5808 0.6952 0.5774 0.5292 0.6128]
+```
+C. Collusion (1 group of 3, under_report 0.5), AUC compromised vs reliable, [200,400):
+```
+rho   AUC_C mean sd        AUC_D mean sd        D-C mean   sd      95% CI              per-seed D-C
+0.00  0.7344 0.1304        0.7913 0.1614        +0.0569    0.2091  [-0.2027, +0.3166]  [+0.3282 -0.2523 +0.0272 +0.0549 +0.1267]
+1.00  0.7332 0.1308        0.7958 0.1654        +0.0626    0.2325  [-0.2261, +0.3513]  [+0.3538 -0.2877 +0.0287 +0.0682 +0.1497]
+per-seed AUC_C (rho0) [0.5882 0.7954 0.7928 0.8877 0.6077]  AUC_D [0.9164 0.5431 0.8200 0.9426 0.7344]
+```
+D. Cold start (1 joiner at step 600), AUC test vs control of 1 - joiner mean trust. D42 accounting:
+```
+rho 0.00: attempted 250/condition; control infeasible 25 (aggregated 225); test infeasible 0 (aggregated 250);
+          paired (both feasible) aggregated 225; per seed [46 45 49 43 42]
+rho 1.00: attempted 250/condition; control infeasible 0; test infeasible 0; paired aggregated 250 (50 per seed)
+                          AUC_C mean sd       AUC_D mean sd       D-C mean   sd      95% CI              per-seed D-C
+rho 0  [600,630)           0.7951 0.0889       0.6520 0.1420       -0.1431    0.0641  [-0.2226, -0.0635]  [-0.1843 -0.1037 -0.0820 -0.2347 -0.1105]
+rho 0  [600,660) secondary  0.9348 0.0742       0.8232 0.0812       -0.1116    0.1098  [-0.2479, +0.0248]  [-0.0198 -0.0795 -0.0296 -0.2883 -0.1406]
+rho 1  [600,630)           0.8193 0.1020       0.7920 0.0957       -0.0273    0.0533  [-0.0935, +0.0389]  [-0.1156 +0.0272 -0.0280 -0.0104 -0.0096]
+rho 1  [600,660) secondary  0.9419 0.0210       0.8976 0.0501       -0.0443    0.0482  [-0.1041, +0.0155]  [-0.0272 -0.0016 -0.0256 -0.1268 -0.0404]
+mean joiner trust [600,630): rho0  C control 0.9737 test 0.8853 | D control 0.9127 test 0.8706
+                             rho1  C control 0.9757 test 0.8888 | D control 0.9245 test 0.7936
+```
+
+### F17 — S4 verdict against D43 (applied to F16 after F16 was committed in 09cc126)
+Date: 2026-10-14 | Session: S4 | Commit: 09cc126 (numbers) | Config/seeds: as F16
+Command: `python scripts/s4_analyse.py --seeds 1 2 3 4 5 --verdict`
+
+```
+H2 core, correlation sweep:   rho=1.0  Delta -0.0297  CI [-0.0542, -0.0051]   W1 False (lo > 0 fails)
+                              rho=0.0  Delta -0.0517  CI [-0.0902, -0.0131]   W2 False
+                              W3 mean slope +0.0300  CI [-0.0017, +0.0617]    W3 False (CI includes 0)
+  NEGATIVE check: hi < 0 and mean <= -0.02 at rho=1.0 -> TRUE.   VERDICT: NEGATIVE (C beats D)
+Collusion rho=0:  Delta +0.0569 CI [-0.2027, +0.3166]  -> NOISY
+Collusion rho=1:  Delta +0.0626 CI [-0.2261, +0.3513]  -> NOISY
+Cold start rho=1: Delta -0.0273 CI [-0.0935, +0.0389]  -> NULL (hi < 0.05)
+(info) cold start rho=0: Delta -0.1431 CI [-0.2226, -0.0635]
+H2 holds in full (three WIN): False.  Combination: core NEGATIVE, collusion NOISY x2, cold start NULL.
+```
+Interpretation: on the pre-registered metric, the graph model D is *worse* than the node-local MLP C
+at every rho in the sweep (by 0.03-0.05 AUC), D's deficit is smallest where failures are most
+correlated (-0.052 at rho 0 to -0.030 at rho 1; per-seed slopes mostly positive, mean +0.030 but its
+interval includes 0), and seed 1 is the only seed where D is level with C. The gap is therefore not
+structural in the sense H2 claims: D does not beat C at any correlation, and the narrowing with
+correlation is not statistically established. Cold start is a NULL at rho=1 (an advantage of 0.05 is
+ruled out) and D is significantly worse at rho=0. Collusion cannot separate the models: per-seed gaps
+run from -0.29 to +0.35 and the seed-level sd of the gap is 0.21-0.23, so it is NOISY. Secondary
+metric, latency: C detects degradation ~77-97 steps earlier than D at every rho (CIs do not overlap)
+with all degraded RSUs detected, again favouring C. Caveats that bear on the reading, not
+re-analysed: (i) C reaches AUC 0.98 so there is little headroom, and the gap could partly reflect
+D's weaker fit on seeds 2-3 (F15) rather than a property of message passing; (ii) the F14 held-out
+AUC ceiling of 1.0 for both was a one-scenario artefact, as predicted; (iii) seeds 2-5 were trained
+for S4 (F15), under identical settings. D43 section 5 applies: no window, threshold, seed, draw, model
+or hyperparameter change; any response (e.g. staggered onset D31(c), observation-count feature D38(d),
+other architecture) is a new DECISIONS entry labelled post-hoc and never replaces this result.
+The NOISY-response extension to seeds 6-10 is not triggered by the core (NEGATIVE) and was not run for
+collusion (see the decision request).
