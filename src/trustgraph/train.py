@@ -43,7 +43,7 @@ class TrainSettings:
 
     lr: float = 1e-3
     batch_graphs: int = 32
-    max_epochs: int = 60
+    max_epochs: int = 200
     patience: int = 8
     min_delta: float = 1e-4
     weight_decay: float = 0.0

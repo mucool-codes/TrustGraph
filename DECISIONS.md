@@ -1133,3 +1133,22 @@ rather than hidden.
 
 **Limitation queued for the paper (S11):** training and evaluation share a seed's traffic
 and differ only in injection draws (D39, D43 section 2).
+
+### D45 — Epoch cap raised from 60 to 200 for both C and D, because the cap was binding (F13)
+Date: 2026-10-13 | Session: S3 | Status: active
+
+**Decision:** `TrainSettings.max_epochs` goes from 60 to 200 for BOTH variants. Every other
+setting (lr 1e-3, Adam, batch 32 graphs, patience 8, min_delta 1e-4, selection on held-out
+next-task BCE) is unchanged. C and D are re-run from scratch under the new budget and F13 stays
+as recorded.
+
+**Alternatives:** (a) accept D at epoch 60 - rejected, the S3 exit condition is convergence and
+D's best epoch was its last; (b) raise D's learning rate or change its optimiser - rejected, it
+would give C and D different settings (S3 Task 7); (c) a larger cap only for D - rejected for the
+same reason.
+
+**Rationale:** A cap that binds for one variant and not the other is a truncation of the
+slower-learning model, not a convergence criterion. The change uses only the training/validation
+BCE curves (F13), not any AUC or C-vs-D comparison, and the patience rule that actually decides
+when each model stops is untouched - C stopped at epoch 24 by patience and will do so again, so
+the larger cap only releases D. The F13 numbers are not edited.
