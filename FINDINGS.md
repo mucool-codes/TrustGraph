@@ -767,3 +767,37 @@ rho 1  [600,660) secondary  0.9419 0.0210       0.8976 0.0501       -0.0443    0
 mean joiner trust [600,630): rho0  C control 0.9737 test 0.8853 | D control 0.9127 test 0.8706
                              rho1  C control 0.9757 test 0.8888 | D control 0.9245 test 0.7936
 ```
+
+### F17 — S4 verdict against D43 (applied to F16 after F16 was committed in 09cc126)
+Date: 2026-10-14 | Session: S4 | Commit: 09cc126 (numbers) | Config/seeds: as F16
+Command: `python scripts/s4_analyse.py --seeds 1 2 3 4 5 --verdict`
+
+```
+H2 core, correlation sweep:   rho=1.0  Delta -0.0297  CI [-0.0542, -0.0051]   W1 False (lo > 0 fails)
+                              rho=0.0  Delta -0.0517  CI [-0.0902, -0.0131]   W2 False
+                              W3 mean slope +0.0300  CI [-0.0017, +0.0617]    W3 False (CI includes 0)
+  NEGATIVE check: hi < 0 and mean <= -0.02 at rho=1.0 -> TRUE.   VERDICT: NEGATIVE (C beats D)
+Collusion rho=0:  Delta +0.0569 CI [-0.2027, +0.3166]  -> NOISY
+Collusion rho=1:  Delta +0.0626 CI [-0.2261, +0.3513]  -> NOISY
+Cold start rho=1: Delta -0.0273 CI [-0.0935, +0.0389]  -> NULL (hi < 0.05)
+(info) cold start rho=0: Delta -0.1431 CI [-0.2226, -0.0635]
+H2 holds in full (three WIN): False.  Combination: core NEGATIVE, collusion NOISY x2, cold start NULL.
+```
+Interpretation: on the pre-registered metric, the graph model D is *worse* than the node-local MLP C
+at every rho in the sweep (by 0.03-0.05 AUC), D's deficit is smallest where failures are most
+correlated (-0.052 at rho 0 to -0.030 at rho 1; per-seed slopes mostly positive, mean +0.030 but its
+interval includes 0), and seed 1 is the only seed where D is level with C. The gap is therefore not
+structural in the sense H2 claims: D does not beat C at any correlation, and the narrowing with
+correlation is not statistically established. Cold start is a NULL at rho=1 (an advantage of 0.05 is
+ruled out) and D is significantly worse at rho=0. Collusion cannot separate the models: per-seed gaps
+run from -0.29 to +0.35 and the seed-level sd of the gap is 0.21-0.23, so it is NOISY. Secondary
+metric, latency: C detects degradation ~77-97 steps earlier than D at every rho (CIs do not overlap)
+with all degraded RSUs detected, again favouring C. Caveats that bear on the reading, not
+re-analysed: (i) C reaches AUC 0.98 so there is little headroom, and the gap could partly reflect
+D's weaker fit on seeds 2-3 (F15) rather than a property of message passing; (ii) the F14 held-out
+AUC ceiling of 1.0 for both was a one-scenario artefact, as predicted; (iii) seeds 2-5 were trained
+for S4 (F15), under identical settings. D43 section 5 applies: no window, threshold, seed, draw, model
+or hyperparameter change; any response (e.g. staggered onset D31(c), observation-count feature D38(d),
+other architecture) is a new DECISIONS entry labelled post-hoc and never replaces this result.
+The NOISY-response extension to seeds 6-10 is not triggered by the core (NEGATIVE) and was not run for
+collusion (see the decision request).
