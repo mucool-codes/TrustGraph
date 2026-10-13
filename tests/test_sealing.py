@@ -43,6 +43,8 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s2_rho_quantization.py",
         "s2b_cold_start_conditions.py",
         "s3_train.py",  # wires the sealed-label diagnostic into the trainer
+        "s4_eval.py",  # evaluates frozen C/D against sealed classes (D43)
+        "s4_analyse.py",  # aggregates the above; verdict against D43
     }
 )
 
