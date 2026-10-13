@@ -971,3 +971,121 @@ sample toward scenarios where degradation happened to be concentrated, which is 
 the property the rho axis is meant to vary, and would make the control condition's
 rho = 0 result quietly less "rho = 0" than the test condition's. (b) is the silent mixing
 of conditions D38 already rejects.
+
+### D43 — S4 pre-registration: conditions, metrics, and the H2 verdict rule, fixed before any C-vs-D number exists
+Date: 2026-10-13 | Session: S3 (Task 0) | Status: active — **FROZEN. Do not revise after any
+C-vs-D measurement.** A change requires a new entry that supersedes this one, and the S4
+result already obtained stays reported alongside it.
+
+State of knowledge at writing: no trust model (C or D) has been trained, and no C-vs-D
+quantity of any kind has been computed. Everything below is derived from the spec, from
+F10-F12 (properties of the *scenarios*, not of any model), and from D29/D31/D38/D39/D42.
+This entry does not depend on the Variant D architecture; "D" means whichever Variant D
+the S3 architecture decision fixes, which is itself fixed before training.
+
+**1. Conditions that constitute the structural test (nothing else counts toward H2)**
+
+- **Correlation sweep.** rho in {0, 0.25, 0.5, 0.75, 1.0}, degraded fraction 0.20 (K = 4),
+  no collusion, no cold start.
+- **Collusion.** 1 group of 3 colluders, under_report 0.5 (the config values), at fraction
+  0.20, at rho = 0 and rho = 1.0.
+- **Cold start.** 1 cold-start RSU joining at step 600, as the control/test pair of D38
+  (`healthy_segment` / `degraded_segment`), at fraction 0.20, at rho = 0 and rho = 1.0.
+  D42 applies: attempted / infeasible / aggregated draws are reported beside every cold-start
+  number, and the control-vs-test comparison uses only draws feasible in *both*.
+- **The 5% degraded point is excluded from the structural claim.** At K = 1, rho has no
+  effect and there is no correlated failure (F10). It belongs to the fraction sweep (S9)
+  and is reported there as containing no correlated failure. The 10% point (K = 2) is
+  likewise not in the structural test (every draw is binary, F10).
+
+**2. Seeds and draws**
+
+- Seeds 1, 2, 3, 4, 5 (the seeds of F10/F12). One model per seed per variant, trained on
+  mixed conditions and frozen (L12), selected by held-out next-task BCE only.
+- Evaluation draws are injection draws 100-149 (50 per seed per cell, D39). Training uses
+  draw indices < 100 only; no evaluation draw is ever seen in training. Traffic and
+  execution noise are fixed per seed (D39), so training and evaluation share a seed's
+  traffic and differ in which RSUs misbehave. This is a stated limitation of the design,
+  not something to be fixed after the fact.
+- **The unit of analysis is the seed.** Draws within a seed share a model and traffic, so
+  they are not independent samples. Each draw yields a paired (D, C) value; draws are
+  averaged within a seed; the 95% intervals are Student-t over the 5 per-seed values
+  (df = 4, t = 2.776) of the *paired* difference D - C.
+
+**3. Metrics**
+
+- **Primary: diagnostic AUC of trust vs the sealed class.** Per draw: each active RSU's
+  trust is its mean over steps **[450, 650)** (the contested part of the ramp: one sixth
+  to five sixths of the way through, D31); score = 1 - trust; label = `degraded` (1) vs
+  `reliable` (0); compromised and cold-start RSUs excluded from this AUC. The window is
+  chosen from the design (D31: the advantage claimed is pooling weak simultaneous
+  evidence), not from any model output, because at the plateau both models can be expected
+  to be at ceiling (degraded `success_ewma` ~0.3 vs healthy ~0.97, F11) and a ceiling
+  comparison can only return a null. **Secondary, reported never gating:** the same AUC
+  over the plateau [1100, 1200).
+- **Collusion AUC:** trust over **[200, 400)** (before any degradation can act), label
+  `compromised` (1) vs `reliable` (0), degraded RSUs excluded.
+- **Cold-start AUC:** per seed, over the pooled control and test draws feasible in both,
+  score = 1 - (cold-start RSU's mean trust over the 30 steps after it joins, [600, 630)),
+  label = test (1) / control (0). Secondary window: 60 steps.
+- **Secondary: detection latency.** Per model and seed, tau = the 1st percentile of that
+  model's trust over all active RSU-steps in [100, 400) (pre-onset, so tau depends on no
+  degradation). A degraded RSU is detected at the first step t >= onset (400) from which
+  its trust stays below tau for 10 consecutive steps. Latency = t - 400, in steps; a
+  never-detected RSU is censored at 799 and the detected fraction is reported beside the
+  mean. Latency never enters the H2 verdict.
+- **Realised correlation.** Every draw records its realised pair concentration c (the
+  five possible shapes at K = 4 are c = 0, 1/6, 1/3, 1/2, 1; D29/F10). All results are
+  reported against realised c as well as nominal rho (D41 Q1).
+
+**4. The H2 verdict rule** (Delta = per-seed mean AUC_D - AUC_C, interval = 95% t over seeds)
+
+Let [lo, hi] be the interval for Delta at **rho = 1.0** in the correlation sweep.
+
+- **WIN (structural)** requires all three:
+  - **W1** lo > 0 **and** mean Delta >= 0.02 at rho = 1.0.
+  - **W2** at rho = 0 the interval for Delta contains 0, **or** |mean Delta| < 0.02. (If
+    D also beats C when failures are independent, the advantage is not structural.)
+  - **W3** per seed, regress the per-draw Delta on realised c over all 250 draws of that
+    seed (all five nominal rho pooled); the mean of the 5 slopes is > 0 with its t-interval
+    excluding 0.
+- **WIN-NONSTRUCTURAL:** W1 holds and W2 fails. D is better, but not for the reason H2
+  claims; reported as exactly that, not as support for H2.
+- **NEGATIVE:** hi < 0 and mean Delta <= -0.02 at rho = 1.0 (C beats D).
+- **NULL:** not WIN/NEGATIVE, and hi < 0.05 (an advantage of 0.05 or more is ruled out).
+- **NOISY:** anything else — the interval at rho = 1.0 is too wide to either confirm 0.02
+  or rule out 0.05. Check order: NEGATIVE, WIN / WIN-NONSTRUCTURAL, NULL, NOISY.
+- **Response to NOISY (decided now):** one extension only, to seeds 6-10, same draws, same
+  code, same hyperparameters; the verdict is re-evaluated on all 10 seeds (t = 2.262,
+  df = 9). Still NOISY at 10 seeds is reported as inconclusive. Draws are not increased in
+  place of seeds: they do not reduce seed-level variance.
+- **Cold start and collusion are judged separately**, each by W1 alone on its own AUC (at
+  rho = 1.0 for cold start; at rho = 1.0 and rho = 0 for collusion, reported separately),
+  using the same WIN / NULL / NOISY thresholds. No pooling across conditions and no
+  multiplicity correction: the three conditions are named in H2 and are reported as three
+  verdicts. "H2 holds in full" means all three are WIN; any other combination is stated
+  as the combination it is.
+
+**5. What may not happen after the result**
+
+- No change to the windows, thresholds, seeds, draws, or this rule. No model or
+  hyperparameter change between seeds or after seeing S4 output.
+- If S4 is NULL or NOISY and a response is wanted (staggered onset D31(c), an
+  observation-count feature D38(d), a different architecture), it is a new DECISIONS
+  entry and its run is labelled post-hoc; it never replaces the S4 result.
+
+**Alternatives:** (a) non-overlap of the two models' separate 95% intervals (the
+illustrative criterion in the S3 brief) — rejected as the primary: C and D share seeds,
+traffic and draws, so the paired difference is the correct statistic, and non-overlap of
+unpaired intervals at n = 5 mostly measures between-seed spread rather than the gap; the
+non-overlap check is still printed. (b) plateau-window AUC as primary — rejected as a
+ceiling comparison (above). (c) a threshold-free "gap widens" criterion only — rejected: a
+significance-only rule would count a gap of 0.003.
+
+**Rationale:** L12 and the H2 text commit to a gap that is "statistically meaningful
+across >= 5 seeds, widening as rho strengthens", which cannot be judged unless "meaningful"
+and "widening" are numbers. Fixing them before any model exists is what makes a positive
+S4 result credible and a negative one publishable (PROJECT_SPEC.md 4.1: the fallback is an
+honest negative result). The 0.02 effect floor stops a statistically detectable but
+practically empty gap counting as a win; the 0.05 ruling-out bound is what lets a NULL be
+stated as "an advantage of 0.05 is excluded" rather than "no significant difference".
