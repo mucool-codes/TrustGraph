@@ -1089,3 +1089,47 @@ S4 result credible and a negative one publishable (PROJECT_SPEC.md 4.1: the fall
 honest negative result). The 0.02 effect floor stops a statistically detectable but
 practically empty gap counting as a win; the 0.05 ruling-out bound is what lets a NULL be
 stated as "an advantage of 0.05 is excluded" rather than "no significant difference".
+
+### D44 — Variant D is a 2-layer GINEConv over all four edge features; C matches its depth and width; a C-independent fallback trigger is fixed before training
+Date: 2026-10-13 | Session: S3 | Status: active
+Resolves the S3 decision request. Amends the layer type of the S0 TrustHead (D1/L1 fix the
+role and depth, not the conv type). D43 is untouched.
+
+**Decision:**
+1. **Q1 — edge-aware layer.** Variant D uses two `GINEConv` layers with `edge_dim = 4`
+   (link_latency, signal_strength, link_age, same_segment), followed by the same scalar
+   sigmoid head. Depth stays 2 (L1); the edge type stays single and homogeneous (L6). A
+   LayerNorm on the layer output is allowed if training is unstable, applied identically
+   in any later variant of D, and recorded if used.
+2. **Q2 — capacity matching.** Variant C is an MLP over the RSU feature block only
+   (`RSU_FEATURES`, no vehicle block, no position, no neighbour data) with 2 hidden layers
+   of width 32 and the same head. Only message passing differs. Both parameter counts and
+   D's count as a multiple of C's are reported in FINDINGS.md.
+3. **Fallback trigger, fixed before training and independent of C.** After D is trained,
+   on the *validation* scenarios only, two checks:
+   - **Edge probe:** set `same_segment` to 0 on every edge (and, separately, to 1 on every
+     RSU-RSU edge) at inference; the mean absolute change in RSU trust must be >= 0.01.
+   - **Loss check:** held-out next-task BCE after training is below the untrained model's
+     held-out BCE.
+   If D fails either check it is replaced **once** by `GATv2Conv` with `edge_dim = 4`,
+   the reason is recorded, and the choice is then frozen. No switch of architecture is
+   made on the basis of any C-vs-D number (that is the choice-after-outcome D43 exists to
+   prevent), and (c) "same_segment-gated SAGE" is not a further fallback.
+
+**Why SAGEConv was ruled out:** it cannot see `same_segment` (and `forward` never received
+`edge_attr`), so D could not distinguish a same-segment from a cross-segment neighbour and
+H2 would be untestable rather than false.
+
+**Alternatives:** (b) GATv2Conv with edge_dim=4 as the first choice - more parts, kept as
+the single pre-committed fallback; (c) SAGE with aggregation split by `same_segment` -
+custom code, no evidence it is needed (Standing Rule 3); matching C by parameter count
+instead of depth and width.
+
+**Rationale:** GINEConv is the simplest off-the-shelf layer that exposes every edge
+feature. Its sum aggregation scales with degree, but the graph is capped at 15-30 RSUs
+(L9) so degree is bounded. Matching depth and width keeps message passing the only
+difference between C and D; D has more parameters (edge encoders), which is reported
+rather than hidden.
+
+**Limitation queued for the paper (S11):** training and evaluation share a seed's traffic
+and differ only in injection draws (D39, D43 section 2).
