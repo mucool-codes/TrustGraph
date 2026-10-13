@@ -48,6 +48,7 @@ def run_pipeline(
     device = torch.device(cfg.device)
 
     model = build_trust_head(cfg.model, cfg.seeds.torch_seed("model_init"), cfg.device)
+    model.eval()  # inference mode; training is train.py's job
     builder = build_snapshot_builder(cfg, world, trace, observed)
 
     alpha = float(cfg.selection["alpha"])
@@ -69,7 +70,7 @@ def run_pipeline(
         graph = data.to(device)
 
         with torch.no_grad():
-            trust_all = model(graph.x, graph.edge_index).cpu().numpy()
+            trust_all = model(graph.x, graph.edge_index, graph.edge_attr).cpu().numpy()
 
         # Advertised load is read straight out of the graph's RSU block, so there is
         # no parallel array to drift out of sync with the features.

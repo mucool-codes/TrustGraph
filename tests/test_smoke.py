@@ -32,7 +32,7 @@ def test_trust_head_output_shape_and_range(cfg, world, trace, observed):
     model = build_trust_head(cfg.model, cfg.seeds.torch_seed("model_init"), cfg.device)
 
     with torch.no_grad():
-        trust = model(data.x, data.edge_index)
+        trust = model.eval()(data.x, data.edge_index, data.edge_attr)
 
     # L1: a single scalar per node, nothing else.
     assert trust.shape == (data.num_nodes,)

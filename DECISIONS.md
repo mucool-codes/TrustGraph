@@ -971,3 +971,184 @@ sample toward scenarios where degradation happened to be concentrated, which is 
 the property the rho axis is meant to vary, and would make the control condition's
 rho = 0 result quietly less "rho = 0" than the test condition's. (b) is the silent mixing
 of conditions D38 already rejects.
+
+### D43 — S4 pre-registration: conditions, metrics, and the H2 verdict rule, fixed before any C-vs-D number exists
+Date: 2026-10-13 | Session: S3 (Task 0) | Status: active — **FROZEN. Do not revise after any
+C-vs-D measurement.** A change requires a new entry that supersedes this one, and the S4
+result already obtained stays reported alongside it.
+
+State of knowledge at writing: no trust model (C or D) has been trained, and no C-vs-D
+quantity of any kind has been computed. Everything below is derived from the spec, from
+F10-F12 (properties of the *scenarios*, not of any model), and from D29/D31/D38/D39/D42.
+This entry does not depend on the Variant D architecture; "D" means whichever Variant D
+the S3 architecture decision fixes, which is itself fixed before training.
+
+**1. Conditions that constitute the structural test (nothing else counts toward H2)**
+
+- **Correlation sweep.** rho in {0, 0.25, 0.5, 0.75, 1.0}, degraded fraction 0.20 (K = 4),
+  no collusion, no cold start.
+- **Collusion.** 1 group of 3 colluders, under_report 0.5 (the config values), at fraction
+  0.20, at rho = 0 and rho = 1.0.
+- **Cold start.** 1 cold-start RSU joining at step 600, as the control/test pair of D38
+  (`healthy_segment` / `degraded_segment`), at fraction 0.20, at rho = 0 and rho = 1.0.
+  D42 applies: attempted / infeasible / aggregated draws are reported beside every cold-start
+  number, and the control-vs-test comparison uses only draws feasible in *both*.
+- **The 5% degraded point is excluded from the structural claim.** At K = 1, rho has no
+  effect and there is no correlated failure (F10). It belongs to the fraction sweep (S9)
+  and is reported there as containing no correlated failure. The 10% point (K = 2) is
+  likewise not in the structural test (every draw is binary, F10).
+
+**2. Seeds and draws**
+
+- Seeds 1, 2, 3, 4, 5 (the seeds of F10/F12). One model per seed per variant, trained on
+  mixed conditions and frozen (L12), selected by held-out next-task BCE only.
+- Evaluation draws are injection draws 100-149 (50 per seed per cell, D39). Training uses
+  draw indices < 100 only; no evaluation draw is ever seen in training. Traffic and
+  execution noise are fixed per seed (D39), so training and evaluation share a seed's
+  traffic and differ in which RSUs misbehave. This is a stated limitation of the design,
+  not something to be fixed after the fact.
+- **The unit of analysis is the seed.** Draws within a seed share a model and traffic, so
+  they are not independent samples. Each draw yields a paired (D, C) value; draws are
+  averaged within a seed; the 95% intervals are Student-t over the 5 per-seed values
+  (df = 4, t = 2.776) of the *paired* difference D - C.
+
+**3. Metrics**
+
+- **Primary: diagnostic AUC of trust vs the sealed class.** Per draw: each active RSU's
+  trust is its mean over steps **[450, 650)** (the contested part of the ramp: one sixth
+  to five sixths of the way through, D31); score = 1 - trust; label = `degraded` (1) vs
+  `reliable` (0); compromised and cold-start RSUs excluded from this AUC. The window is
+  chosen from the design (D31: the advantage claimed is pooling weak simultaneous
+  evidence), not from any model output, because at the plateau both models can be expected
+  to be at ceiling (degraded `success_ewma` ~0.3 vs healthy ~0.97, F11) and a ceiling
+  comparison can only return a null. **Secondary, reported never gating:** the same AUC
+  over the plateau [1100, 1200).
+- **Collusion AUC:** trust over **[200, 400)** (before any degradation can act), label
+  `compromised` (1) vs `reliable` (0), degraded RSUs excluded.
+- **Cold-start AUC:** per seed, over the pooled control and test draws feasible in both,
+  score = 1 - (cold-start RSU's mean trust over the 30 steps after it joins, [600, 630)),
+  label = test (1) / control (0). Secondary window: 60 steps.
+- **Secondary: detection latency.** Per model and seed, tau = the 1st percentile of that
+  model's trust over all active RSU-steps in [100, 400) (pre-onset, so tau depends on no
+  degradation). A degraded RSU is detected at the first step t >= onset (400) from which
+  its trust stays below tau for 10 consecutive steps. Latency = t - 400, in steps; a
+  never-detected RSU is censored at 799 and the detected fraction is reported beside the
+  mean. Latency never enters the H2 verdict.
+- **Realised correlation.** Every draw records its realised pair concentration c (the
+  five possible shapes at K = 4 are c = 0, 1/6, 1/3, 1/2, 1; D29/F10). All results are
+  reported against realised c as well as nominal rho (D41 Q1).
+
+**4. The H2 verdict rule** (Delta = per-seed mean AUC_D - AUC_C, interval = 95% t over seeds)
+
+Let [lo, hi] be the interval for Delta at **rho = 1.0** in the correlation sweep.
+
+- **WIN (structural)** requires all three:
+  - **W1** lo > 0 **and** mean Delta >= 0.02 at rho = 1.0.
+  - **W2** at rho = 0 the interval for Delta contains 0, **or** |mean Delta| < 0.02. (If
+    D also beats C when failures are independent, the advantage is not structural.)
+  - **W3** per seed, regress the per-draw Delta on realised c over all 250 draws of that
+    seed (all five nominal rho pooled); the mean of the 5 slopes is > 0 with its t-interval
+    excluding 0.
+- **WIN-NONSTRUCTURAL:** W1 holds and W2 fails. D is better, but not for the reason H2
+  claims; reported as exactly that, not as support for H2.
+- **NEGATIVE:** hi < 0 and mean Delta <= -0.02 at rho = 1.0 (C beats D).
+- **NULL:** not WIN/NEGATIVE, and hi < 0.05 (an advantage of 0.05 or more is ruled out).
+- **NOISY:** anything else — the interval at rho = 1.0 is too wide to either confirm 0.02
+  or rule out 0.05. Check order: NEGATIVE, WIN / WIN-NONSTRUCTURAL, NULL, NOISY.
+- **Response to NOISY (decided now):** one extension only, to seeds 6-10, same draws, same
+  code, same hyperparameters; the verdict is re-evaluated on all 10 seeds (t = 2.262,
+  df = 9). Still NOISY at 10 seeds is reported as inconclusive. Draws are not increased in
+  place of seeds: they do not reduce seed-level variance.
+- **Cold start and collusion are judged separately**, each by W1 alone on its own AUC (at
+  rho = 1.0 for cold start; at rho = 1.0 and rho = 0 for collusion, reported separately),
+  using the same WIN / NULL / NOISY thresholds. No pooling across conditions and no
+  multiplicity correction: the three conditions are named in H2 and are reported as three
+  verdicts. "H2 holds in full" means all three are WIN; any other combination is stated
+  as the combination it is.
+
+**5. What may not happen after the result**
+
+- No change to the windows, thresholds, seeds, draws, or this rule. No model or
+  hyperparameter change between seeds or after seeing S4 output.
+- If S4 is NULL or NOISY and a response is wanted (staggered onset D31(c), an
+  observation-count feature D38(d), a different architecture), it is a new DECISIONS
+  entry and its run is labelled post-hoc; it never replaces the S4 result.
+
+**Alternatives:** (a) non-overlap of the two models' separate 95% intervals (the
+illustrative criterion in the S3 brief) — rejected as the primary: C and D share seeds,
+traffic and draws, so the paired difference is the correct statistic, and non-overlap of
+unpaired intervals at n = 5 mostly measures between-seed spread rather than the gap; the
+non-overlap check is still printed. (b) plateau-window AUC as primary — rejected as a
+ceiling comparison (above). (c) a threshold-free "gap widens" criterion only — rejected: a
+significance-only rule would count a gap of 0.003.
+
+**Rationale:** L12 and the H2 text commit to a gap that is "statistically meaningful
+across >= 5 seeds, widening as rho strengthens", which cannot be judged unless "meaningful"
+and "widening" are numbers. Fixing them before any model exists is what makes a positive
+S4 result credible and a negative one publishable (PROJECT_SPEC.md 4.1: the fallback is an
+honest negative result). The 0.02 effect floor stops a statistically detectable but
+practically empty gap counting as a win; the 0.05 ruling-out bound is what lets a NULL be
+stated as "an advantage of 0.05 is excluded" rather than "no significant difference".
+
+### D44 — Variant D is a 2-layer GINEConv over all four edge features; C matches its depth and width; a C-independent fallback trigger is fixed before training
+Date: 2026-10-13 | Session: S3 | Status: active
+Resolves the S3 decision request. Amends the layer type of the S0 TrustHead (D1/L1 fix the
+role and depth, not the conv type). D43 is untouched.
+
+**Decision:**
+1. **Q1 — edge-aware layer.** Variant D uses two `GINEConv` layers with `edge_dim = 4`
+   (link_latency, signal_strength, link_age, same_segment), followed by the same scalar
+   sigmoid head. Depth stays 2 (L1); the edge type stays single and homogeneous (L6). A
+   LayerNorm on the layer output is allowed if training is unstable, applied identically
+   in any later variant of D, and recorded if used.
+2. **Q2 — capacity matching.** Variant C is an MLP over the RSU feature block only
+   (`RSU_FEATURES`, no vehicle block, no position, no neighbour data) with 2 hidden layers
+   of width 32 and the same head. Only message passing differs. Both parameter counts and
+   D's count as a multiple of C's are reported in FINDINGS.md.
+3. **Fallback trigger, fixed before training and independent of C.** After D is trained,
+   on the *validation* scenarios only, two checks:
+   - **Edge probe:** set `same_segment` to 0 on every edge (and, separately, to 1 on every
+     RSU-RSU edge) at inference; the mean absolute change in RSU trust must be >= 0.01.
+   - **Loss check:** held-out next-task BCE after training is below the untrained model's
+     held-out BCE.
+   If D fails either check it is replaced **once** by `GATv2Conv` with `edge_dim = 4`,
+   the reason is recorded, and the choice is then frozen. No switch of architecture is
+   made on the basis of any C-vs-D number (that is the choice-after-outcome D43 exists to
+   prevent), and (c) "same_segment-gated SAGE" is not a further fallback.
+
+**Why SAGEConv was ruled out:** it cannot see `same_segment` (and `forward` never received
+`edge_attr`), so D could not distinguish a same-segment from a cross-segment neighbour and
+H2 would be untestable rather than false.
+
+**Alternatives:** (b) GATv2Conv with edge_dim=4 as the first choice - more parts, kept as
+the single pre-committed fallback; (c) SAGE with aggregation split by `same_segment` -
+custom code, no evidence it is needed (Standing Rule 3); matching C by parameter count
+instead of depth and width.
+
+**Rationale:** GINEConv is the simplest off-the-shelf layer that exposes every edge
+feature. Its sum aggregation scales with degree, but the graph is capped at 15-30 RSUs
+(L9) so degree is bounded. Matching depth and width keeps message passing the only
+difference between C and D; D has more parameters (edge encoders), which is reported
+rather than hidden.
+
+**Limitation queued for the paper (S11):** training and evaluation share a seed's traffic
+and differ only in injection draws (D39, D43 section 2).
+
+### D45 — Epoch cap raised from 60 to 200 for both C and D, because the cap was binding (F13)
+Date: 2026-10-13 | Session: S3 | Status: active
+
+**Decision:** `TrainSettings.max_epochs` goes from 60 to 200 for BOTH variants. Every other
+setting (lr 1e-3, Adam, batch 32 graphs, patience 8, min_delta 1e-4, selection on held-out
+next-task BCE) is unchanged. C and D are re-run from scratch under the new budget and F13 stays
+as recorded.
+
+**Alternatives:** (a) accept D at epoch 60 - rejected, the S3 exit condition is convergence and
+D's best epoch was its last; (b) raise D's learning rate or change its optimiser - rejected, it
+would give C and D different settings (S3 Task 7); (c) a larger cap only for D - rejected for the
+same reason.
+
+**Rationale:** A cap that binds for one variant and not the other is a truncation of the
+slower-learning model, not a convergence criterion. The change uses only the training/validation
+BCE curves (F13), not any AUC or C-vs-D comparison, and the patience rule that actually decides
+when each model stops is untouched - C stopped at epoch 24 by patience and will do so again, so
+the larger cap only releases D. The F13 numbers are not edited.
