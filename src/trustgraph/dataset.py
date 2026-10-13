@@ -26,8 +26,8 @@ from torch_geometric.data import Data
 
 from .config import Config
 from .observed import ObservedScenario, default_observed_path, load_observed
-from .scenario import build_snapshot_builder, build_world
-from .trace import default_trace_path, load_trace
+from .scenario import World, build_snapshot_builder, build_world
+from .trace import Trace, default_trace_path, load_trace
 
 
 def next_task_labels(observed: ObservedScenario) -> tuple[np.ndarray, np.ndarray]:
@@ -80,13 +80,36 @@ def build_graphset(
     stride: int = 4,
     step_range: tuple[int, int] | None = None,
 ) -> GraphSet:
-    """Load the observable scenario and trace for `cfg` and cache every `stride`-th
-    graph. The snapshot builder is stateful (D25), so it is stepped through every
-    timestep; only the retained graphs are kept."""
+    """Load the observable scenario and trace for `cfg` from disk and cache every
+    `stride`-th graph."""
     observed_path = default_observed_path(config_path, cfg)
     observed = load_observed(observed_path)
     trace = load_trace(default_trace_path(config_path, cfg.seed))
-    world = build_world(cfg)
+    return graphset_from(
+        cfg,
+        build_world(cfg),
+        trace,
+        observed,
+        stride=stride,
+        step_range=step_range,
+        name=observed_path.name.removesuffix(".observed.npz"),
+    )
+
+
+def graphset_from(
+    cfg: Config,
+    world: World,
+    trace: Trace,
+    observed: ObservedScenario,
+    stride: int = 4,
+    step_range: tuple[int, int] | None = None,
+    name: str = "",
+) -> GraphSet:
+    """Cache every `stride`-th graph of an in-memory (world, trace, observable) triple.
+
+    The snapshot builder is stateful (D25), so it is stepped through every timestep;
+    only the retained graphs are kept.
+    """
     builder = build_snapshot_builder(cfg, world, trace, observed)
     y_all, valid_all = next_task_labels(observed)
     num_rsus = world.topology.num_rsus
@@ -118,5 +141,5 @@ def build_graphset(
         graphs=graphs,
         steps=np.asarray(steps, dtype=np.int64),
         num_rsus=num_rsus,
-        name=observed_path.name.removesuffix(".observed.npz"),
+        name=name,
     )
