@@ -582,3 +582,45 @@ rho = 0 the test node has on average only 0.5 degraded same-segment coordination
 neighbours, against 2.05 at rho = 1: at low rho the "test" condition mostly offers the
 GNN no degraded neighbour to propagate from, so the cold-start test condition only probes
 the claim it is meant to probe at high rho.
+
+### F13 — S3 first training run (seed 1): C converges by patience; D hits the 60-epoch cap still improving
+Date: 2026-10-13 | Session: S3 | Commit: cc1dfdb (code identical to bce1464 apart from the dataset refactor and tests)
+Config: `configs/demo.yaml`, seed 1; `TrainSettings` lr 1e-3, Adam, batch 32 graphs, max 60 epochs,
+patience 8, min_delta 1e-4 - all set a priori, shared by C and D, not tuned |
+Data: Baseline A dispatch; train rho{0,.25,.5,.75,1} x frac{.1,.2,.3} x draws{0,1} = 30 scenarios
+(9000 graphs at stride 4); validation rho{0,.5,1} x frac{.1,.2,.3} draw 40 = 9 scenarios;
+held-out rho 1.0, frac 0.2, draw 90 (stride 1)
+Command: `python scripts/s3_train.py --config configs/demo.yaml --seed 1` (253 s)
+(A 2-epoch plumbing run preceded this; its numbers were not recorded and not used.)
+
+Numbers:
+```
+parameters           C 1313   D 1614   D/C 1.23x
+                          C                     D
+untrained val BCE         0.68385               0.93336
+best val BCE              0.16614 (epoch 16)    0.16226 (epoch 60)
+stopped                   epoch 24, patience    epoch 60, MAX_EPOCHS (best epoch = last)
+D val BCE, epochs 50..60 : 0.16352 0.16608 0.16509 0.16424 0.16309 0.16306 0.16614 0.16252 0.16711 0.16596 0.16226
+held-out (rho 1.0, frac 0.2, draw 90):
+  next-task BCE                 0.16804               0.16845
+  diagnostic AUC [450,650)      1.0000                0.9844
+  diagnostic AUC [1100,1200)    1.0000                1.0000
+validation-scenario diagnostic AUC [450,650) (rho 1.0, frac 0.2, draw 40), per epoch, final:
+  C 0.7812 (rose 0.52 -> 0.78 over training)   D 0.5625 (range 0.42-0.72, noisy, no trend)
+D edge probe (validation): mean |dtrust| same_segment->0 on all edges 0.0423; ->1 on RSU-RSU edges 0.0199
+Calibration, held-out (predicted bin: n, mean_pred, observed):
+ C: 0.0-0.1 49 .083 .000 | .1-.2 371 .156 .140 | .2-.3 592 .249 .297 | .3-.4 679 .345 .317 | .4-.5 437 .438 .474
+    .5-.6 237 .532 .616 | .6-.7 86 .626 .616 | .7-.8 138 .764 .797 | .8-.9 1391 .867 .874 | .9-1.0 19913 .976 .976
+ D: 0.0-0.1 46 .075 .022 | .1-.2 238 .156 .092 | .2-.3 317 .251 .211 | .3-.4 373 .352 .332 | .4-.5 493 .450 .323
+    .5-.6 422 .547 .429 | .6-.7 373 .651 .552 | .7-.8 494 .752 .692 | .8-.9 1308 .861 .839 | .9-1.0 19829 .982 .979
+```
+D44 fallback checks for D: edge probe >= 0.01 in both directions - PASS; held-out BCE below the
+untrained model's - PASS. The architecture stays GINEConv.
+
+Interpretation: C converged; D did NOT converge under the a-priori budget - its validation BCE
+was still falling at the epoch cap (0.1623 vs C's 0.1661), so "C and D converge" is unmet and
+the comparison above is between a converged C and a truncated D. D over-predicts trust at
+mid-range (bins .4-.8 observed below predicted), C is closer to calibrated there. One held-out
+scenario (4 degraded RSUs) says nothing about H2; the per-epoch validation-scenario AUC (0.78
+vs 0.56) and the held-out AUC (1.00 vs 0.98) disagree by a wide margin for both models,
+showing the single-scenario AUC is dominated by which RSUs happened to degrade.
