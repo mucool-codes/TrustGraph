@@ -31,7 +31,7 @@ SEALED = "trustgraph.sealed"
 
 # Package modules allowed to hold ground truth. The simulator decides what goes wrong,
 # so it must. Nothing else in the package may.
-GROUND_TRUTH_MODULES = frozenset({"trustgraph.simulator"})
+GROUND_TRUTH_MODULES = frozenset({"trustgraph.simulator", "trustgraph.diagnostic"})
 
 # Scripts allowed to hold ground truth: they generate scenarios or evaluate against
 # the sealed state (PROJECT_SPEC.md 4.4 - evaluation code may hold both).
@@ -42,6 +42,7 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s2_report.py",
         "s2_rho_quantization.py",
         "s2b_cold_start_conditions.py",
+        "s3_train.py",  # wires the sealed-label diagnostic into the trainer
     }
 )
 
@@ -168,6 +169,7 @@ def test_training_path_modules_are_all_covered():
     failure message says which part of the training path broke."""
     training_path = {
         "trustgraph.config",
+        "trustgraph.dataset",
         "trustgraph.features",
         "trustgraph.graph",
         "trustgraph.model",
@@ -176,6 +178,7 @@ def test_training_path_modules_are_all_covered():
         "trustgraph.selection",
         "trustgraph.tasks",
         "trustgraph.tracking",
+        "trustgraph.train",
         "trustgraph.trace",
     }
     assert training_path <= set(INDEX)
