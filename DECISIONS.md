@@ -1709,3 +1709,19 @@ Data are read from `results/s9b/raw` and the stored S9 files; `make_figures.py` 
 **Alternatives:** leaving Gate-C out of the figures (the paper would then omit the baseline a reviewer is most likely to ask for); showing it highlighted (would present a null as a finding).
 
 **Rationale:** the comparison is part of the record (F29/F30) and the figures must stay current with it, in the same style as the other variants.
+
+### D62 — Resolution of the S9b decision request: how "weighted, not a gate" is framed, no further gate designs, where Gate-C appears (amends D61's "Figure 3 is not changed")
+Date: 2026-10-14 | Session: after S9b (design review) | Status: active
+Records the review answers to the S9b decision request. D59, F28-F31 and D61's other content are not edited; nothing is re-run.
+
+**Decision:**
+- **Q1: "weighted term, not a gate" is framed as a design argument, not a measured gain.** The paper states what the data showed: on the same trust head, gating performed equivalently on success (C minus Gate-C within +/-0.001 at every fraction, D59 verdict NOT SEPARATED, F30).
+  The weighted form's benefits are stated as design properties: an exactly decomposable score (Layer 1) and no empty-candidate-set failure mode (the gate fell back on 4-19% of decisions, F29/F30; the weighted rule has no such case).
+- **Q2: accept the null. No further gate designs** (no gate on D's head, no other alpha, no soft gate); D59 section 5 stands.
+- **Q3: Gate-C appears in Figures 3 and 4 and in the ablation table, labelled as an extra baseline;** not in the timeline (Figure 2) or the S4/S8 figures (Figures 5, 6), where it was not evaluated. This extends D61, which had left Figure 3 unchanged; Figure 3 now shows Gate-C in both panels
+  (success per fraction, and its paired gain over A), in its own colour, not highlighted.
+- **Tags:** `s9b-complete` stays on `1c8c67e` (the first S9b merge) and is not moved; `s9b-final` is added on `99065b0` (S9b after the record completion, F31 and D61). The D62 / Figure 3 change comes after `s9b-final`.
+
+**Alternatives:** presenting the weighted form as a measured improvement (contradicted by F30); a further gate study (D59 section 5); Gate-C in every figure (it was not evaluated in the timeline or the S4/S8 scenarios).
+
+**Rationale:** the paper may claim only what F30 supports; the exact decomposition and the absence of a fallback case are properties of the design that do not depend on a success gap.

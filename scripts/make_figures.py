@@ -92,7 +92,8 @@ def load_paired() -> dict:
 def load_gate() -> dict:
     """Gate-C (S9b, D59) at the four fraction-sweep points, from results/s9b/raw (read through s9b_gate's json loader; no sealed access).
 
-    Returns {"T": {(rho, frac): {metric: (mean, sd)}}, "paired": {(rho, frac): Effect of C minus Gate-C success}}.
+    Returns {"T": {(rho, frac): {metric: (mean, sd)}}, "paired": {(rho, frac): Effect of C minus Gate-C success},
+    "vs_a": {(rho, frac): Effect of Gate-C minus A success}}.
     """
     if not (REPO_ROOT / "results" / "s9b" / "raw").exists():
         raise SystemExit("results/s9b/raw missing: run `python scripts/s9b_gate.py run` first (S9b)")
@@ -100,7 +101,7 @@ def load_gate() -> dict:
     from trustgraph import sweep_metrics as M
 
     g = G.load_gate()
-    T, paired = {}, {}
+    T, paired, vs_a = {}, {}, {}
     for pt, d in G.load_arrays(g).items():
         a = d["a"]
         sm = lambda x: (float(np.mean(M.seed_means(x))), float(np.std(M.seed_means(x), ddof=1)))  # noqa: E731
@@ -108,7 +109,8 @@ def load_gate() -> dict:
         T[key] = {"success_post_onset": sm(a["g_succ"]), "success_all": sm(a["g_all"]), "n_av": sm(a["g_nav"]), "n_win": sm(a["g_nwin"]),
                   "never_avoided": sm(a["g_never"]), "fallback_all": sm(a["fb_all"]), "fallback_post": sm(a["fb_post"])}
         paired[key] = M.h3_effect(a["c_succ"], a["g_succ"])
-    return {"T": T, "paired": paired, "tau": g["tau"]}
+        vs_a[key] = M.h3_effect(a["g_succ"], a["a_succ"])
+    return {"T": T, "paired": paired, "vs_a": vs_a, "tau": g["tau"]}
 
 
 def ensure_inputs(recompute: bool) -> None:
@@ -253,24 +255,31 @@ def fig_timeline() -> None:
 
 
 # ------------------------------------------------------------------ Figure 3: success vs fraction
-def fig_success_vs_fraction(T, P) -> None:
+def fig_success_vs_fraction(T, P, GT) -> None:
     fr = [0.05, 0.10, 0.20, 0.30]
     fig, ax = plt.subplots(1, 2, figsize=(14, 5.4), gridspec_kw={"wspace": 0.22})
     a = ax[0]
-    order = [("A", "A = B  (identical decisions)", "o"), ("B_oracle", NAME["B_oracle"], "s"), ("C", NAME["C"], "^"), ("D", "D = E  (same dispatch)", "D")]
-    off = {"A": -0.9, "B_oracle": -0.3, "C": 0.3, "D": 0.9}
+    order = [("A", "A = B  (identical decisions)", "o"), ("B_oracle", NAME["B_oracle"], "s"), ("C", NAME["C"], "^"),
+             ("Gate_C", "Gate-C  (extra baseline)", "v"), ("D", "D = E  (same dispatch)", "D")]
+    off = {"A": -1.2, "B_oracle": -0.6, "C": 0.0, "Gate_C": 0.6, "D": 1.2}
     for v, lab, mk in order:
-        m = [T[(1.0, f)][v]["success_post_onset"][0] for f in fr]; s = [T[(1.0, f)][v]["success_post_onset"][1] for f in fr]
+        src_ = {f: (GT["T"][(1.0, f)] if v == "Gate_C" else T[(1.0, f)][v]) for f in fr}
+        m = [src_[f]["success_post_onset"][0] for f in fr]; s = [src_[f]["success_post_onset"][1] for f in fr]
         a.errorbar(np.array(fr) * 100 + off[v], m, yerr=s, color=COL[v], marker=mk, ms=8, capsize=4, lw=2.2,
                    ls="--" if v == "B_oracle" else "-", label=lab)
     a.set_xticks([5, 10, 20, 30]); a.set_xlabel("degraded fraction of RSUs (%)  at rho = 1.0"); a.set_ylabel("task success rate after onset")
     a.set_title("(a) Success, mean +/- sd over 5 seeds"); a.legend(frameon=False, fontsize=11, loc="lower left")
     a.text(30.5, 0.9755, "at 5% only one RSU is degraded:\nno correlated failure", fontsize=10.5, color=MUTED, ha="right", va="top")
     b = ax[1]
-    for v, off_ in (("C", -0.4), ("D", 0.4)):
-        m = np.array([P[(1.0, f, v, "A")]["h3_mean"] for f in fr]); lo = np.array([P[(1.0, f, v, "A")]["h3_lo"] for f in fr])
-        hi = np.array([P[(1.0, f, v, "A")]["h3_hi"] for f in fr])
-        b.errorbar(np.array(fr) * 100 + off_, m, yerr=[m - lo, hi - m], color=COL[v], marker="o", ms=8, capsize=4, label=f"{v} minus A")
+    for v, off_ in (("C", -0.6), ("Gate_C", 0.0), ("D", 0.6)):
+        if v == "Gate_C":
+            e = [GT["vs_a"][(1.0, f)] for f in fr]
+            m = np.array([x.mean for x in e]); lo = np.array([x.lo for x in e]); hi = np.array([x.hi for x in e])
+        else:
+            m = np.array([P[(1.0, f, v, "A")]["h3_mean"] for f in fr]); lo = np.array([P[(1.0, f, v, "A")]["h3_lo"] for f in fr])
+            hi = np.array([P[(1.0, f, v, "A")]["h3_hi"] for f in fr])
+        b.errorbar(np.array(fr) * 100 + off_, m, yerr=[m - lo, hi - m], color=COL[v], marker="v" if v == "Gate_C" else "o", ms=8, capsize=4,
+                   label=("Gate-C minus A  (extra baseline)" if v == "Gate_C" else f"{v} minus A"))
     b.axhline(0, color=MUTED, lw=1.2); b.axhline(0.01, color=MUTED, lw=1.2, ls=":")
     b.text(30.8, 0.0115, "pre-registered floor 0.01", ha="right", fontsize=10.5, color=MUTED)
     b.set_xticks([5, 10, 20, 30]); b.set_xlabel("degraded fraction of RSUs (%)  at rho = 1.0"); b.set_ylabel("paired gain in success rate")
@@ -506,7 +515,7 @@ def main() -> int:
     ensure_inputs(a.recompute)
     T, P, GT = load_table(), load_paired(), load_gate()
     print("figures:")
-    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P); fig_ablation(T, P, GT); fig_s4_gap(); fig_explanation()
+    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P, GT); fig_ablation(T, P, GT); fig_s4_gap(); fig_explanation()
     print("tables:")
     tables(T, P, GT)
     return 0
