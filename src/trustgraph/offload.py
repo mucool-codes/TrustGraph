@@ -39,7 +39,7 @@ from .train import load_checkpoint
 
 VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E")
 HANDOFF_MODES: tuple[str, ...] = ("relay", "off")
-LOG_SCHEMA_VERSION = 1
+LOG_SCHEMA_VERSION = 2  # 2: candidates carry `load`, the exact value the score used (D53)
 
 # variant -> where its trust term comes from
 TRUST_SOURCE = {
@@ -279,6 +279,7 @@ class OffloadEngine:
                     "trust": trust,
                     "trust_term": t_term,
                     "latency_term": l_term,
+                    "load": float(adv_load[r]),
                     "load_term": g_term,
                     "score": float((t_term or 0.0) + l_term + g_term),
                 }
