@@ -1519,3 +1519,96 @@ presenting C's FAITHFUL verdict as better explanations.
 
 **Rationale:** H4 asks for rates and a gap; D54 fixed what counts. The honest summary is a measured, modest fidelity with an unstable
 explainer and a rarely supported neighbour clause, which is what a reviewer will check first.
+
+### D56 — S9 pre-registration: the sweep grid, the H1/H3 metrics, the comparisons, and the WIN / NULL / NOISY rule, fixed before any sweep number exists
+Date: 2026-10-14 | Session: S9 | Status: active — **FROZEN. Do not revise after the first sweep result exists.**
+State of knowledge at writing: no S9 harness code exists and no sweep quantity has been computed. Known beforehand and disclosed: F20/F22
+(seed 100, the tuning seed, excluded from evaluation) and the cost of ONE closed-loop run (seed 1, draw 149, wall time only, outcome not
+read): 1.0 s (A), 1.5 s (D), 1.2 s (C), single thread. A harness bug found before the first evaluation run may be fixed; once any
+evaluation draw (seed 1-5, draw 100-149) has produced a result, a change needs a new entry and the earlier result stays reported.
+Harness debugging uses draws 900+ only, which are not evaluation draws.
+
+**1. Grid (L12, D12).** Seeds 1-5, each with its frozen S3 checkpoints (C, D) trained once and used unchanged at every point. Injection
+draws 100-149 (50 per seed per point; training used draws < 100). Excluded: tuning seed 100, the demo draw (seed 100, draw 7), draws 0-2.
+Variants A, B, B_oracle, C, D with the D52 weights from `configs/weights.yaml`, applied unchanged; dwell filter and handoff on (D51);
+closed loop. **No retuning of any kind.** E has D's dispatch (D50, D55 item 5) and is not a performance cell: one assertion run per seed
+at the shared point checks E's task stream equals D's; E is otherwise measured only for H4/H5 overhead (section 7).
+- rho sweep: rho in {0, 0.25, 0.5, 0.75, 1.0} at degraded fraction 0.20. Fraction sweep: fraction in {0.05, 0.10, 0.20, 0.30} at rho 1.0
+  ("high" = 1.0, as in D43). The shared operating point is (rho 1.0, fraction 0.20): it is run once, used by both sweeps, and asserted
+  (a) at config level, both sweep definitions resolve to the same (rho, fraction) key, and (b) at data level, the shared cell recomputed
+  independently (seed 1-5, draw 100, all variants) equals the stored cell bit-for-bit. 8 distinct points x 5 seeds x 50 draws x 5 variants
+  = 10,000 closed-loop runs, estimated 3-4 h serial, under an hour on 12 workers. This is below the 12 h threshold, so **no reduction of
+  draws** is made.
+- The fraction 0.05 point has K = 1 degraded RSU, so no correlated failure; the 0.10 point has K = 2 (every draw binary, F10). Both are
+  reported and labelled as such; they are not part of any structural claim (and none is made here: H2 was decided in S4).
+- Unit of analysis = the seed (D43): for each seed, the mean over its 50 draws of the per-draw paired quantity; mean +/- sd across the 5
+  seeds is reported everywhere; 95% intervals are Student-t over the 5 seed values (df 4, t = 2.776).
+
+**2. Metrics (per run; the sealed class is read only by the evaluation, never by a model).**
+- **H3, task success rate post-onset (primary).** Deadline-success rate of dispatched tasks at steps >= 400 (the F20 objective).
+  `success_all` is recorded beside it.
+- **H1 primary, dispatches to a degraded node between onset and effective avoidance.** n_av = number of post-onset dispatches whose RSU is
+  a `degraded` RSU, counted over steps [400, t_avoid). s0 = the variant's own share of dispatches going to those RSUs over [100, 400).
+  r(t) = the same share over the 60 steps [t, t+60) (0 if no dispatch). **t_avoid = the first t in [400, 1110] with r(t') <= 0.75 * s0 for
+  every t' in [t, t+30]**; if there is none, t_avoid = 1200 (never avoided: every post-onset dispatch to a degraded RSU counts) and the run is
+  flagged. The 0.75 is chosen from F22's phase shares (tuning seed: a degraded share falling from 0.21 to 0.13-0.14) so that a 25% cut
+  in the degraded share counts as avoidance, and a bar of 0.5 would have censored the trust variants; it is a stated assumption.
+  Reported with it: the fraction of runs never avoiding, and **n_win = post-onset dispatches to degraded RSUs over the fixed window
+  [400, 1200)**, which does not depend on the avoidance rule.
+- **H1 secondary, detection latency (D43's rule, applied to the closed-loop trust).** Per run, tau = the 1st percentile of that run's trust
+  over all active RSU-steps in [100, 400); a degraded RSU is detected at the first t >= 400 from which its trust stays strictly below tau for 10
+  consecutive steps; latency = t - 400, censored at 399 if never detected (D43's 799). The run value is the mean over its degraded RSUs,
+  and the detected fraction is reported beside it. A has no trust and B's is constant, so neither can detect (stated, not a result).
+  **Latency never enters the H1 verdict** (D43 treated latency the same way).
+- Also recorded per run: post-onset dispatched count (asserted equal across variants of a draw; a violation is counted and reported, not
+  hidden), engine counters, realised pair concentration, wall time.
+
+**3. Comparisons (paired per draw, same seed, same draw, same traffic and execution noise; D51).** Primary: **C vs A, D vs A, C vs B_oracle,
+D vs B_oracle.** B equals A in this scenario (D50): asserted as identical task streams on every run; B is reported beside A, never as an
+extra win. B_oracle is an upper bound, not a method: against it the labels read as "headroom". **Secondary, closed-loop check of H2:
+D vs C**, same metrics and rule, labelled secondary, never gating, and it does not revise F17.
+- H3 effect: Delta_H3 = per-seed mean of (success_X - success_ref) over draws, in absolute success rate.
+- H1 effect: per-seed relative reduction rho_s = 1 - mean_draws(n_av_X) / mean_draws(n_av_ref); the interval is over the 5 seeds' values.
+  (A per-draw ratio is unstable; this one is a ratio of seed means.) The same is computed for n_win as a guard.
+
+**4. The rule (D43 style; check order NEGATIVE, WIN, NULL, NOISY).** Let [lo, hi] be the 95% interval of the effect, floor f and bound b:
+- H3: f = 0.01, b = 0.025 (absolute deadline-success rate). H1: f = 0.10, b = 0.25 (relative reduction in dispatches).
+- **NEGATIVE:** hi < 0 and mean <= -f (X is worse than the reference, or the oracle is at least f better than X).
+- **WIN:** lo > 0 and mean >= f. For H1 the n_win reduction must also have lo > 0, otherwise the label is NOISY (guards against an
+  avoidance rule that moves the censoring point rather than the dispatches).
+- **NULL:** not WIN or NEGATIVE, and hi < b (an effect of b or more is ruled out).
+- **NOISY:** anything else.
+The f and b are stated assumptions: f is a third of the A-to-C gap seen on the tuning seed (F20, ~0.03) for H3 and 10% of the count for H1.
+They are fixed now, not derived.
+
+**5. Where each hypothesis is judged.** H3 is judged on the fraction sweep (rho 1.0), at each of its 4 points, for each primary
+comparison; **H3 holds against a reference only if the label is WIN at >= 2 of the 4 points** (PROJECT_SPEC 4.1). The spec's literal
+"non-overlapping error bars" is also printed (separate 95% intervals of the two variants' seed means) but does not decide. H1 is judged at the
+shared point (rho 1.0, fraction 0.20), for each primary comparison; every other point is reported with its label, descriptively. With 4
+primary comparisons x 2 hypotheses there is no multiplicity correction and each is a separate verdict (as D43).
+A NOISY outcome is reported as inconclusive. The seed-6-10 extension of D43 would need new frozen checkpoints and is not run; whether to
+extend is the DECISION REQUEST's question, not decided here.
+
+**6. Resumability, determinism.** One result file per (point, seed, draw), written atomically (temp file then rename), holding all five
+variants' metrics for that paired draw. A restart skips existing files, and refuses to resume if the stored config hash differs. Every run is
+reproducible from (configs/demo.yaml, configs/sweep.yaml, weights.yaml, seed, rho, fraction, draw); workers use one torch thread each.
+Infeasible or failed (point, seed, draw) tasks are recorded as such and reported per point (attempted / failed / aggregated, D42), never
+dropped. The sweep contains no cold-start RSU (cold_start.num_nodes = 0), so no cold-start aggregate exists; the D42 table is nonetheless
+printed beside every cell so a future cold-start addition cannot omit it.
+
+**7. H4 and H5 (serial stage after the sweep, nothing else running).** H4: the D54 procedure unchanged (units, delta 0.3, floors 0.20 / 0.05,
+D54 sampler, GNNExplainer run seed 0, no stability repeat) applied to Variant D's head at the shared point on **injection draw 101** (D54
+used 100): seeds 1-5, 40 decisions each, winner and runner-up. It is a replication on a fresh draw, reported with D54's verdict labels, and
+does not replace F24/F25. H5: per-component timing (trust inference, selection, Layer 1, Layer 2) on the same decisions, at the default torch
+thread count and at 1 thread, median / mean / p95; Layer 2 judged against D54's 100 ms assumption. Per-run timing inside the parallel sweep is
+not reported (workers contend for the CPU); the wall time per cell is only for the cost estimate.
+
+**Alternatives:** (a) a bar of 0.5 for avoidance (rejected: censors the trust variants on the F22 evidence); (b) the fixed-window count as
+the only H1 metric (kept only as a guard: the brief asks for dispatches between onset and avoidance); (c) a cross product (L12 forbids);
+(d) fewer draws (not needed: the grid costs less than the threshold); (e) per-draw bootstrap intervals (draws within a seed share a model and
+traffic, so they are not independent: D43).
+
+**Rationale:** L12 and PROJECT_SPEC 4.1 give H1 and H3 criteria in words ("reduction", "consistent improvement with non-overlapping error
+bars at >= 2 points") that cannot be judged unless the metric, the floor and the reference are numbers; fixing them before the run is what
+lets a null be reported as a null. B_oracle brackets how much any certificate-like signal could add, so a reviewer can read A-vs-C/D as a
+gain over no trust and B_oracle-vs-C/D as the remaining headroom, and B (equal to A here) is not mistaken for a strawman win.
