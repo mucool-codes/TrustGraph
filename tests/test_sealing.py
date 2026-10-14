@@ -45,6 +45,7 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s3_train.py",  # wires the sealed-label diagnostic into the trainer
         "s4_eval.py",  # evaluates frozen C/D against sealed classes (D43)
         "s4_analyse.py",  # aggregates the above; verdict against D43
+        "s5_diagnostics.py",  # S5 gate-response diagnostics (D48)
     }
 )
 
