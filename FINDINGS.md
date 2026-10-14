@@ -1629,3 +1629,18 @@ Interpretation:
    4.8%, 6.2%, 12.1% and 19.1% over steps >= 400. On those decisions Gate-C is C by construction. So the null is not an artefact of the gate never acting: it acts often and the outcome still matches C.
 4. Limits. tau was chosen on one seed from a flat grid (F28: all eight values within 0.0007, chosen on a 0.0005 margin); D59 forbids re-tuning on evaluation seeds, so a better tau, a gate on D's head, or a gate with different weights is not excluded
    and would be a new, labelled post-hoc entry. A hypothesis, untested: C's weighted rule with alpha 1 already steers away from low-trust candidates, so a threshold adds little. The result is for this scenario and injection model only.
+
+### F31 — S9b addendum to F29: the never-avoided rate that F29 omitted (RAW, from the same stored runs; no new run, no new number elsewhere)
+Date: 2026-10-14 | Session: S9b (record completion) | Commit: see `git log`
+F29 listed success, n_av, n_win and the empty-candidate-set rate but not the fraction of runs that never reached the D56 effective-avoidance rule, which the S9b record is required to carry (D60 Q4 also asks that
+censoring be quoted beside n_av). F29 and F30 are not edited. The rows below are computed from the same 1000 stored Gate-C result files and the stored S9 A and C files by `python scripts/s9b_gate.py report`
+(the report now prints this row; no other part of the analysis changed, and every F29/F30 number reproduces). Mean +/- sd across the 5 seed means.
+```
+fraction   fraction of runs never avoiding:    A                C                Gate-C (tau 0.9)
+0.05                                           0.056 +/- 0.055  0.000 +/- 0.000  0.000 +/- 0.000
+0.10                                           0.264 +/- 0.059  0.000 +/- 0.000  0.000 +/- 0.000
+0.20 (shared)                                  0.468 +/- 0.119  0.028 +/- 0.039  0.028 +/- 0.039
+0.30                                           0.656 +/- 0.167  0.000 +/- 0.000  0.000 +/- 0.000
+```
+Consistency: the A and C columns equal F26's (0.056 / 0.264 / 0.468 / 0.656 and 0.000 / 0.000 / 0.028 / 0.000), as they must since they are read from the same S9 files.
+Interpretation: Gate-C's censoring is identical to C's at every point, so the n_av comparison between them is not distorted by different censoring; the large censoring is A's (up to 66% at 30% degraded), as F27 item 3 says.

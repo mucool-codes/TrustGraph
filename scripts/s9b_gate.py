@@ -172,7 +172,7 @@ def load_arrays(g):
     for (rho, frac) in eval_points(g):
         shape = (len(seeds), len(draws))
         a = {k: np.full(shape, np.nan) for k in ("g_succ", "c_succ", "a_succ", "g_nwin", "c_nwin", "a_nwin", "g_nav", "c_nav", "a_nav",
-                                                 "fb_all", "fb_post", "excl")}
+                                                 "fb_all", "fb_post", "excl", "g_all", "g_never", "c_never", "a_never")}
         ok = np.zeros(shape, bool); c_mismatch = 0; failed = 0
         for i, s in enumerate(seeds):
             for j, dr in enumerate(draws):
@@ -186,6 +186,8 @@ def load_arrays(g):
                 ok[i, j] = True
                 c_mismatch += int(not r["c_recompute_equals_s9"])
                 a["g_succ"][i, j], a["c_succ"][i, j], a["a_succ"][i, j] = gm["success_post_onset"], st["C"]["success_post_onset"], st["A"]["success_post_onset"]
+                a["g_all"][i, j] = gm["success_all"]
+                a["g_never"][i, j], a["c_never"][i, j], a["a_never"][i, j] = float(gm["never_avoided"]), float(st["C"]["never_avoided"]), float(st["A"]["never_avoided"])
                 a["g_nwin"][i, j], a["c_nwin"][i, j], a["a_nwin"][i, j] = gm["n_win"], st["C"]["n_win"], st["A"]["n_win"]
                 a["g_nav"][i, j], a["c_nav"][i, j], a["a_nav"][i, j] = gm["n_av"], st["C"]["n_av"], st["A"]["n_av"]
                 gi = gm["gate"]
@@ -225,6 +227,7 @@ def cmd_report(verdict: bool) -> int:
         L.append(f"  {'metric':44s}{'A':>22s}{'C (weighted)':>22s}{'Gate-C':>22s}")
         for key, lab, nd in (("succ", "H3 success post-onset", 4), ("nav", "dispatches to degraded, onset->avoidance", 1), ("nwin", "n_win: dispatches to degraded, [400,1200)", 1)):
             L.append(f"  {lab:44s}{ms(a['a_' + key], nd):>22s}{ms(a['c_' + key], nd):>22s}{ms(a['g_' + key], nd):>22s}")
+        L.append(f"  {'fraction of runs never avoiding (D56 rule)':44s}{ms(a['a_never'], 3):>22s}{ms(a['c_never'], 3):>22s}{ms(a['g_never'], 3):>22s}")
         L.append(f"  empty-candidate-set (fallback) rate, all steps : {ms(a['fb_all'], 5)}   steps >= 400 : {ms(a['fb_post'], 5)}")
         L.append(f"  decisions where the gate removed >= 1 candidate: {ms(a['excl'], 4)}  (includes the fallback decisions)")
         e = M.h3_effect(a["c_succ"], a["g_succ"])     # C - Gate-C

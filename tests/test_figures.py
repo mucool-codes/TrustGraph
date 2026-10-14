@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-NEEDED = [REPO / "results" / "s9" / "results_table.csv", REPO / "results" / "s4" / "summary-5seeds.json",
+NEEDED = [REPO / "results" / "s9" / "results_table.csv", REPO / "results" / "s9b" / "tuning.json", REPO / "results" / "s4" / "summary-5seeds.json",
           REPO / "results" / "s10" / "timeline.npz", REPO / "results" / "s10" / "example.json"]
 FIGURES = ["fig1_architecture", "fig2_trust_timeline", "fig3_success_vs_fraction", "fig4_ablation",
            "fig5_s4_gap_vs_correlation", "fig6_explanation"]
