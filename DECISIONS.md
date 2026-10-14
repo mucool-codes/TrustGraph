@@ -1377,3 +1377,44 @@ re-tuning per evaluation seed (leaks the evaluation).
 config-default point is 0.002-0.005, inside the draw-to-draw spread), so the exact weights should not be read as
 carrying a finding; what matters is that every variant, A included, was tuned by the identical procedure, so no
 variant has a handicap the others do not.
+
+### D53 — S7 Layer 1: exact decomposition from the log, the dominance rule, and a log-schema amendment
+Date: 2026-10-14 | Session: S7 | Status: active
+Amends D51 item 6 (log schema) and fixes Layer 1's wording rules before any explanation is written.
+
+**Decision:**
+1. **Source of truth is the decision log.** An explanation reads the weights and every candidate's inputs from the
+   logged record, never from the config or `weights.yaml`, so a later weight change cannot alter an old
+   explanation. Each candidate's terms are recomputed from the logged inputs as `alpha*trust`, `-beta*latency_norm`,
+   `-gamma*load`, in that summation order, and must equal the logged terms and the logged score **exactly**
+   (`==`, not approximately); a mismatch, or a selected node that is not the rule's argmax over the dwell-eligible
+   candidates (ties to the lowest RSU index), raises `ExplanationError`. This is what "exact by construction" means.
+2. **Schema 2.** The S6 log stored the advertised load only as the float32-rounded feature, while the score used
+   the float64 value, so the load term could not be reproduced bit-for-bit. Candidates now carry `load` (the value
+   the score used) and the schema number is 2. Layer 1 accepts schema 2 only; S6's schema-1 files are gitignored
+   artefacts and are regenerated. No other S6 behaviour changes (open-loop equivalence is unaffected).
+3. **Every variant.** The same code explains A, B, B-oracle, C, D and E. Trust enters only as `alpha*trust`:
+   - alpha = 0 (Variant A): "trust did not influence this decision"; no trust story is told;
+   - alpha > 0 but every contender has the same trust term (Variant B, constant certificate): "trust was the
+     same for every candidate, so it did not discriminate";
+   - otherwise trust is a term like the other two.
+4. **Contrastive margin** is winner minus top runner-up (the best-scoring other dwell-eligible candidate). It
+   splits exactly into three signed differences `d_trust + d_latency + d_load`. A term is **decisive** if its
+   difference is positive and at least **0.6 of the margin** (fixed here, before any explanation was produced).
+   Otherwise the decision is **mixed**: the two largest positive differences are named together. Terms that
+   favoured the runner-up (negative difference) are always named as outweighed, which is how a winner with
+   *lower trust* than the runner-up is explained. A margin of 0 is reported as a tie broken to the lower RSU index;
+   a single eligible candidate has no runner-up and is reported as such. RSUs in range but excluded by the dwell
+   filter are listed with that reason.
+5. **What Layer 1 does not say.** It explains the *score*, not why trust has its value: trust is an input here.
+   The logged own-node behaviour record (promise-keeping EWMA, latency deviation) is shown as context, without a
+   causal claim. The neighbourhood clause of TECHNICAL_AND_NOVELTY.md 3.4 is Layer 2's (S8) and is not produced.
+6. Interface: `trustgraph.explain.explain_decision(record) -> Explanation` (data) and `render_text(explanation)`;
+   CLI `python explain.py --decision <id> [--log <file>]`, plus `--survey` to list example decision ids by category.
+
+**Alternatives:** approximate tolerance instead of exact equality (hides schema drift); recomputing weights from
+config (a later retune would silently change old explanations); a dominance threshold chosen after looking at
+examples; a single sentence with no contrast (the point of L11 is the contrast).
+
+**Rationale:** the selection score is linear, so the winner-runner-up margin is an identity in three terms; testing it
+bit-for-bit makes any divergence between what the system did and what it says it did a failing test.
