@@ -1246,3 +1246,27 @@ retraining; the training-thread difference itself cannot be tested without retra
 defect in how the graph carries segment membership (check 1) and a scenario in which neighbour evidence
 cannot arrive before own-node evidence (check 2). Fixing the operationalisation first prevents choosing
 the threshold that produces the story.
+
+### D49 — H2 fallback framing adopted: a pre-registered negative on graph-based trust, with a stated boundary condition
+Date: 2026-10-14 | Session: S5 | Status: active
+Applies the S5 brief's fallback and the H2 fallback clause of PROJECT_SPEC.md 4.1. D43 and F17 are untouched.
+
+**Decision:** The paper reports H2 as tested and not supported: a 2-layer GINEConv trust head did not beat a
+capacity-matched node-local MLP on the pre-registered diagnostic AUC (F17, NEGATIVE), cold start NULL at rho 1,
+collusion inconclusive (D47). The stated boundary condition is F18/F19: in this scenario own-node evidence
+appears at the same time as neighbouring degraded RSUs' (shared onset, D31), the segment feature is correctly
+supplied and used by D, and C already sits near ceiling (0.98 AUC). The contribution is carried by H1 and H3
+(trust-aware vs certificate-only and no-trust dispatch, tested in the closed loop in S6/S9, which do not
+depend on D beating C) and by the integrated, explainable formulation (L11). No model, generator, window or
+threshold is changed in response to S4 or S5. Any later study of regimes where a GNN should help (e.g. staggered
+onset) is exploratory, pre-registered before it runs, and never replaces the S4 result.
+
+**Open for S6 (not decided here):** which trust head feeds Variant E and the closed-loop comparison. Variants C and
+D both exist and are frozen per seed (L1/L12); S6 must raise this as a decision request rather than inherit a
+default. D40's question (Variant B's certificate model) also remains S6's first task.
+
+**Alternatives:** (a) fix D and re-test; (b) change the scenario until the gap appears; (c) drop H2 from the paper.
+
+**Rationale:** (a)/(b) are post-result changes of the thing the pre-registration fixed. (c) hides a result that
+the spec says must be reported. A measured, pre-registered negative with an identified boundary condition is a
+defensible finding; the same numbers after a rescue would not be.

@@ -853,3 +853,41 @@ beyond rounding (D48: max |dtrust| > 1e-5 or |dAUC| >= 5e-5): False
 ```
 Not measured: the effect of the training-time thread count (seed 1 at default threads, seeds 2-5 at 3), which
 cannot be tested without retraining.
+
+### F19 — S5 interpretation of F18, and the gap-narrowing observation on F16/F17 (written after F18 was committed in 1bcedac)
+Date: 2026-10-14 | Session: S5 | Commit: 1bcedac (numbers)
+
+Observation on F16/F17, added as asked: the D-C gap narrows from -0.052 at rho 0 (realised c 0.22) to -0.030 at
+rho 1 (c 0.96), but the per-seed slope on realised c is +0.030 with 95% CI [-0.002, +0.062], so it is not
+significant. It is a direction consistent with H2 and does not support it; D is below C at every rho.
+
+Check 1 - no defect. `same_segment` equals segment equality on every sampled RSU-RSU edge (0 mismatches over
+92,000 instances) and is 0 on every vehicle-RSU edge. D's output moves by 0.024-0.103 mean |trust| when it is
+zeroed, set to 1 or permuted, on every seed (threshold 0.01), so D reads the feature. But removing it does not
+systematically cost detection: window AUC after zeroing is higher on seeds 2 and 5 and lower on 1, 3, 4; after
+permuting it is higher on seeds 1, 2, 5 and lower on 3, 4 (only 5 draws per seed). D uses the segment signal; there is no evidence it uses it to
+separate degraded from reliable RSUs better. The architecture and graph are not the cause of the S4 negative.
+
+Check 2 - neighbour evidence does not lead own-node evidence. A degraded RSU's own `success_ewma` first moves
+about 110 s after onset (ramp level 0.37) at every rho; the mean first-move time of its degraded same-segment
+neighbours differs from its own by -0.3 to +0.5 s (CIs all include 0, widest [-7.8, +7.2] at rho 1; secondary rule
+the same within +-1.1 s). Under D48's pre-declared reading this is "simultaneous": degraded RSUs share their
+onset (D31) and carry the same fault, so neighbouring degraded RSUs show it at the same moment as the RSU itself.
+The "min over neighbours" lead is negative and grows with rho (-3.6 to -33 s), as it must for an order
+statistic over more neighbours (more degraded neighbours at higher rho); it is not a lead. Two structural facts
+limit what message passing could add here: at rho 0, 59% of degraded RSUs have only healthy same-segment
+neighbours (no degraded one to learn from), and at rho 1, 95% have degraded neighbours but those move
+simultaneously. In this scenario own-node evidence is therefore never later than neighbour evidence, so a
+lead-time advantage for D is not available by construction. Caveats: the pre-declared "moves" rule is loose -
+43-55% of healthy neighbours also trip it in [400,799] - so the absolute times are first-excursion times, not
+clean detections; the own-vs-neighbour comparison applies the same rule to both sides. The lead-lag result
+explains why D has no advantage; it does not by itself explain why D detects 77-97 s later than C (F16B). That
+is unmeasured; a candidate (D's aggregation over many healthy neighbours diluting its own-node signal) is a
+hypothesis, not a finding.
+
+Check 3 - inference is not thread-sensitive: the seed-1 checkpoints give identical C and D outputs to within
+6.9e-7 at 3 threads versus 1, with no AUC change. The training-time thread difference (seed 1 default, seeds 2-5
+three threads) is not tested and stays a stated limitation of F15.
+
+Conclusion: neither check finds a defect, so the S4 NEGATIVE (F17) stands unmodified. Under the S5 brief's second
+branch the paper moves to the H2 fallback framing (D49).
