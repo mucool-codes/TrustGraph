@@ -53,6 +53,8 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s8_fidelity.py",  # H4 fidelity, stability, neighbour-clause rate (D54)
         "s8_timing.py",  # H5 timing (D54)
         "s8_example.py",  # the merged example (D54)
+        "s9_sweep.py",  # the sweep runner scores dispatches against the true degraded set (D56)
+        "s9_overhead.py",  # H4/H5 serial stage (D56 section 7)
     }
 )
 

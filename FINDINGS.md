@@ -1253,3 +1253,265 @@ RSU-19 selected over RSU-7. Primary factors: RSU-19 trust score 0.93, the attrib
 [Layer 2 numbers, RSU-19: trust 0.926, own share 0.063, same-segment RSU neighbours [2, 14], same-segment share 0.129, clause False]
 [Layer 2 numbers, RSU-7: trust 0.660, own share 0.089, same-segment RSU neighbours [5, 10, 16], same-segment share 0.205, clause False]
 ```
+
+### F26 — S9 raw results: the L12 sweeps, closed loop, 5 variants x 5 seeds x 50 draws (RAW - no labels, no verdicts recorded here)
+Date: 2026-10-14 | Session: S9 | Commit: 9f2a8f9 (harness; D56 = 26e6e79, D57 = 9f2a8f9; code and rules unchanged since the grid was launched)
+Config: `configs/sweep.yaml` over `configs/demo.yaml`, weights `configs/weights.yaml` (D52, unchanged), frozen seed 1-5 checkpoints; draws 100-149
+(seed 100 and the demo draw excluded); closed loop, dwell filter and handoff on; 12 workers, one torch thread each.
+Command: `python scripts/s9_sweep.py all --sweep configs/sweep.yaml` (log results/s9/sweep.log; tables results/s9/results_table.csv,
+paired_comparisons.csv, report-raw.txt - gitignored). Grid: 2000 of 2000 tasks completed, 0 failed, 10,000 closed-loop runs, about 35 min wall
+(the 12 h threshold was not approached, so no draws were dropped). Harness history: a smoke test on non-evaluation draws 900-901 exposed a
+zero oracle reference in D56's H1 formula and led to D57 before any evaluation draw ran; its numbers are not reported.
+Checks: B's task stream equals A's on every one of 2000 paired draws; the post-onset dispatched count is equal across variants on every draw;
+the shared cell (rho 1, fraction 0.2, draw 100) recomputed serially is bit-identical for all five seeds; E's task stream equals D's for all five.
+Reading key: "dispatches to degraded" n_av is counted from onset to the run's own effective-avoidance step (D56); mean +/- sd is across the five
+seed means. Latency is censored at 399 and A, B cannot detect by construction. Realised pair concentration is nominal-rho dependent (0.22 at rho 0
+to 0.96 at rho 1; F10 shapes).
+
+Numbers:
+```
+D42 accounting: draws attempted / failed / aggregated per point (every variant shares the same paired draws)
+  The sweep injects no cold-start RSU (cold_start.num_nodes = 0), so no cold-start aggregate exists; the counts below are the whole-run accounting.
+  point                                        attempted  failed aggregated   K degraded (mean)  realised pair concentration (mean over draws with K>=2)
+  rho=0.00 frac=0.20 [rho]                           250       0        250    4.00              0.216
+  rho=0.25 frac=0.20 [rho]                           250       0        250    4.00              0.333
+  rho=0.50 frac=0.20 [rho]                           250       0        250    4.00              0.500
+  rho=0.75 frac=0.20 [rho]                           250       0        250    4.00              0.717
+  rho=1.00 frac=0.20 [rho+fraction]                  250       0        250    4.00              0.956
+  rho=1.00 frac=0.05 [fraction]                      250       0        250    1.00              nan
+  rho=1.00 frac=0.10 [fraction]                      250       0        250    2.00              1.000
+  rho=1.00 frac=0.30 [fraction]                      250       0        250    6.00              0.761
+  consistency: runs where B's task stream differs from A's: 0; runs where the post-onset dispatched count differs across variants: 0
+
+----------------------------------------------------------------------------------------------------------------------
+rho sweep (fraction fixed)
+
+  rho=0.00 frac=0.20 [rho]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8709 +/- 0.0035   0.8709 +/- 0.0035   0.9516 +/- 0.0034   0.9484 +/- 0.0041   0.9325 +/- 0.0053
+    success (all steps)                              0.9060 +/- 0.0039   0.9060 +/- 0.0039   0.9597 +/- 0.0038   0.9574 +/- 0.0044   0.9459 +/- 0.0032
+    H1 dispatches to degraded, onset->avoidance         619.1 +/- 23.4      619.1 +/- 23.4         0.2 +/- 0.6        91.8 +/- 9.1      137.8 +/- 25.6
+    dispatches to degraded, [400,1200)                  909.8 +/- 15.6      909.8 +/- 15.6      125.8 +/- 17.3      299.4 +/- 18.7      412.1 +/- 69.2
+    fraction of runs never avoiding                  0.4960 +/- 0.0167   0.4960 +/- 0.0167   0.0000 +/- 0.0000   0.0000 +/- 0.0000   0.0000 +/- 0.0000
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      163.0 +/- 29.3      250.0 +/- 21.8
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9470 +/- 0.0821
+
+  rho=0.25 frac=0.20 [rho]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8710 +/- 0.0026   0.8710 +/- 0.0026   0.9478 +/- 0.0034   0.9448 +/- 0.0042   0.9289 +/- 0.0060
+    success (all steps)                              0.9060 +/- 0.0035   0.9060 +/- 0.0035   0.9572 +/- 0.0042   0.9550 +/- 0.0047   0.9435 +/- 0.0043
+    H1 dispatches to degraded, onset->avoidance         616.3 +/- 26.3      616.3 +/- 26.3         2.3 +/- 3.1      100.0 +/- 13.9      145.7 +/- 27.9
+    dispatches to degraded, [400,1200)                   909.7 +/- 8.2       909.7 +/- 8.2      161.6 +/- 16.9      327.2 +/- 17.5      438.2 +/- 72.5
+    fraction of runs never avoiding                  0.4760 +/- 0.0410   0.4760 +/- 0.0410   0.0000 +/- 0.0000   0.0000 +/- 0.0000   0.0000 +/- 0.0000
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      161.6 +/- 29.7      244.4 +/- 21.2
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9520 +/- 0.0794
+
+  rho=0.50 frac=0.20 [rho]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8708 +/- 0.0018   0.8708 +/- 0.0018   0.9398 +/- 0.0046   0.9370 +/- 0.0051   0.9215 +/- 0.0056
+    success (all steps)                              0.9059 +/- 0.0029   0.9059 +/- 0.0029   0.9519 +/- 0.0053   0.9498 +/- 0.0056   0.9386 +/- 0.0047
+    H1 dispatches to degraded, onset->avoidance         607.0 +/- 32.2      607.0 +/- 32.2         8.8 +/- 8.4      114.4 +/- 20.3      161.9 +/- 33.5
+    dispatches to degraded, [400,1200)                   912.0 +/- 9.8       912.0 +/- 9.8      237.6 +/- 31.0      386.1 +/- 31.9      490.7 +/- 68.2
+    fraction of runs never avoiding                  0.4520 +/- 0.0756   0.4520 +/- 0.0756   0.0040 +/- 0.0089   0.0040 +/- 0.0089   0.0040 +/- 0.0089
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      157.8 +/- 26.7      236.6 +/- 21.9
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9520 +/- 0.0726
+
+  rho=0.75 frac=0.20 [rho]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8718 +/- 0.0021   0.8718 +/- 0.0021   0.9332 +/- 0.0069   0.9306 +/- 0.0073   0.9139 +/- 0.0061
+    success (all steps)                              0.9066 +/- 0.0033   0.9066 +/- 0.0033   0.9475 +/- 0.0068   0.9455 +/- 0.0070   0.9335 +/- 0.0056
+    H1 dispatches to degraded, onset->avoidance         602.2 +/- 69.1      602.2 +/- 69.1       19.2 +/- 24.5      132.9 +/- 31.9      183.4 +/- 47.0
+    dispatches to degraded, [400,1200)                  907.6 +/- 13.5      907.6 +/- 13.5      301.3 +/- 53.0      434.3 +/- 46.2      545.4 +/- 67.0
+    fraction of runs never avoiding                  0.4400 +/- 0.0762   0.4400 +/- 0.0762   0.0120 +/- 0.0268   0.0200 +/- 0.0283   0.0200 +/- 0.0283
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      154.4 +/- 22.2      229.9 +/- 24.7
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9520 +/- 0.0780
+
+  rho=1.00 frac=0.20 [rho+fraction]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8713 +/- 0.0026   0.8713 +/- 0.0026   0.9234 +/- 0.0099   0.9211 +/- 0.0100   0.9049 +/- 0.0083
+    success (all steps)                              0.9062 +/- 0.0036   0.9062 +/- 0.0036   0.9409 +/- 0.0087   0.9392 +/- 0.0088   0.9276 +/- 0.0074
+    H1 dispatches to degraded, onset->avoidance        627.5 +/- 100.4     627.5 +/- 100.4       24.4 +/- 25.6      152.7 +/- 47.9      210.6 +/- 84.5
+    dispatches to degraded, [400,1200)                  912.4 +/- 20.6      912.4 +/- 20.6      394.7 +/- 89.9      506.3 +/- 74.6      610.1 +/- 84.2
+    fraction of runs never avoiding                  0.4680 +/- 0.1188   0.4680 +/- 0.1188   0.0120 +/- 0.0268   0.0280 +/- 0.0390   0.0280 +/- 0.0390
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      150.7 +/- 21.8      220.2 +/- 25.1
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9590 +/- 0.0701
+
+----------------------------------------------------------------------------------------------------------------------
+fraction sweep (rho fixed)
+
+  rho=1.00 frac=0.20 [rho+fraction]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8713 +/- 0.0026   0.8713 +/- 0.0026   0.9234 +/- 0.0099   0.9211 +/- 0.0100   0.9049 +/- 0.0083
+    success (all steps)                              0.9062 +/- 0.0036   0.9062 +/- 0.0036   0.9409 +/- 0.0087   0.9392 +/- 0.0088   0.9276 +/- 0.0074
+    H1 dispatches to degraded, onset->avoidance        627.5 +/- 100.4     627.5 +/- 100.4       24.4 +/- 25.6      152.7 +/- 47.9      210.6 +/- 84.5
+    dispatches to degraded, [400,1200)                  912.4 +/- 20.6      912.4 +/- 20.6      394.7 +/- 89.9      506.3 +/- 74.6      610.1 +/- 84.2
+    fraction of runs never avoiding                  0.4680 +/- 0.1188   0.4680 +/- 0.1188   0.0120 +/- 0.0268   0.0280 +/- 0.0390   0.0280 +/- 0.0390
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      150.7 +/- 21.8      220.2 +/- 25.1
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9590 +/- 0.0701
+
+  rho=1.00 frac=0.05 [fraction]   [K = 1: no correlated failure possible, F10]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.9474 +/- 0.0028   0.9474 +/- 0.0028   0.9697 +/- 0.0025   0.9685 +/- 0.0029   0.9637 +/- 0.0027
+    success (all steps)                              0.9570 +/- 0.0035   0.9570 +/- 0.0035   0.9718 +/- 0.0035   0.9708 +/- 0.0037   0.9667 +/- 0.0040
+    H1 dispatches to degraded, onset->avoidance           71.3 +/- 8.3        71.3 +/- 8.3         0.0 +/- 0.0        22.3 +/- 3.0        31.0 +/- 4.1
+    dispatches to degraded, [400,1200)                   226.9 +/- 6.2       226.9 +/- 6.2        11.5 +/- 2.9        58.7 +/- 4.0       82.6 +/- 13.8
+    fraction of runs never avoiding                  0.0560 +/- 0.0555   0.0560 +/- 0.0555   0.0000 +/- 0.0000   0.0000 +/- 0.0000   0.0000 +/- 0.0000
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      161.3 +/- 26.6      264.1 +/- 20.8
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9160 +/- 0.1152
+
+  rho=1.00 frac=0.10 [fraction]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.9223 +/- 0.0024   0.9223 +/- 0.0024   0.9619 +/- 0.0023   0.9601 +/- 0.0027   0.9513 +/- 0.0027
+    success (all steps)                              0.9402 +/- 0.0033   0.9402 +/- 0.0033   0.9666 +/- 0.0037   0.9652 +/- 0.0040   0.9585 +/- 0.0034
+    H1 dispatches to degraded, onset->avoidance         235.9 +/- 33.7      235.9 +/- 33.7         0.8 +/- 0.7        48.6 +/- 8.0       70.9 +/- 12.8
+    dispatches to degraded, [400,1200)                   451.7 +/- 9.4       451.7 +/- 9.4       66.1 +/- 16.2      150.7 +/- 17.2      204.4 +/- 37.7
+    fraction of runs never avoiding                  0.2640 +/- 0.0590   0.2640 +/- 0.0590   0.0000 +/- 0.0000   0.0000 +/- 0.0000   0.0000 +/- 0.0000
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      159.2 +/- 26.1      247.9 +/- 26.2
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9280 +/- 0.1008
+
+  rho=1.00 frac=0.30 [fraction]
+    metric                                                           A                   B            B_oracle                   C                   D
+    H3 success post-onset                            0.8212 +/- 0.0023   0.8212 +/- 0.0023   0.8777 +/- 0.0128   0.8750 +/- 0.0129   0.8604 +/- 0.0085
+    success (all steps)                              0.8729 +/- 0.0033   0.8729 +/- 0.0033   0.9105 +/- 0.0107   0.9084 +/- 0.0108   0.8979 +/- 0.0073
+    H1 dispatches to degraded, onset->avoidance       1065.0 +/- 195.5    1065.0 +/- 195.5       62.4 +/- 51.1      250.0 +/- 70.6     344.3 +/- 125.1
+    dispatches to degraded, [400,1200)                 1358.9 +/- 27.9     1358.9 +/- 27.9     796.7 +/- 134.6     915.0 +/- 107.4     1001.0 +/- 92.8
+    fraction of runs never avoiding                  0.6560 +/- 0.1670   0.6560 +/- 0.1670   0.0000 +/- 0.0000   0.0000 +/- 0.0000   0.0080 +/- 0.0179
+    H1 detection latency (steps, censored 399)           399.0 +/- 0.0       399.0 +/- 0.0         0.0 +/- 0.0      146.8 +/- 19.3      210.7 +/- 23.4
+    fraction of degraded RSUs detected               0.0000 +/- 0.0000   0.0000 +/- 0.0000   1.0000 +/- 0.0000   1.0000 +/- 0.0000   0.9633 +/- 0.0522
+
+Paired effects (X - ref; seed means; 95% t interval over 5 seeds). H3 = absolute success rate. H1 = (n_ref - n_X)/n_A (D57), n_av primary, [n_win guard]. Latency diff in steps.
+point(rho/frac)  X vs ref      H3 diff [95% CI]                  H1 n_av reduction [95% CI]       n_win guard   lat diff
+1.00/0.05   C vs A        +0.0211 [+0.0203,+0.0219]  +0.681 [+0.591,+0.771]  +0.741 [+0.720,+0.762]  -238
+1.00/0.05   D vs A        +0.0162 [+0.0146,+0.0179]  +0.558 [+0.448,+0.669]  +0.635 [+0.551,+0.719]  -135
+1.00/0.05   C vs B_oracle -0.0012 [-0.0019,-0.0006]  -0.319 [-0.409,-0.229]  -0.208 [-0.219,-0.198]  +161
+1.00/0.05   D vs B_oracle -0.0061 [-0.0073,-0.0048]  -0.442 [-0.552,-0.331]  -0.315 [-0.401,-0.228]  +264
+1.00/0.05   D vs C        -0.0049 [-0.0060,-0.0037]  -0.123 [-0.200,-0.045]  -0.106 [-0.188,-0.024]  +103
+
+1.00/0.10   C vs A        +0.0379 [+0.0353,+0.0404]  +0.791 [+0.738,+0.844]  +0.667 [+0.622,+0.711]  -240
+1.00/0.10   D vs A        +0.0291 [+0.0240,+0.0341]  +0.697 [+0.636,+0.759]  +0.547 [+0.440,+0.653]  -151
+1.00/0.10   C vs B_oracle -0.0018 [-0.0026,-0.0010]  -0.205 [-0.258,-0.153]  -0.187 [-0.197,-0.177]  +159
+1.00/0.10   D vs B_oracle -0.0106 [-0.0147,-0.0066]  -0.299 [-0.360,-0.239]  -0.307 [-0.392,-0.222]  +248
+1.00/0.10   D vs C        -0.0088 [-0.0131,-0.0045]  -0.094 [-0.120,-0.068]  -0.120 [-0.211,-0.028]  +89
+
+1.00/0.20   C vs A        +0.0498 [+0.0392,+0.0605]  +0.756 [+0.676,+0.836]  +0.446 [+0.351,+0.541]  -248
+1.00/0.20   D vs A        +0.0337 [+0.0221,+0.0452]  +0.664 [+0.523,+0.806]  +0.331 [+0.221,+0.442]  -179
+1.00/0.20   C vs B_oracle -0.0023 [-0.0028,-0.0017]  -0.205 [-0.287,-0.123]  -0.123 [-0.147,-0.099]  +151
+1.00/0.20   D vs B_oracle -0.0184 [-0.0287,-0.0082]  -0.296 [-0.447,-0.146]  -0.237 [-0.344,-0.130]  +220
+1.00/0.20   D vs C        -0.0162 [-0.0267,-0.0056]  -0.091 [-0.179,-0.004]  -0.114 [-0.209,-0.019]  +69
+
+1.00/0.30   C vs A        +0.0538 [+0.0382,+0.0694]  +0.758 [+0.663,+0.853]  +0.327 [+0.234,+0.420]  -252
+1.00/0.30   D vs A        +0.0392 [+0.0267,+0.0517]  +0.669 [+0.517,+0.820]  +0.263 [+0.181,+0.346]  -188
+1.00/0.30   C vs B_oracle -0.0028 [-0.0034,-0.0021]  -0.183 [-0.246,-0.120]  -0.087 [-0.114,-0.061]  +147
+1.00/0.30   D vs B_oracle -0.0173 [-0.0302,-0.0045]  -0.273 [-0.391,-0.154]  -0.151 [-0.248,-0.054]  +211
+1.00/0.30   D vs C        -0.0146 [-0.0279,-0.0012]  -0.090 [-0.166,-0.013]  -0.064 [-0.141,+0.013]  +64
+
+0.00/0.20   C vs A        +0.0775 [+0.0742,+0.0808]  +0.852 [+0.839,+0.865]  +0.671 [+0.648,+0.694]  -236
+0.00/0.20   D vs A        +0.0615 [+0.0508,+0.0723]  +0.777 [+0.723,+0.831]  +0.546 [+0.445,+0.647]  -149
+0.00/0.20   C vs B_oracle -0.0032 [-0.0043,-0.0020]  -0.148 [-0.161,-0.135]  -0.191 [-0.199,-0.182]  +163
+0.00/0.20   D vs B_oracle -0.0191 [-0.0289,-0.0093]  -0.222 [-0.276,-0.169]  -0.316 [-0.422,-0.210]  +250
+0.00/0.20   D vs C        -0.0160 [-0.0266,-0.0054]  -0.075 [-0.122,-0.028]  -0.125 [-0.236,-0.014]  +87
+
+0.25/0.20   C vs A        +0.0738 [+0.0703,+0.0773]  +0.838 [+0.815,+0.861]  +0.640 [+0.617,+0.664]  -237
+0.25/0.20   D vs A        +0.0579 [+0.0477,+0.0681]  +0.764 [+0.713,+0.815]  +0.518 [+0.417,+0.619]  -155
+0.25/0.20   C vs B_oracle -0.0030 [-0.0040,-0.0020]  -0.158 [-0.180,-0.136]  -0.182 [-0.189,-0.175]  +162
+0.25/0.20   D vs B_oracle -0.0189 [-0.0284,-0.0094]  -0.232 [-0.281,-0.183]  -0.304 [-0.403,-0.206]  +244
+0.25/0.20   D vs C        -0.0159 [-0.0261,-0.0057]  -0.074 [-0.118,-0.030]  -0.122 [-0.227,-0.018]  +83
+
+0.50/0.20   C vs A        +0.0662 [+0.0607,+0.0717]  +0.811 [+0.767,+0.855]  +0.577 [+0.535,+0.619]  -241
+0.50/0.20   D vs A        +0.0507 [+0.0417,+0.0597]  +0.734 [+0.673,+0.795]  +0.462 [+0.369,+0.555]  -162
+0.50/0.20   C vs B_oracle -0.0028 [-0.0037,-0.0020]  -0.174 [-0.206,-0.143]  -0.163 [-0.170,-0.156]  +158
+0.50/0.20   D vs B_oracle -0.0183 [-0.0277,-0.0090]  -0.252 [-0.308,-0.195]  -0.278 [-0.372,-0.184]  +237
+0.50/0.20   D vs C        -0.0155 [-0.0253,-0.0057]  -0.077 [-0.128,-0.027]  -0.115 [-0.211,-0.019]  +79
+
+0.75/0.20   C vs A        +0.0588 [+0.0515,+0.0661]  +0.779 [+0.723,+0.835]  +0.522 [+0.461,+0.582]  -245
+0.75/0.20   D vs A        +0.0421 [+0.0329,+0.0512]  +0.696 [+0.616,+0.776]  +0.399 [+0.307,+0.491]  -169
+0.75/0.20   C vs B_oracle -0.0026 [-0.0032,-0.0019]  -0.190 [-0.242,-0.138]  -0.147 [-0.158,-0.136]  +154
+0.75/0.20   D vs B_oracle -0.0193 [-0.0295,-0.0091]  -0.273 [-0.356,-0.190]  -0.269 [-0.374,-0.165]  +230
+0.75/0.20   D vs C        -0.0167 [-0.0273,-0.0062]  -0.083 [-0.131,-0.036]  -0.123 [-0.221,-0.024]  +75
+
+H3 'non-overlapping error bars' (PROJECT_SPEC 4.1), fraction sweep: separate 95% t intervals of the variants' seed means
+  rho=1.00 frac=0.20 [rho+fraction]            C vs A: non-overlap; C vs B_oracle: overlap; D vs A: non-overlap; D vs B_oracle: overlap
+  rho=1.00 frac=0.05 [fraction]                C vs A: non-overlap; C vs B_oracle: overlap; D vs A: non-overlap; D vs B_oracle: overlap
+  rho=1.00 frac=0.10 [fraction]                C vs A: non-overlap; C vs B_oracle: overlap; D vs A: non-overlap; D vs B_oracle: non-overlap
+  rho=1.00 frac=0.30 [fraction]                C vs A: non-overlap; C vs B_oracle: overlap; D vs A: non-overlap; D vs B_oracle: overlap
+shared-point agreement (D56 1b): config-level assert passed at load; shared cell (rho 1.0, frac 0.2, draw 100) recomputed bit-identical for all 5 seeds: True; E's task stream equal to D's for all 5 seeds: True
+======================================================================================================================
+H4 FIDELITY REPLICATION and H5 TIMING (D56 section 7): Variant E (head D), shared point, draw 101
+  hardware: {'platform': 'Windows-10-10.0.26300-SP0', 'logical_cpus': 16, 'torch': '2.6.0+cu124', 'default_torch_threads': 10, 'device': 'cpu', 'cpu': '13th Gen Intel(R) Core(TM) i5-13450HX | 10 cores', 'ram_gb': '24'}
+  decisions per seed {'1': 40, '2': 40, '3': 40, '4': 40, '5': 40}; graph rebuild max |trust diff| 0.00e+00; decisions whose re-run differs from the logged selection: 0 of 200
+  H4 trust-change: per-seed (top, low, gap):
+      seed 1: top 0.125  low 0.013  gap +0.113
+      seed 2: top 0.150  low 0.037  gap +0.112
+      seed 3: top 0.113  low 0.050  gap +0.062
+      seed 4: top 0.212  low 0.037  gap +0.175
+      seed 5: top 0.362  low 0.037  gap +0.325
+    mean top 0.192 (sd 0.103)  low 0.035 (sd 0.014)  gap +0.158 (sd 0.102) 95% [+0.031, +0.284]  floor 0.2
+  H4 decision-change: per-seed (top, low, gap):
+      seed 1: top 0.075  low 0.013  gap +0.062
+      seed 2: top 0.025  low 0.000  gap +0.025
+      seed 3: top 0.050  low 0.025  gap +0.025
+      seed 4: top 0.100  low 0.050  gap +0.050
+      seed 5: top 0.100  low 0.013  gap +0.088
+    mean top 0.070 (sd 0.033)  low 0.020 (sd 0.019)  gap +0.050 (sd 0.027) 95% [+0.017, +0.083]  floor 0.05
+  H5 per-decision times in ms, threads1 (200 decisions); median / mean / p95:
+      trust_inference              0.269 /     0.326 /     0.631
+      selection                    0.039 /     0.044 /     0.059
+      layer1                       0.089 /     0.091 /     0.130
+      layer2_per_decision        310.236 /   310.883 /   356.479
+      layer2_per_explanation     152.895 /   155.439 /   191.024
+  H5 per-decision times in ms, threads10 (200 decisions); median / mean / p95:
+      trust_inference              0.939 /     0.958 /     1.317
+      selection                    0.049 /     0.051 /     0.061
+      layer1                       0.107 /     0.112 /     0.153
+      layer2_per_decision        674.923 /   672.157 /   734.458
+      layer2_per_explanation     334.565 /   336.075 /   372.970
+```
+
+### F27 — S9 verdicts against D56/D57, and interpretation (written after F26 was committed in 0b6585e)
+Date: 2026-10-14 | Session: S9 | Commit: see `git log` | No rule, floor, bound, window or number of F26 was changed.
+Labels from `python scripts/s9_analyse.py --sweep configs/sweep.yaml --verdict` (results/s9/report-verdict.txt), applied exactly as D56 section 4
+and D57:
+```
+H3 (fraction sweep, rho 1.0; label at fractions 0.05 / 0.10 / 0.20 / 0.30; H3 holds only with WIN at >= 2 of 4)
+  C vs A        WIN WIN WIN WIN           -> 4 of 4  -> HOLDS      (non-overlapping error bars at all 4: yes)
+  D vs A        WIN WIN WIN WIN           -> 4 of 4  -> HOLDS      (non-overlapping error bars at all 4: yes)
+  C vs B_oracle NULL NULL NULL NULL       -> 0 of 4  (within the bound of the oracle at every point; oracle better by 0.001-0.003)
+  D vs B_oracle NULL NEGATIVE NEGATIVE NEGATIVE -> 0 of 4  (the oracle is at least the 0.01 floor better at 0.10, 0.20, 0.30)
+H1 (n_av, shared point rho 1.0 / fraction 0.20)
+  C vs A  WIN  +0.756 [+0.676, +0.836]      D vs A  WIN  +0.664 [+0.523, +0.806]
+  C vs B_oracle NEGATIVE -0.205 [-0.287, -0.123]      D vs B_oracle NEGATIVE -0.296 [-0.447, -0.146]
+  (the n_win guard is positive for the vs-A rows: C +0.446 [+0.351, +0.541], D +0.331 [+0.221, +0.442])
+Secondary, closed-loop H2 check, D vs C (H3 metric), fraction 0.05 / 0.10 / 0.20 / 0.30: NULL NULL NEGATIVE NEGATIVE (never gating; F17 unchanged)
+Every other point (rho 0 ... 0.75) has the same labels as the shared point for vs-A (WIN) and vs-oracle (C NULL on H3, D NEGATIVE; both NEGATIVE on H1).
+B vs A: identical on all 2000 paired draws (sanity row exactly zero).
+H4 replication (draw 101, D54 procedure): trust-change gap +0.158 [+0.031, +0.284], floor 0.20 -> WEAK (F25: +0.160, WEAK).
+  decision-change gap +0.0500 [+0.017, +0.083], floor 0.05 -> FAITHFUL by the rule's >=, at the boundary (F25: +0.033, WEAK).
+H5: Layer 2 median 310 ms/decision at 1 thread, 675 ms at 10 threads vs the 100 ms assumption -> asynchronous only; trust inference
+  0.27 ms (0.94 at 10 threads), selection 0.04 ms, Layer 1 0.09 ms.
+```
+Interpretation (what the numbers say, in the order of the hypotheses):
+1. **H3 holds against no-trust dispatch.** Both learned heads raise post-onset deadline success over A at all four degraded fractions, with
+   non-overlapping seed intervals: C by +0.021 (5%), +0.038, +0.050, +0.054 (30%); D by +0.016, +0.029, +0.034, +0.039. The gain is smallest at 5%
+   (little to avoid) and largest where more nodes fail, but at rho 1.0, fraction 0.2 it is smaller than at rho 0 (C +0.050 vs +0.078): the more the
+   failures share a segment, the fewer healthy alternatives a vehicle has.
+2. **B is A here**, as D50 states; the "improvement over certificate trust" is an improvement over no behavioural signal, and the oracle shows what
+   a perfect certificate-style signal could do. C recovers all but 0.001-0.003 of the oracle's success at every fraction (NULL: the floor of 0.01 is not
+   reached); D falls 0.006-0.018 short of it and is NEGATIVE against it at three fractions.
+3. **H1 holds against A with a large effect, and is far from the oracle.** C sends 76% fewer tasks (of A's count) to degraded RSUs than A before its
+   own avoidance point, D 66%; the oracle is a further 21% (C) and 30% (D) of A's count better because it avoids at once. Caution: A reaches the
+   avoidance rule in only 53% of runs (47% "never avoided", so its n_av is a full-window count), so the n_av reduction partly measures where the rule
+   stops counting; the fixed-window n_win reduction, which does not depend on the rule, is smaller (C +0.45, D +0.33 at the shared point) and is the
+   more conservative statement. Detection latency (descriptive, not gating): C 151 steps, D 220 steps after onset at the shared point against 0 for
+   the oracle and "never" for A and B; D leaves 4% of degraded RSUs undetected inside the 400-step window.
+4. **The closed loop agrees with S4 about the graph.** D is not better than C on any point and is worse on H3 at two of four fractions (NEGATIVE) and
+   on latency by 64-103 steps; the D-minus-C gap does not shrink or grow with rho (-0.016 at rho 0, -0.016 at rho 1.0). The structural claim H2 gets no
+   support from the closed loop either. Possible contributors, none tested: D's weights were tuned by the same procedure as C's (F20 showed D weaker
+   on the tuning seed too) and the training/evaluation dispatch shift of F21 item 3 and F22 (D's healthy-RSU trust drifts down). These are hypotheses.
+5. **H4 replicates as WEAK on the trust-change criterion**, with essentially the F25 gap (+0.158 vs +0.160). The decision-change criterion lands exactly
+   on its 0.05 floor and so reads FAITHFUL by the literal rule, but F25 measured +0.033 (WEAK) on draw 100 with the same procedure; their mean is
+   0.042, and a single boundary pass is not a claim. **H5 replicates F24:** Layer 2 is asynchronous only, three orders of
+   magnitude above the decision itself.
+6. **D42:** no cold-start RSU was injected, so no cold-start aggregate exists; every point has 250 draws attempted, 0 failed, 250 aggregated.
+Limits that apply to all of the above: simulation-only, one topology per seed, the injection model is the most attackable assumption (PROJECT_SPEC
+4.6), the trust heads were trained on A-dispatch (F21), the avoidance bar 0.75 is a stated assumption (D56), the vs-oracle rows are headroom and not a
+competing method, and the H4/H5 stage uses the D54 sample size (200 decisions, 400 explanations), not larger.

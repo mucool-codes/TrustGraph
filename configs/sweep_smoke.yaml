@@ -1,0 +1,19 @@
+# Harness smoke test ONLY (D56: "Harness debugging uses draws 900+ only"). Same structure as sweep.yaml, two
+# non-evaluation draws, its own out_dir. Nothing from this file is a result.
+base_config: configs/demo.yaml
+weights_file: configs/weights.yaml
+out_dir: results/s9-smoke
+seeds: [1, 2, 3, 4, 5]
+draws: [900, 901]
+variants: [A, B, B_oracle, C, D]
+rho_sweep:
+  rho: [0.0, 0.25, 0.5, 0.75, 1.0]
+  fraction: 0.20
+fraction_sweep:
+  fraction: [0.05, 0.10, 0.20, 0.30]
+  rho: 1.0
+workers: 12
+min_eval_draw: 900
+
+# H4/H5 serial stage (D56 section 7): the injection draw of the shared point it runs on (D54 used 100).
+overhead_draw: 901
