@@ -1466,3 +1466,52 @@ H4 FIDELITY REPLICATION and H5 TIMING (D56 section 7): Variant E (head D), share
       layer2_per_decision        674.923 /   672.157 /   734.458
       layer2_per_explanation     334.565 /   336.075 /   372.970
 ```
+
+### F27 — S9 verdicts against D56/D57, and interpretation (written after F26 was committed in 0b6585e)
+Date: 2026-10-14 | Session: S9 | Commit: see `git log` | No rule, floor, bound, window or number of F26 was changed.
+Labels from `python scripts/s9_analyse.py --sweep configs/sweep.yaml --verdict` (results/s9/report-verdict.txt), applied exactly as D56 section 4
+and D57:
+```
+H3 (fraction sweep, rho 1.0; label at fractions 0.05 / 0.10 / 0.20 / 0.30; H3 holds only with WIN at >= 2 of 4)
+  C vs A        WIN WIN WIN WIN           -> 4 of 4  -> HOLDS      (non-overlapping error bars at all 4: yes)
+  D vs A        WIN WIN WIN WIN           -> 4 of 4  -> HOLDS      (non-overlapping error bars at all 4: yes)
+  C vs B_oracle NULL NULL NULL NULL       -> 0 of 4  (within the bound of the oracle at every point; oracle better by 0.001-0.003)
+  D vs B_oracle NULL NEGATIVE NEGATIVE NEGATIVE -> 0 of 4  (the oracle is at least the 0.01 floor better at 0.10, 0.20, 0.30)
+H1 (n_av, shared point rho 1.0 / fraction 0.20)
+  C vs A  WIN  +0.756 [+0.676, +0.836]      D vs A  WIN  +0.664 [+0.523, +0.806]
+  C vs B_oracle NEGATIVE -0.205 [-0.287, -0.123]      D vs B_oracle NEGATIVE -0.296 [-0.447, -0.146]
+  (the n_win guard is positive for the vs-A rows: C +0.446 [+0.351, +0.541], D +0.331 [+0.221, +0.442])
+Secondary, closed-loop H2 check, D vs C (H3 metric), fraction 0.05 / 0.10 / 0.20 / 0.30: NULL NULL NEGATIVE NEGATIVE (never gating; F17 unchanged)
+Every other point (rho 0 ... 0.75) has the same labels as the shared point for vs-A (WIN) and vs-oracle (C NULL on H3, D NEGATIVE; both NEGATIVE on H1).
+B vs A: identical on all 2000 paired draws (sanity row exactly zero).
+H4 replication (draw 101, D54 procedure): trust-change gap +0.158 [+0.031, +0.284], floor 0.20 -> WEAK (F25: +0.160, WEAK).
+  decision-change gap +0.0500 [+0.017, +0.083], floor 0.05 -> FAITHFUL by the rule's >=, at the boundary (F25: +0.033, WEAK).
+H5: Layer 2 median 310 ms/decision at 1 thread, 675 ms at 10 threads vs the 100 ms assumption -> asynchronous only; trust inference
+  0.27 ms (0.94 at 10 threads), selection 0.04 ms, Layer 1 0.09 ms.
+```
+Interpretation (what the numbers say, in the order of the hypotheses):
+1. **H3 holds against no-trust dispatch.** Both learned heads raise post-onset deadline success over A at all four degraded fractions, with
+   non-overlapping seed intervals: C by +0.021 (5%), +0.038, +0.050, +0.054 (30%); D by +0.016, +0.029, +0.034, +0.039. The gain is smallest at 5%
+   (little to avoid) and largest where more nodes fail, but at rho 1.0, fraction 0.2 it is smaller than at rho 0 (C +0.050 vs +0.078): the more the
+   failures share a segment, the fewer healthy alternatives a vehicle has.
+2. **B is A here**, as D50 states; the "improvement over certificate trust" is an improvement over no behavioural signal, and the oracle shows what
+   a perfect certificate-style signal could do. C recovers all but 0.001-0.003 of the oracle's success at every fraction (NULL: the floor of 0.01 is not
+   reached); D falls 0.006-0.018 short of it and is NEGATIVE against it at three fractions.
+3. **H1 holds against A with a large effect, and is far from the oracle.** C sends 76% fewer tasks (of A's count) to degraded RSUs than A before its
+   own avoidance point, D 66%; the oracle is a further 21% (C) and 30% (D) of A's count better because it avoids at once. Caution: A reaches the
+   avoidance rule in only 53% of runs (47% "never avoided", so its n_av is a full-window count), so the n_av reduction partly measures where the rule
+   stops counting; the fixed-window n_win reduction, which does not depend on the rule, is smaller (C +0.45, D +0.33 at the shared point) and is the
+   more conservative statement. Detection latency (descriptive, not gating): C 151 steps, D 220 steps after onset at the shared point against 0 for
+   the oracle and "never" for A and B; D leaves 4% of degraded RSUs undetected inside the 400-step window.
+4. **The closed loop agrees with S4 about the graph.** D is not better than C on any point and is worse on H3 at two of four fractions (NEGATIVE) and
+   on latency by 64-103 steps; the D-minus-C gap does not shrink or grow with rho (-0.016 at rho 0, -0.016 at rho 1.0). The structural claim H2 gets no
+   support from the closed loop either. Possible contributors, none tested: D's weights were tuned by the same procedure as C's (F20 showed D weaker
+   on the tuning seed too) and the training/evaluation dispatch shift of F21 item 3 and F22 (D's healthy-RSU trust drifts down). These are hypotheses.
+5. **H4 replicates as WEAK on the trust-change criterion**, with essentially the F25 gap (+0.158 vs +0.160). The decision-change criterion lands exactly
+   on its 0.05 floor and so reads FAITHFUL by the literal rule, but F25 measured +0.033 (WEAK) on draw 100 with the same procedure; their mean is
+   0.042, and a single boundary pass is not a claim. **H5 replicates F24:** Layer 2 is asynchronous only, three orders of
+   magnitude above the decision itself.
+6. **D42:** no cold-start RSU was injected, so no cold-start aggregate exists; every point has 250 draws attempted, 0 failed, 250 aggregated.
+Limits that apply to all of the above: simulation-only, one topology per seed, the injection model is the most attackable assumption (PROJECT_SPEC
+4.6), the trust heads were trained on A-dispatch (F21), the avoidance bar 0.75 is a stated assumption (D56), the vs-oracle rows are headroom and not a
+competing method, and the H4/H5 stage uses the D54 sample size (200 decisions, 400 explanations), not larger.
