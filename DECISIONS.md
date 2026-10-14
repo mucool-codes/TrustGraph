@@ -1360,3 +1360,20 @@ in-range (ignores dwell as the brief asks).
 
 **Rationale:** one simulator with one hook keeps the world identical across modes, makes the open-loop/closed-loop
 equivalence a testable property, and keeps ground truth out of the observable log.
+
+### D52 — S6 weights adopted: `configs/weights.yaml`, applied unchanged on every evaluation seed
+Date: 2026-10-14 | Session: S6 | Status: active
+Records the outcome of the D50 procedure (raw grid: F20).
+
+**Decision:** The weights selected on the tuning seed are used as they are, per variant, for every later
+evaluation: A (alpha 0, beta 0.25, gamma 0.6), B = A's, B-oracle (0.5, 0.25, 0.6), C (1, 0.25, 0.6), D (2, 0.25, 0.6),
+E = D's. They are never re-tuned on an evaluation seed or after seeing an evaluation number; a change needs a new
+entry. Tuning seed 100 and the demo draw (seed 100, draw 7) are excluded from the evaluation (the S4 seeds 1-5 remain the evaluation seeds).
+
+**Alternatives:** one shared weight triple for all variants (hides that a variant may need a different alpha);
+re-tuning per evaluation seed (leaks the evaluation).
+
+**Rationale:** the surface is flat for the trust-bearing variants (F20: the spread between the best and the
+config-default point is 0.002-0.005, inside the draw-to-draw spread), so the exact weights should not be read as
+carrying a finding; what matters is that every variant, A included, was tuned by the identical procedure, so no
+variant has a handicap the others do not.

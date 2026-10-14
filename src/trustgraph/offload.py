@@ -65,6 +65,8 @@ class OffloadSettings:
     handoff: str = "relay"
     checkpoint_dir: str = "checkpoints"
     log_decisions: bool = False
+    # Score every RSU at every step and keep the history (for plots); changes no outcome.
+    record_trust: bool = False
 
     def __post_init__(self) -> None:
         if self.variant not in VARIANTS:
@@ -133,6 +135,7 @@ class OffloadEngine:
 
     def __post_init__(self) -> None:
         self.log: list[dict] = []
+        self.trust_history: list[np.ndarray] = []
         self._builder: SnapshotBuilder | None = None
         self._trust = np.zeros(0)
         self._t = -1
@@ -167,7 +170,7 @@ class OffloadEngine:
         variant = self.settings.variant
         source = TRUST_SOURCE[variant]
         n = self._num_rsus
-        if variant == "A" or not need_trust:
+        if variant == "A" or not (need_trust or self.settings.record_trust):
             self._trust = np.zeros(n)
         elif source == "cert_valid_feature":
             self._trust = self._rsu_features[t, :, RSU_COL["cert_valid"]].astype(np.float64)
@@ -177,6 +180,8 @@ class OffloadEngine:
             with torch.no_grad():
                 out = self.model(data.x, data.edge_index, data.edge_attr)
             self._trust = out[:n].numpy().astype(np.float64)
+        if self.settings.record_trust:
+            self.trust_history.append(self._trust.copy())
 
     # ----------------------------------------------------------------- dispatch
 

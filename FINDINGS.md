@@ -984,3 +984,36 @@ Date: 2026-10-14 | Session: S6 | Commit: see `git log`
    stops receiving tasks stops producing evidence, so its features freeze). That is a distribution shift between
    training and evaluation. True load does not respond to dispatch in this world (D32), so the shift is in the
    observation and feedback distribution, not in load.
+
+### F22 — S6 demo scenario: closed-loop A vs C vs D on one degrading backhaul segment
+Date: 2026-10-14 | Session: S6 | Commit: see `git log`
+Config: `configs/demo.yaml`, seed 100 (tuning seed, not an evaluation seed), rho 1.0, fraction 0.20, injection draw 7
+(fixed before running; the tuning draws were 0-2), closed loop, dwell filter and handoff on, weights from
+`configs/weights.yaml` (F20) | One scenario, one run per variant - a demonstration, not an evaluation.
+Command: `python scripts/s6_demo.py --config configs/demo.yaml --weights-file configs/weights.yaml`
+Figure: `figures/s6_demo.png` (generated, not committed); numbers: results/s6/demo.txt
+
+Numbers:
+```
+degraded RSUs [0, 5, 7, 16], all on backhaul segment 3 (onset 400, ramp 300); realised pair concentration 1.000
+variant  weights (a,b,g)   tasks  success all  success post-onset  post-onset tasks to degraded RSUs (share)
+A        0,    0.25, 0.6   6873   0.8980      0.8593              1094 of 4597 (0.2380)
+C        1,    0.25, 0.6   6873   0.9259      0.9012               715 of 4597 (0.1555)
+D        2,    0.25, 0.6   6873   0.9185      0.8908               767 of 4597 (0.1668)
+phase               share of dispatched tasks to degraded RSUs / deadline success
+pre-onset [0,400)   A 0.216 / 0.976   C 0.208 / 0.976   D 0.222 / 0.975
+ramp [400,700)      A 0.257 / 0.927   C 0.201 / 0.942   D 0.209 / 0.934
+plateau [700,1200)  A 0.226 / 0.819   C 0.128 / 0.877   D 0.142 / 0.865
+mean trust of the degraded RSUs (step 399 / 550 / 700 / 1199):  C 0.909 / 0.879 / 0.469 / 0.306   D 0.938 / 0.840 / 0.434 / 0.283
+mean trust of the healthy RSUs (step 399 / 1199):               C 0.981 / 0.958                  D 0.978 / 0.896
+engine counters (identical across the three runs): decisions 6873, dwell exclusions 52, dwell fallbacks 0, relayed 2, lost to handoff 0
+```
+Interpretation: in this one scenario trust for the degraded segment falls from ~0.9 to ~0.3 under both C and D
+while healthy RSUs stay at 0.9-0.98, dispatch shifts away from the degraded RSUs (plateau share 0.23 under A vs 0.13
+under C and 0.14 under D) and plateau deadline success is 0.82 under A vs 0.88 (C) and 0.87 (D). The shift is partial,
+not total: the degraded RSUs still receive about 13-14% of plateau tasks, because trust is one weighted term against
+latency and load and many vehicles have a degraded RSU as their only or best in-range candidate (mean 2.4 candidates,
+F11). C is not behind D here (consistent with F17). The dwell filter removed an RSU on 52 decisions and the relay rule
+fired twice, so both are live but rare on this seed. D's mean healthy-RSU trust drifts down to 0.90 late in the run
+(C: 0.96), a possible sign of the training/evaluation dispatch shift (F21 item 3); it is not investigated here.
+One scenario says nothing about H1/H3 magnitudes; those are S9's.

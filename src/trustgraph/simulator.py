@@ -350,6 +350,7 @@ def generate_scenario(
             "handoff_lost": np.asarray(handoff_lost_flags, dtype=bool),
             "decision_log": engine.log,
             "counters": engine.counters,
+            "trust_history": np.asarray(engine.trust_history) if engine.trust_history else None,
         }
     return Scenario(observed=observed, ground_truth=ground_truth, extras=extras)
 
