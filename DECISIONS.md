@@ -1677,3 +1677,22 @@ Also reported, never gating: n_win (dispatches to degraded RSUs over [400, 1200)
 **Alternatives:** (a) a gate with alpha = 0 among survivors (a pure filter): rejected as the baseline because the brief asks for the same L1 rule with C's weights, and a pure filter would conflate "gate" with "no trust weighting"; (b) a gate threshold from a quantile of pre-onset trust (like the D43 tau): rejected, it would depend on the scenario, not on one fixed number; (c) tau tuned per evaluation seed: leaks the evaluation; (d) falling back to the single highest-trust candidate: a different rule, not asked for.
 
 **Rationale:** the comparison isolates how trust enters the decision (a threshold plus the same weighted score, versus the weighted score alone) with the head, the weights, the candidates and the data held fixed. Fixing the grid, the single tuning seed, the effect floor and the verdict rule beforehand makes a gate that wins as reportable as a gate that loses.
+
+### D60 — Resolution of the S9 decision request: how the paper reports the heads, H4, the negative on D, and H1
+Date: 2026-10-14 | Session: after S9/S10 (design review) | Status: active
+Records the review answers to the S9 decision request. D56-D58 and F26/F27 are not edited; nothing is re-run. The S9b decision request (F28-F30, D59) is a separate request and is still open.
+
+**Decision:**
+- **Q1 (headline head): both heads shown equally, C named as the strongest result.** D is the graph variant and the text says plainly that it did not beat the node-local head (S4 NEGATIVE, F17;
+  closed loop F27 item 4). Nothing in the title or abstract implies the graph helped. This is what D58 already does in the figures.
+- **Q2 (H4 decision-change result): report both passes with their exact numbers and call the decision-change result borderline.** S8 (draw 100): +0.033, WEAK. S9 replication (draw 101): +0.0500,
+  exactly on the 0.05 floor, which the literal D54 rule (>=) labels FAITHFUL. The mean of the two is about 0.042. Each pass carries its own literal D54 label; the two are not pooled into a new test
+  after the fact, and the mean is quoted only as a description. The trust-change criterion is WEAK on both passes (+0.160 and +0.158). D54 stays frozen.
+- **Q3 (why D trails C): accept the negative.** No rescue runs (D47 stands). The F21 dispatch-shift (trust heads trained on Baseline-A dispatch, evaluated in the closed loop) and training on closed-loop
+  dispatch are recorded as **untested future work** in the paper's limitations, stated as hypotheses.
+- **Q4 (H1 presentation): both n_av and n_win, as D58 does.** Every H1 statement in the paper quotes the fixed-window n_win figure and the censoring (never-avoided) rate beside n_av; n_av is
+  never quoted alone. At the shared point: C n_av 153 / n_win 506, D 211 / 610, A 627 / 912 (A never avoids in 47% of runs, C and D in 3%, B-oracle in 1%).
+
+**Alternatives:** presenting D as the headline (contradicted by F17 and F27); pooling the two H4 passes into one interval (a post-hoc test); a rescue study of D (D47); quoting n_av alone (A's censoring makes it look larger than the rule-free count supports).
+
+**Rationale:** each choice reports the measured result at its measured strength. The H4 decision-change gap straddles the floor across two honest passes, so "borderline, with both numbers" is what the data supports; the headline and the H1 rules keep the paper from claiming more than F26/F27 show.
