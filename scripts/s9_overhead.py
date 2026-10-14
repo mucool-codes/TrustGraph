@@ -148,6 +148,7 @@ def run(sw: dict, default_threads: int) -> None:
     rows, checks, samples = collect(sw)
     h4 = h4_summary(rows, sw["seeds"])
     hw = T.hardware()
+    hw["default_torch_threads"] = default_threads
     res = {}
     for threads in sorted({default_threads, 1}):
         res[f"threads{threads}"] = timing(sw, threads)

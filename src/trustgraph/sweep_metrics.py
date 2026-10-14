@@ -149,18 +149,20 @@ def h3_effect(succ_x: np.ndarray, succ_ref: np.ndarray) -> Effect:
     return Effect(m, sd, lo, hi, label(m, lo, hi, *FLOORS["H3"]))
 
 
-def relative_reduction(count_x: np.ndarray, count_ref: np.ndarray) -> np.ndarray:
-    """Per-seed 1 - mean_draws(x) / mean_draws(ref). A reference with a zero seed mean is an error."""
-    mx, mr = np.nanmean(count_x, axis=1), np.nanmean(count_ref, axis=1)
-    if (mr <= 0).any():
-        raise ValueError("reference count is zero for a seed; the relative reduction is undefined")
-    return 1.0 - mx / mr
+def relative_reduction(count_x: np.ndarray, count_ref: np.ndarray, count_a: np.ndarray) -> np.ndarray:
+    """Per-seed (mean_draws(ref) - mean_draws(x)) / mean_draws(A): D57. Positive = X sends fewer tasks to degraded RSUs
+    than the reference, in units of the no-trust baseline's count. With ref = A this is D56's 1 - x/ref. The
+    reference is not the denominator because the oracle's count is ~0 by construction (it avoids at once)."""
+    mx, mr, ma = (np.nanmean(v, axis=1) for v in (count_x, count_ref, count_a))
+    if (ma <= 0).any():
+        raise ValueError("Variant A's count is zero for a seed; the normalised reduction is undefined")
+    return (mr - mx) / ma
 
 
-def h1_effect(n_av_x, n_av_ref, n_win_x, n_win_ref) -> tuple[Effect, Effect]:
+def h1_effect(n_av_x, n_av_ref, n_win_x, n_win_ref, n_av_a, n_win_a) -> tuple[Effect, Effect]:
     """(primary on n_av, guard on n_win). The primary's WIN is downgraded to NOISY unless the guard's lo > 0."""
-    m, sd, lo, hi = t_interval(relative_reduction(n_av_x, n_av_ref))
-    g = t_interval(relative_reduction(n_win_x, n_win_ref))
+    m, sd, lo, hi = t_interval(relative_reduction(n_av_x, n_av_ref, n_av_a))
+    g = t_interval(relative_reduction(n_win_x, n_win_ref, n_win_a))
     lab = label(m, lo, hi, *FLOORS["H1"])
     if lab == "WIN" and not g[2] > 0:
         lab = "NOISY"

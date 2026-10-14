@@ -111,15 +111,22 @@ def test_h1_win_is_downgraded_when_the_fixed_window_guard_fails():
     ref = rng.uniform(90, 110, (5, 50))
     x = ref * 0.5
     win_guard = ref * 1.0  # the guard shows no reduction at all
-    primary, guard = M.h1_effect(x, ref, win_guard, ref)
+    primary, guard = M.h1_effect(x, ref, win_guard, ref, ref, ref)
     assert primary.label == "NOISY"
-    primary, guard = M.h1_effect(x, ref, x, ref)
+    primary, guard = M.h1_effect(x, ref, x, ref, ref, ref)
     assert primary.label == "WIN" and guard.label == "WIN"
 
 
-def test_h1_zero_reference_is_an_error():
+def test_h1_reduction_against_a_zero_oracle_count_is_defined_and_negative():
+    a = np.full((5, 3), 100.0); oracle = np.zeros((5, 3)); x = np.full((5, 3), 40.0)
+    assert np.allclose(M.relative_reduction(x, a, a), 0.6)        # vs A: D56's 1 - x/ref
+    assert np.allclose(M.relative_reduction(x, oracle, a), -0.4)  # vs the oracle: 40% of A's count short of it
+    assert np.allclose(M.relative_reduction(oracle, oracle, a), 0.0)
+
+
+def test_h1_zero_baseline_is_an_error():
     with pytest.raises(ValueError):
-        M.relative_reduction(np.ones((5, 3)), np.zeros((5, 3)))
+        M.relative_reduction(np.ones((5, 3)), np.ones((5, 3)), np.zeros((5, 3)))
 
 
 # ------------------------------------------------------------------ grid and resumability

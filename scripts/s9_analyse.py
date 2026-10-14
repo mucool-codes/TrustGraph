@@ -87,7 +87,8 @@ def pname(sw, pt):
 def comparisons(arr, x, ref):
     """Effects of X relative to ref on one point: (H3 effect, H1 primary, H1 guard, latency diff tuple)."""
     h3 = M.h3_effect(arr[x]["success_post_onset"], arr[ref]["success_post_onset"])
-    h1, guard = M.h1_effect(arr[x]["n_av"], arr[ref]["n_av"], arr[x]["n_win"], arr[ref]["n_win"])
+    h1, guard = M.h1_effect(arr[x]["n_av"], arr[ref]["n_av"], arr[x]["n_win"], arr[ref]["n_win"],
+                            arr["A"]["n_av"], arr["A"]["n_win"])
     lat = M.t_interval(M.seed_means(arr[x]["latency"] - arr[ref]["latency"]))
     return h3, h1, guard, lat
 
@@ -142,7 +143,7 @@ def report(sw: dict, cells: dict, verdict: bool) -> tuple[str, dict]:
     # ---- paired comparisons
     L.append("\n" + "=" * 118)
     L.append("PAIRED COMPARISONS (X - ref per draw, seed means, Student-t 95% over 5 seeds). H3 in absolute success rate;"
-             " H1 as relative reduction in dispatches to degraded RSUs (1 - X/ref, positive = X sends fewer); latency diff in steps.")
+             " H1 as reduction in dispatches to degraded RSUs, (ref - X) / A per D57 (positive = X sends fewer than ref; in units of Variant A's count); latency diff in steps.")
     pairs = PRIMARY + SECONDARY + EXTRA
     csv_rows = []
     for pt, c in cells.items():

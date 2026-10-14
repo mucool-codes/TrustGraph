@@ -1612,3 +1612,28 @@ traffic, so they are not independent: D43).
 bars at >= 2 points") that cannot be judged unless the metric, the floor and the reference are numbers; fixing them before the run is what
 lets a null be reported as a null. B_oracle brackets how much any certificate-like signal could add, so a reviewer can read A-vs-C/D as a
 gain over no trust and B_oracle-vs-C/D as the remaining headroom, and B (equal to A here) is not mistaken for a strawman win.
+
+### D57 — S9: the H1 effect is normalised by Variant A's count, because the oracle's count is zero by construction (amends D56 section 3 only)
+Date: 2026-10-14 | Session: S9 | Status: active — **FROZEN with D56. Written before any evaluation draw (seed 1-5, draw 100-149) produced a result.**
+Supersedes the H1-effect formula of D56 section 3 ("rho_s = 1 - mean(n_av_X) / mean(n_av_ref)"). Everything else in D56 stands, including the
+metrics, f = 0.10 and b = 0.25, the check order and the n_win guard.
+
+**What happened.** The harness smoke test (configs/sweep_smoke.yaml: five seeds, draws 900 and 901 only, which D56 reserves for harness
+debugging; nothing from it is a result) crashed the analysis with a zero reference count. Cause: B_oracle's trust is 0 for every faulty RSU from
+the step its fault begins (D50), so its dispatch share to degraded RSUs is under the avoidance bar from the first window, t_avoid = 400 and
+n_av = 0 in nearly every cell. The ratio X / ref against the oracle is therefore undefined (a zero denominator) or enormous, which is a flaw in D56's
+formula, not a property of the variants. The same smoke output was NOT used to change any floor, bound, window, ratio or other rule, and is not
+reported as a finding.
+
+**Decision.** The H1 effect is the per-seed reduction **in units of the no-trust baseline's count**:
+`rho_s = (mean_draws(n_ref) - mean_draws(n_X)) / mean_draws(n_A)`, with the 95% t interval over the 5 seeds. Positive = X sends fewer tasks to
+degraded RSUs than the reference. For ref = A this equals D56's `1 - n_X / n_A` exactly, so the vs-A comparisons are unchanged. Against B_oracle
+the effect is non-positive when the oracle is better (here: by that fraction of A's count) and labels as D56 section 4 (NEGATIVE: the oracle is at
+least f = 0.10 of A's count better; NULL: within b = 0.25 of A's count of the oracle). The n_win guard uses the same normalisation with n_win.
+A seed whose A count is zero is an error (undefined), not dropped.
+
+**Alternatives:** (a) an absolute difference in dispatches with new absolute floors (arbitrary scale, no link to the baseline); (b) dropping the
+oracle comparison for H1 (the addendum asks for it); (c) adding a constant to the oracle count (an invented smoothing).
+
+**Rationale:** the oracle comparison answers "how much of the available headroom does the learned trust recover", and the baseline's count is
+the natural unit of that headroom; the vs-A rows stay identical to D56 so no reader has to re-derive them.
