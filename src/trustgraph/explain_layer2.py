@@ -330,3 +330,57 @@ def render_merged(layer1: Explanation, layer2: dict[int, NodeTrustExplanation]) 
         f"carry at least {NEIGHBOUR_SHARE_MIN:.0%} of the attribution.)"
     )
     return "\n".join(lines)
+
+
+# ------------------------------------------------------------------- from a decision record
+
+
+def explain_record_layer2(
+    record: dict,
+    *,
+    config_path: str | Path,
+    seed: int,
+    observed_path: str | Path,
+    trace_path: str | Path | None = None,
+    checkpoint_dir: str | Path = "checkpoints",
+    run_seed: int = 0,
+) -> tuple[Explanation, dict[int, NodeTrustExplanation]]:
+    """Layer 1 and Layer 2 for one logged decision of a closed-loop run.
+
+    The step's graph is rebuilt from the closed-loop observable scenario and the mobility trace, the frozen
+    seed-`seed` head named by the record's variant is loaded, and the trust it gives every candidate must
+    reproduce the logged trust (otherwise the wrong scenario/seed/checkpoint was supplied).
+    """
+    from .config import load_config, with_overrides
+    from .explain import ExplanationError, explain_decision
+    from .model import build_trust_head
+    from .observed import load_observed
+    from .scenario import build_snapshot_builder, build_world
+    from .trace import default_trace_path, load_trace
+    from .train import load_checkpoint
+
+    variant = record["variant"]
+    if variant not in ("C", "D", "E"):
+        raise ExplanationError(f"Layer 2 explains a trust head; Variant {variant} has none (Layer 1 still applies)")
+    layer1 = explain_decision(record)
+    cfg = with_overrides(load_config(config_path), seed=seed)
+    world = build_world(cfg)
+    trace = load_trace(trace_path or default_trace_path(config_path, seed))
+    builder = build_snapshot_builder(cfg, world, trace, load_observed(observed_path))
+    graph = None
+    for t in range(record["step"] + 1):
+        graph = builder.build(t)
+    head = "C" if variant == "C" else "D"
+    model = build_trust_head(cfg.model, 0, cfg.device, head)
+    load_checkpoint(Path(checkpoint_dir) / f"s3-seed{seed}-{head}.pt", model)
+    model.eval()
+    n = world.topology.num_rsus
+    base = trust_vector(model, graph, n)
+    for c in record["candidates"]:
+        if c["trust"] is not None and abs(base[c["rsu"]] - c["trust"]) > 1e-6:
+            raise ExplanationError(
+                f"the rebuilt graph and checkpoint give RSU {c['rsu']} trust {base[c['rsu']]:.6f}, the log says "
+                f"{c['trust']:.6f}: wrong --seed, --scenario or --checkpoint-dir for this log"
+            )
+    ids = [layer1.winner] + ([layer1.runner_up.loser] if layer1.runner_up else [])
+    return layer1, {v: explain_node(model, graph, v, n, run_seed, record["decision_id"]) for v in ids}
