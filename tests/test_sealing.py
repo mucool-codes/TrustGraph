@@ -46,6 +46,9 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s4_eval.py",  # evaluates frozen C/D against sealed classes (D43)
         "s4_analyse.py",  # aggregates the above; verdict against D43
         "s5_diagnostics.py",  # S5 gate-response diagnostics (D48)
+        "s6_run.py",  # closed-loop run + sealed side files (D51)
+        "s6_tune.py",  # weight tuning on the tuning seed (D50)
+        "s6_demo.py",  # the S6 demo plot
     }
 )
 

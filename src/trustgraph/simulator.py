@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import heapq
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -51,6 +52,9 @@ from .tracking import (
     build_tracking_config,
 )
 
+if TYPE_CHECKING:
+    from .offload import OffloadEngine
+
 DISPATCH_POLICIES: tuple[str, ...] = ("baseline_a",)
 
 
@@ -58,6 +62,9 @@ DISPATCH_POLICIES: tuple[str, ...] = ("baseline_a",)
 class Scenario:
     observed: ObservedScenario
     ground_truth: GroundTruth
+    # Closed-loop only (S6): sealed per-task `handoff_lost`, the observable decision log,
+    # and engine counters. None for the open-loop scenario.
+    extras: dict | None = None
 
 
 def check_trace_matches(cfg: Config, trace: Trace) -> None:
@@ -85,14 +92,24 @@ def check_trace_matches(cfg: Config, trace: Trace) -> None:
         )
 
 
-def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
-    """Simulate the task stream and outcomes over `trace`."""
+def generate_scenario(
+    cfg: Config, world: World, trace: Trace, engine: "OffloadEngine | None" = None
+) -> Scenario:
+    """Simulate the task stream and outcomes over `trace`.
+
+    With `engine=None` this is the open-loop Baseline A world of S2: dispatch is the L1 rule
+    with alpha = 0 (D33). With an engine (S6, D51) the engine makes the dispatch decisions
+    and applies the handoff rule; arrivals, execution noise and injection are unchanged.
+    """
     check_trace_matches(cfg, trace)
 
     policy = str((cfg.dispatch or {}).get("policy", "baseline_a"))
-    if policy not in DISPATCH_POLICIES:
+    if engine is not None:
+        policy = f"closed_loop:{engine.settings.variant}"
+    elif policy not in DISPATCH_POLICIES:
         raise ValueError(
-            f"unknown dispatch.policy {policy!r}; S2 implements only {DISPATCH_POLICIES}"
+            f"unknown dispatch.policy {policy!r}; open loop implements only {DISPATCH_POLICIES}; "
+            "closed-loop dispatch is selected by passing an OffloadEngine (D51)"
         )
 
     topo = world.topology
@@ -131,7 +148,17 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
     records: dict[str, list] = {name: [] for name in TaskStream.__dataclass_fields__}
     true_completion: list[float] = []
     dropped_flags: list[bool] = []
+    handoff_lost_flags: list[bool] = []
     pending: list[tuple[float, int]] = []  # (observed_at_s, task index)
+
+    # B_oracle (D50): a faulty RSU's cert_valid is 0 from the step its fault begins - the
+    # onset step for a degraded RSU, step 0 for a compromised one. World-side by construction.
+    fault_start = np.full(num_rsus, np.iinfo(np.int64).max, dtype=np.int64)
+    fault_start[plan.degraded] = plan.onset_step
+    fault_start[plan.colluding] = 0
+
+    if engine is not None:
+        engine.bind(world, trace, exec_model, rsu_features, rsu_active, task_demand)
 
     for t in range(num_steps):
         now_s = t * dt
@@ -184,11 +211,22 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
         capacity_factor = plan.capacity_factor(t)
         drop_prob = plan.drop_probability(t)
 
-        for v in np.flatnonzero(draws.offloads):
+        offloaders = np.flatnonzero(draws.offloads)
+        # The step's graph carries every offloader's task size, so it is written before
+        # anything reads the graph (the engine builds it before dispatching).
+        for v in offloaders:
+            task_demand[t, v] = float(task_model.cycles[int(draws.type_idx[v])]) / task_model.max_cycles
+        if engine is not None:
+            engine.begin_step(
+                t,
+                need_trust=bool(offloaders.size),
+                oracle_cert_valid=(t < fault_start).astype(np.float64),
+            )
+
+        for v in offloaders:
             type_idx = int(draws.type_idx[v])
             cycles = float(task_model.cycles[type_idx])
             deadline = float(task_model.deadline_s(type_idx, draws.slack[v]))
-            task_demand[t, v] = cycles / task_model.max_cycles
             candidates = np.flatnonzero(covered[v])
 
             records["step"].append(t)
@@ -209,19 +247,36 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
                     records[name].append(value)
                 true_completion.append(np.nan)
                 dropped_flags.append(False)
+                handoff_lost_flags.append(False)
                 continue
 
-            decision = select(
-                timestep=t,
-                vehicle_id=int(v),
-                candidates=candidates,
-                trust=np.zeros(candidates.size),
-                latency=latency_norm[v, candidates],
-                load=adv_load[candidates],
-                alpha=0.0,
-                beta=beta,
-                gamma=gamma,
-            )
+            record = None
+            if engine is None:
+                decision = select(
+                    timestep=t,
+                    vehicle_id=int(v),
+                    candidates=candidates,
+                    trust=np.zeros(candidates.size),
+                    latency=latency_norm[v, candidates],
+                    load=adv_load[candidates],
+                    alpha=0.0,
+                    beta=beta,
+                    gamma=gamma,
+                )
+            else:
+                decision, record = engine.dispatch(
+                    t=t,
+                    task_idx=len(records["step"]) - 1,
+                    vehicle=int(v),
+                    covered_row=covered[v],
+                    dist_row=veh_dist[v],
+                    latency_ms_row=latency_ms[v],
+                    latency_norm_row=latency_norm[v],
+                    adv_load=adv_load,
+                    cycles=cycles,
+                    deadline_s=deadline,
+                    type_idx=type_idx,
+                )
             r = decision.chosen_rsu
             comm_s = float(round_trip_comm_s(latency_ms[v, r]))
 
@@ -239,8 +294,13 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
                 drop_u[v],
             )
             completion = float(completion)
+            relayed = lost = False
+            if engine is not None:
+                completion, relayed, lost = engine.apply_handoff(t, int(v), int(r), completion, deadline)
             met = bool(completion <= deadline)
             observed = completion if met else deadline
+            if engine is not None:
+                engine.finish_decision(record, advertised, observed, met, relayed)
 
             idx = len(records["rsu"])
             records["rsu"].append(int(r))
@@ -250,6 +310,7 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
             records["observed_at_s"].append(now_s + observed)
             true_completion.append(completion)
             dropped_flags.append(bool(dropped))
+            handoff_lost_flags.append(bool(lost))
             heapq.heappush(pending, (now_s + observed, idx))
 
     dtypes = {
@@ -283,4 +344,19 @@ def generate_scenario(cfg: Config, world: World, trace: Trace) -> Scenario:
         task_true_completion_s=np.asarray(true_completion, dtype=np.float64),
         task_dropped=np.asarray(dropped_flags, dtype=bool),
     )
-    return Scenario(observed=observed, ground_truth=ground_truth)
+    extras = None
+    if engine is not None:
+        extras = {
+            "handoff_lost": np.asarray(handoff_lost_flags, dtype=bool),
+            "decision_log": engine.log,
+            "counters": engine.counters,
+            "trust_history": np.asarray(engine.trust_history) if engine.trust_history else None,
+        }
+    return Scenario(observed=observed, ground_truth=ground_truth, extras=extras)
+
+
+def run_closed_loop(cfg: Config, world: World, trace: Trace, settings, model=None) -> Scenario:
+    """One closed-loop run: the frozen trust head (if the variant has one) drives dispatch."""
+    from .offload import OffloadEngine
+
+    return generate_scenario(cfg, world, trace, engine=OffloadEngine(cfg, settings, model=model))

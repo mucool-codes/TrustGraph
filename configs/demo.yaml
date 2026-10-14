@@ -160,3 +160,18 @@ selection:
   alpha: 1.0
   beta: 0.5
   gamma: 0.3
+
+# ---------------------------------------------------------------- S6: the offloading engine
+# Closed-loop dispatch (offload.py, DECISIONS.md D50/D51). Read by scripts/s6_run.py and the
+# S6 scripts; the open-loop scenario generator (dispatch.policy: baseline_a) ignores it.
+#   variant      A (alpha 0) | B (certificate only; equals A here, D50) | B_oracle (sensitivity)
+#                | C (frozen MLP) | D (frozen GNN) | E (D; explanation lands in S7/S8)
+#   dwell_filter drop in-range RSUs the vehicle will leave before the result is due
+#   handoff      relay | off - what happens if the vehicle leaves coverage mid-task
+# Selection weights come from `selection:` above, or per variant from configs/weights.yaml
+# (tuned on seed 100 by the D50 procedure; pass --weights-file).
+offload:
+  variant: A
+  dwell_filter: true
+  handoff: relay
+  checkpoint_dir: checkpoints
