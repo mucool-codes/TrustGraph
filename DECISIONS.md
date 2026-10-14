@@ -1637,3 +1637,20 @@ oracle comparison for H1 (the addendum asks for it); (c) adding a constant to th
 
 **Rationale:** the oracle comparison answers "how much of the available headroom does the learned trust recover", and the baseline's count is
 the natural unit of that headroom; the vs-A rows stay identical to D56 so no reader has to re-derive them.
+
+### D58 — S10 figures: one script, no hand edits, and the presentation choices that could be read as claims
+Date: 2026-10-14 | Session: S10 | Status: active
+The S9 decision request (Q1-Q4) had not been answered when S10 started. The presentation below follows the stated leans and changes no S9 number, label or rule.
+
+**Decision.**
+1. **One command, one script:** `python scripts/make_figures.py` writes figures 1-6 (SVG and PDF, plus a PNG preview) and the tables (md, csv, tex). Every plotted or tabulated number is read from `results/s9/` (results_table.csv, paired_comparisons.csv, summary-verdict.json, overhead.json) or `results/s4/summary-5seeds.json`; the two closed-loop inputs (Figure 2 timeline, Figure 6 worked example) are built by `scripts/s10_data.py` (sealed-aware, allowlisted) and cached under `results/s10/`. Output is byte-identical across runs (fixed SVG hash salt, no dates in metadata). Generated figures and tables are not committed (CLAUDE.md).
+2. **C and D shown side by side everywhere (S9 Q1, lean c)**; C is not hidden and D is not presented as the winner. Figure 5 and Figure 4's "C vs D: the structural test" band show the pre-registered negative.
+3. **Both H1 counts plotted (S9 Q4, lean c):** the avoidance-bounded n_av and the rule-free fixed-window n_win, side by side, because A's 47% "never avoided" makes n_av alone look larger than the rule-free count supports (F27 item 3).
+4. **Figure 2** shows the same story twice: one illustrative scenario (seed 100, draw 7 - the F22/F25 demo scenario, a tuning seed and not an evaluation result, labelled as such) and the evaluation aggregate (seeds 1-5 x draws 100-149 at the shared point, mean +/- sd over seeds). The single-scenario trust lines are drawn as a 15 s moving average for legibility (raw per-step trust is noisy); the aggregate and all dispatch shares are unsmoothed (25 s windows).
+5. **Figure 4 truncates the success axis at 0.80** and says so on the axis label; the other two panels start at zero. E is drawn hatched with D's values (identical decisions, asserted in S9), B in a lighter A colour; B-oracle is a dashed reference line, never a bar among the variants.
+6. **Figure 6** renders the text the system itself produced (`render_merged`) in blocks, plus the score decomposition from the logged candidate terms; it adds no wording. It is the S8 merged example (D54 section 9 rule, not chosen for its looks), in which the neighbour clause is not produced.
+7. **Related-work table:** the ten rows are copied from TECHNICAL_AND_NOVELTY.md section 6 for S11 to update. The "This work" structure-aware cell is annotated "built; no measured gain over node-local (F17/F27)" so the table cannot be read as claiming the graph helped.
+
+**Alternatives:** committing the figures (violates the generated-artifact rule); smoothing the aggregate (hides the per-step spread); one H1 panel only; a y-axis from zero for success (hides a 0.05 difference).
+
+**Rationale:** a figure is a claim. Every choice above is either neutral between C and D or marked on the figure, so a reviewer can reproduce each number from the results table.
