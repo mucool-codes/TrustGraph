@@ -1604,3 +1604,28 @@ rho 1.00, fraction 0.30
           Gate-C - A  success: +0.0541 (sd 0.0128) 95% [+0.0382, +0.0699]  (descriptive)
           (Gate-C - C) n_win reduction in units of A: -0.010 [-0.014, -0.006]   n_av: -0.019 [-0.043, +0.004]   (positive = C sends fewer; descriptive)
 ```
+
+### F30 — S9b verdict against D59 and interpretation (written after F29 was committed)
+Date: 2026-10-14 | Session: S9b | Commit: see `git log` | No tau, floor, bound, point, seed, draw or rule of D59 was changed.
+Correction to F29's reading key (F29 itself is not edited): the row "(Gate-C - C) n_win reduction in units of A" is (Gate-C count minus C count) / A's count with the sign of
+`relative_reduction(C, Gate-C, A)`, so a NEGATIVE value means Gate-C sent FEWER tasks to degraded RSUs than C, not more. F29's printed numbers are unchanged and correct; only its one-line gloss was wrong.
+Labels from `python scripts/s9b_gate.py report --verdict` (results/s9b/report-verdict.txt), D59 section 4 (effect = C minus Gate-C success; floor 0.01, bound 0.025):
+```
+fraction   C - Gate-C success difference [95% interval over seeds]     label
+0.05       +0.0003 [-0.0003, +0.0009]                                  NULL
+0.10       +0.0001 [-0.0004, +0.0005]                                  NULL
+0.20       -0.0002 [-0.0006, +0.0003]    (shared operating point)      NULL
+0.30       -0.0003 [-0.0006, +0.0001]                                  NULL
+WIN at 0 of 4, NEGATIVE at 0 of 4  ->  D59 verdict: NOT SEPARATED (all four labels NULL)
+```
+Interpretation:
+1. **The weighted rule is not shown to beat the gate on task success, and the gate is not shown to beat the weighted rule.** At every point the paired difference is below 0.001 in absolute value and every interval
+   lies inside +/-0.001, an order of magnitude below the 0.01 floor. NULL here rules out a weighted advantage of 0.025 or more (the D59 bound); because the lower ends of the intervals are above -0.0007 it also rules out a
+   gate advantage of 0.01 or more. Against no trust, Gate-C gains +0.021 to +0.054 over A, the same as C (+0.021 to +0.054). So the project's design statement that trust enters as a weighted term and not as a gate
+   (PROJECT_SPEC 5.5) is **not supported by a success-rate advantage in this scenario**; it stands as a design argument (a moderately trusted, much closer node can still win; an explanation of the score is exact), not as a measured gain.
+2. **Gate-C sends slightly fewer tasks to degraded RSUs than C**, consistently: n_win 493.5 vs 506.3 at the shared point, 54.0 vs 58.7, 141.6 vs 150.7, 901.5 vs 915.0 at the other fractions, i.e. 1.0-2.1% of A's count, with seed
+   intervals excluding 0 on n_win at all four points (n_av excludes 0 only at the shared point). That reduction does not translate into a success difference above 0.001. Descriptive only (D59: not gating).
+3. **The gate is not rare.** With tau 0.9 it removed at least one candidate on 31-44% of decisions and the empty-candidate-set (fallback) rate was 4.0% (5%), 4.9% (10%), 8.9% (20%), 13.6% (30%) over all steps, and
+   4.8%, 6.2%, 12.1% and 19.1% over steps >= 400. On those decisions Gate-C is C by construction. So the null is not an artefact of the gate never acting: it acts often and the outcome still matches C.
+4. Limits. tau was chosen on one seed from a flat grid (F28: all eight values within 0.0007, chosen on a 0.0005 margin); D59 forbids re-tuning on evaluation seeds, so a better tau, a gate on D's head, or a gate with different weights is not excluded
+   and would be a new, labelled post-hoc entry. A hypothesis, untested: C's weighted rule with alpha 1 already steers away from low-trust candidates, so a threshold adds little. The result is for this scenario and injection model only.
