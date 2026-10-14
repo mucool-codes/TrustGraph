@@ -1172,3 +1172,77 @@ at the end of the horizon (1199).
 (config, seed); the cost of asking was a stalled session, and the choice is reported rather than
 hidden. (2) per-scenario tau would let a degraded RSU's own history set its threshold.
 (3) matches D43's "censored at 799".
+
+### D47 — Resolution of the S4 decision request: the NEGATIVE stands; no rescue runs
+Date: 2026-10-14 | Session: S5 | Status: active
+Records the design-review answers to the S4 decision request. F17 is not edited.
+
+**Decision:**
+- **Q1:** (a) accept the NEGATIVE (F17) as the pre-registered H2 result. No staggered onset
+  (D31(c)), no observation-count feature (D38(d)) and no new D variant (GATv2, LayerNorm): each is a
+  scenario-generator or model change chosen after the result exists, i.e. a rescue attempt (D43 section 5).
+  S5 runs the two diagnostics of its brief and nothing else. A later study of regimes where a GNN should
+  help is allowed only if labelled exploratory and pre-registered before it runs.
+- **Q2:** the two collusion verdicts (NOISY at rho 0 and 1) are reported as inconclusive; seeds 6-10 are
+  not run for them. The core verdict has a CI excluding 0, so the NOISY extension is not triggered
+  for it. The models never saw colluders in training, so collusion is a stress test, not H2 evidence. If a
+  later session trains seeds 6-10, collusion is evaluated on them then, and that is stated in advance.
+- **Q3:** D46 accepted. Training seeds 2-5 is recorded as a **deviation from the "no retraining" wording
+  of the S4 brief** (read as covering the existing seed-1 checkpoints); it was necessary to execute D43's
+  5-seed protocol. Seed 1 was trained at the default torch thread count and seeds 2-5 at 3 threads; the
+  inference-side effect is measured in S5 (D48 check 3), without retraining.
+
+**Alternatives:** rescue runs (b)/(c) of the S4 request; extending collusion to seeds 6-10.
+
+**Rationale:** D43 fixed the response to each outcome in advance; changing the generator or model after
+seeing the number would make the S4 result unfalsifiable. H1 and H3 compare trust-aware dispatch with
+certificate-only and no-trust baselines, do not depend on D beating C, and are tested in the closed loop
+(S6, S9).
+
+### D48 — S5 protocol: what each diagnostic measures and what counts as a defect, fixed before any S5 number
+Date: 2026-10-14 | Session: S5 | Status: active — frozen once check 2 has been computed
+No S5 quantity has been computed when this entry is written. Diagnostics only: no change to the
+generator, models, seeds, draws, windows or thresholds of D43, and none to F16/F17.
+
+**Check 1 (are RSU-RSU edges carrying segment membership into message passing?)**
+- Structural: on built graphs of every seed, `same_segment` must equal (segment_i == segment_j) on every
+  RSU-RSU edge and be 0 on every vehicle-RSU edge.
+- Behavioural, per seed's own D checkpoint, on rho=1.0 sweep draws 100-104, steps [450,650) at stride 5:
+  mean |change in RSU trust| when `same_segment` is (a) zeroed on all edges, (b) set to 1 on all RSU-RSU
+  edges, (c) permuted among RSU-RSU undirected pairs (fixed seed). Also the change in the D43 window AUC
+  for (a) and (c). The D44 probe magnitudes (validation, F15) are restated per seed.
+- **Defect** = any structural mismatch, or mean |dtrust| < 0.01 for (a) or (c) on any seed (D44's
+  threshold). A defect stops the session with a decision request.
+
+**Check 2 (does neighbour evidence lead own-node evidence?)** on the observable `success_ewma`
+(the L8 discrepancy feature) of every sweep scenario (5 seeds x 5 rho x 50 draws), dt = 1 s so steps = s.
+- RSU v "moves" at t_v = first step t in [400,799] with `success_ewma_v` below theta_v for 10
+  consecutive steps, theta_v = 1st percentile of v's own `success_ewma` over [100,400). Never moved:
+  censored at 799 and counted.
+- Neighbours of v = RSU-RSU neighbours (topology edges) on the same backhaul segment. For a degraded v with
+  >=1 degraded same-segment neighbour u: **primary** own-lead = mean_u(t_u) - t_v, in seconds (positive =
+  own evidence first); **secondary** = min_u(t_u) - t_v (biased toward neighbour-first because a minimum over
+  noisy times is early; reported, not primary). Per-seed mean over all such (draw, v), 95% t-interval over 5
+  seeds, per rho.
+- Healthy same-segment neighbours: fraction that "move" in [400,799] (the false-alarm baseline of the same
+  rule); share of degraded RSUs having a degraded / only a healthy / no same-segment neighbour. Also the
+  ramp level (t_v - 400)/300 at which own evidence appears.
+- Secondary operationalisation, reported alongside: "moves" = `success_ewma_v` at least 0.10 below its own
+  [100,400) mean for 10 consecutive steps.
+- **Reading, fixed now:** own-first if the own-lead interval lies above 0; neighbour-first if below 0;
+  otherwise simultaneous. Own-first or simultaneous means neighbour evidence does not precede own-node
+  evidence in this scenario, so a structural advantage cannot come from lead time (consistent with D31's
+  shared onset, which makes degraded neighbours move together by construction).
+
+**Check 3 (thread sensitivity of inference):** re-evaluate the seed-1 checkpoints on all 550 seed-1
+evaluation scenarios with 3 torch threads instead of 1, writing to a separate directory, and compare to F16.
+"Beyond rounding" = max |trust difference| > 1e-5, or any F16 metric changing at the 4th decimal. No
+retraining; the training-thread difference itself cannot be tested without retraining and is stated as such.
+
+**Alternatives:** choosing thresholds after looking at the series; a single threshold-free lag measure
+(cross-correlation) - rejected because it would not say when evidence *first* appears.
+
+**Rationale:** the S4 negative has two candidate causes that are checkable without touching the result: a
+defect in how the graph carries segment membership (check 1) and a scenario in which neighbour evidence
+cannot arrive before own-node evidence (check 2). Fixing the operationalisation first prevents choosing
+the threshold that produces the story.
