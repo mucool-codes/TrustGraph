@@ -1494,3 +1494,28 @@ noise); templating a neighbour clause unconditionally (the rejected "neighbour s
 low pool is restricted to the receptive field and the units are perturbed identically so that the gap measures the attribution, not
 the perturbation or the geometry. Seed-level intervals match D43; the stability check and the conditional clause keep the explanation
 from claiming more than a stochastic mask supports.
+
+### D55 — What Layer 2 may claim, given the H4, stability, clause-rate and timing results
+Date: 2026-10-14 | Session: S8 | Status: active
+Records the consequences of F24/F25. D54 and the S8 numbers are unchanged.
+
+**Decision:**
+1. **H4 is reported as measured:** Layer 2 on the GNN head is *weakly* faithful (trust-change gap +0.16, decision-change gap +0.03; both
+   verdicts WEAK against D54's floors), and the C-head result is reported with its structural caveat (the random-low pool is unreadable by C),
+   so it is not offered as evidence that C's explanations are better. Top, random-low and gap are always quoted together.
+2. **The neighbour clause** is stated as conditional and rare (10% of D explanations; 16% for degraded RSUs), never as the general
+   behaviour of the system. The paper may say a graph model *can* name neighbouring evidence and show a real instance; it may not say
+   the system routinely does, and it must not use the clause as evidence for the graph claim beyond what these rates support. This is
+   consistent with the S4 result and D49's fallback framing.
+3. **GNNExplainer's masks are unstable** (top-unit agreement 0.22 for D); every Layer 2 explanation is reported with its run seed
+   (seed 0 in this project) and described as one draw. No fix is made in this session: averaging masks over runs, more epochs or a
+   different explainer would each be a new, labelled-post-hoc entry evaluated against D54's criterion, never a replacement for it.
+4. **Layer 2 is asynchronous only** (307-598 ms per decision on the stated laptop against a stated 100 ms assumption): it is generated
+   after the decision, off the dispatch path; Layer 1 (0.09 ms) is cheap enough to run inline.
+5. Variant E is D with Layer 1 + Layer 2; E's decisions are D's by construction, so no E-versus-D decision difference exists to measure.
+
+**Alternatives:** tuning epochs/lr or the thresholds until the gap clears 0.20 (choice after outcome); hiding the weak clause rate;
+presenting C's FAITHFUL verdict as better explanations.
+
+**Rationale:** H4 asks for rates and a gap; D54 fixed what counts. The honest summary is a measured, modest fidelity with an unstable
+explainer and a rarely supported neighbour clause, which is what a reviewer will check first.
