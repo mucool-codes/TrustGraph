@@ -801,3 +801,55 @@ or hyperparameter change; any response (e.g. staggered onset D31(c), observation
 other architecture) is a new DECISIONS entry labelled post-hoc and never replaces this result.
 The NOISY-response extension to seeds 6-10 is not triggered by the core (NEGATIVE) and was not run for
 collusion (see the decision request).
+
+### F18 — S5 raw diagnostics: same_segment use, lead-lag of own vs neighbour evidence, thread sensitivity (RAW - no interpretation here)
+Date: 2026-10-14 | Session: S5 | Commit: a746c02 (script scripts/s5_diagnostics.py; protocol D48 committed 568e536 before any number)
+Config: `configs/demo.yaml`, seeds 1-5, S4 evaluation scenarios (draws 100-149) | Frozen checkpoints of F15/F14
+Commands: `python scripts/s5_diagnostics.py check1|check2|check3`;
+          `python scripts/s4_eval.py --config configs/demo.yaml --seeds 1 --workers 4 --threads 3 --out-dir results/s5/raw_t3`
+
+Check 1 - is `same_segment` correct, and does D's output depend on it?
+```
+structural (steps 450..645 stride 5, rho 1.0, draws 100-104, per seed): RSU-RSU edge-instances 18400 per seed,
+  same-segment instances 12000 / 12000 / 12000 / 12800 / 11600 (seeds 1-5); mismatches vs segment equality: 0 on all
+  seeds; vehicle-RSU edge-instances 56630-58170 per seed, nonzero same_segment: 0.
+behavioural (mean |d RSU trust|; window AUC [450,650) degraded vs reliable, mean of the 5 draws):
+ seed  zero-all  ->1 (RSU-RSU)  permuted   AUC base   AUC zeroed   AUC permuted
+ 1     0.0613    0.0418         0.0328     0.9000     0.6312       0.9406
+ 2     0.1025    0.0259         0.0238     0.9469     0.9719       0.9719
+ 3     0.0574    0.0451         0.0443     0.9656     0.9469       0.9531
+ 4     0.1030    0.0654         0.0490     0.8969     0.8688       0.8688
+ 5     0.0669    0.0685         0.0457     0.9625     0.9719       0.9938
+D44 probe (validation scenarios, F15): zero-all / ->1: seed1 0.0571/0.0405  seed2 0.1330/0.0353  seed3 0.0632/0.0358
+  seed4 0.1172/0.0474  seed5 0.0677/0.0573.   D48 defect criterion (any mismatch, or mean |dtrust| < 0.01): not met.
+```
+Check 2 - first movement of `success_ewma` (seconds after onset at 400; dt = 1 s), sweep scenarios, 1000 degraded
+RSU-instances per rho (5 seeds x 50 draws x 4), 95% t-intervals over 5 seeds. "own-lead" = mean (or min) over the RSU's
+degraded same-segment neighbours of their first-move time, minus the RSU's own first-move time (positive = own first).
+```
+primary rule (own-RSU 1st percentile of [100,400), 10 consecutive steps):
+ rho   own first move (s)   ramp level  own-lead, mean over nbrs          own-lead, min over nbrs (biased early)  own censored
+ 0.00  111.8 sd 9.2         0.37        +0.2 sd 1.8 CI [-2.0, +2.5]       -3.6 CI [-4.4, -2.8]                     0.000
+ 0.25  109.5 sd 7.1         0.37        +0.5 sd 2.6 CI [-2.7, +3.6]       -9.4 CI [-14.6, -4.3]                    0.000
+ 0.50  110.9 sd 6.3         0.37        -0.2 sd 4.3 CI [-5.6, +5.2]       -18.5 CI [-25.7, -11.3]                  0.000
+ 0.75  110.5 sd 7.1         0.37        +0.5 sd 5.3 CI [-6.0, +7.0]       -24.1 CI [-32.8, -15.5]                  0.000
+ 1.00  110.1 sd 7.1         0.37        -0.3 sd 6.0 CI [-7.8, +7.2]       -33.0 CI [-44.8, -21.2]                  0.000
+ share of degraded RSUs with: >=1 degraded same-segment neighbour / only healthy ones / none:
+   rho0 0.41/0.59/0.00   rho.25 0.53/0.47/0.00   rho.5 0.66/0.34/0.00   rho.75 0.81/0.19/0.00   rho1 0.95/0.05/0.00
+ fraction of healthy same-segment neighbours that also "move" in [400,799] under the same rule: 0.542 0.546 0.542 0.530 0.512
+secondary rule (drop >= 0.10 below own pre-onset mean, 10 consecutive):
+ rho   own first move (s)   ramp level  own-lead, mean over nbrs          own-lead, min over nbrs                 healthy nbrs "moving"
+ 0.00  122.8 sd 7.3         0.41        -0.3 sd 1.9 CI [-2.7, +2.1]       -4.1 CI [-6.1, -2.0]                     0.429
+ 0.25  121.3 sd 5.4         0.40        +0.3 sd 2.0 CI [-2.2, +2.7]       -8.7 CI [-14.9, -2.4]                    0.437
+ 0.50  122.1 sd 6.6         0.41        -0.1 sd 3.9 CI [-4.9, +4.8]       -17.8 CI [-27.8, -7.8]                   0.434
+ 0.75  121.7 sd 6.1         0.41        +1.1 sd 5.1 CI [-5.2, +7.4]       -22.0 CI [-33.5, -10.6]                  0.431
+ 1.00  120.0 sd 7.2         0.40        +0.9 sd 5.5 CI [-6.0, +7.8]       -30.1 CI [-46.5, -13.7]                  0.447
+```
+Check 3 - seed-1 checkpoints evaluated with 3 torch threads vs the 1-thread F16 run:
+```
+546 feasible scenarios compared (4 infeasible cold-start draws identical in both runs)
+max |trust difference|: C 0.0   D 6.855e-07;   max |AUC difference| over 250 sweep draws, C and D: 0.0
+beyond rounding (D48: max |dtrust| > 1e-5 or |dAUC| >= 5e-5): False
+```
+Not measured: the effect of the training-time thread count (seed 1 at default threads, seeds 2-5 at 3), which
+cannot be tested without retraining.
