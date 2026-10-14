@@ -1270,3 +1270,93 @@ default. D40's question (Variant B's certificate model) also remains S6's first 
 **Rationale:** (a)/(b) are post-result changes of the thing the pre-registration fixed. (c) hides a result that
 the spec says must be reported. A measured, pre-registered negative with an identified boundary condition is a
 defensible finding; the same numbers after a rescue would not be.
+
+### D50 — S6 pre-answered decisions: Variant B, B-oracle, which trust heads, tuning fairness
+Date: 2026-10-14 | Session: S6 | Status: active
+Resolves D40 and the open item of D49. Written before any S6 code and before any B or closed-loop number.
+
+**Decision:**
+1. **Variant B** stays certificate-only: `trust_v = cert_valid`, which is the constant 1.0 for every node in this
+   scenario (D40, F8). **B therefore equals A in this scenario, and this is stated as a fact about the scenario,
+   not a result:** a backhaul degradation is a performance fault, not a certificate event, and no CRL
+   revocation can occur inside a 20-minute run. B is run anyway and the report asserts its decisions are identical to A's.
+2. **B-oracle (a labelled sensitivity, not a realistic baseline).** `trust_v = cert_valid_oracle(v, t)`, with
+   `cert_valid_oracle = 0` for every faulty RSU from the step its fault begins, with no delay, and 1 otherwise.
+   "Faulty" = behaviour class degraded or compromised. A degraded RSU's fault begins at `onset_step` (400; its
+   degradation level is positive from step 401); a compromised (colluding) RSU's fault is present from step 0.
+   Cold-start RSUs are faulty only if they are also degraded. It reads sealed ground truth by construction, so it
+   is world-side (the simulator hands the array to the engine; the engine never imports `sealed`). It is an
+   **upper bound** for any detector, never a competing method, and is reported beside B, never in place of it.
+   The `cert_valid` input feature seen by C and D is NOT changed by B-oracle (they are trained on constant 1).
+3. **Trust heads.** C and D are both reported throughout H1/H3. D is not presented as the headline (S4: C >= D, F17).
+   The closed-loop comparison covers A, B, B-oracle, C, D. **E stays D-based** (Layer 2 needs the graph); Layer 1
+   works for any head. In S6, E selects exactly as D (explanation lands in S7/S8) and is an alias in config.
+4. **Tuning fairness.** alpha/beta/gamma are tuned on ONE tuning seed, **seed 100**, by the same procedure for
+   every variant, A included (beta and gamma only). Seed 100 is excluded from all later evaluation; seeds 1-5
+   (the S4 seeds) are the evaluation seeds, and seeds 6-10 stay unreserved. C and D for seed 100 are trained once
+   with the unchanged D45 settings (same as F15). Procedure, fixed now:
+   - scenario: seed 100, rho 1.0, fraction 0.20, injection draws {0, 1, 2}; closed loop, dwell filter and
+     handoff on (D51); objective = mean over the three draws of the deadline-success rate over steps [400, 1200)
+     (onset to end) of dispatched tasks;
+   - grid (full factorial): alpha in {0.25, 0.5, 1, 2, 4}, beta in {0.25, 0.5, 1.0}, gamma in {0.15, 0.3, 0.6}
+     for C, D, B-oracle; beta x gamma only (alpha = 0) for A; B is not tuned separately because its trust term is a
+     constant (it takes A's weights, and any alpha gives the same decisions);
+   - selection: highest objective; exact ties go to the first grid point in (alpha, beta, gamma) ascending order;
+   - the whole grid table is recorded raw in FINDINGS.md before the weights are used anywhere; the chosen weights
+     are committed in `configs/weights.yaml`. No trust threshold, cutoff or pre-filter is ever added (L1).
+5. **Limitation to log (F-entry).** The trust models were trained on Baseline-A (open-loop) dispatch; the closed loop
+   changes who receives tasks, hence which RSUs' outcomes and `success_ewma` update. This is a distribution shift
+   between training and evaluation. (Correction to the S6 brief's wording: true load in this world is coverage
+   demand and does not respond to dispatch, D32, so the shift is in the observation/feedback distribution, not in
+   load.)
+
+**Alternatives:** (a) B with a revocation model - not chosen, a backhaul fault is not a certificate event;
+(b) presenting D as the headline - contradicted by F17; (c) tuning per evaluation seed - leaks the evaluation.
+
+**Rationale:** B = A is the honest outcome of the scenario and B-oracle brackets how much any certificate-style
+signal could help if it were perfect, so a reviewer cannot read B as a strawman or B-oracle as a method.
+
+### D51 — S6 offloading engine: candidate set, handoff rule, closed-loop hook, decision log
+Date: 2026-10-14 | Session: S6 | Status: active
+Design choices the S6 brief delegates (Tasks 1, 4, 5, 6). None changes the injector, task model, onset ramp or topology.
+
+**Decision:**
+1. **Closed-loop hook, not a new generator.** `simulator.generate_scenario` takes an optional `engine`
+   (`offload.OffloadEngine`). With `engine=None` the code path is the existing open-loop Baseline A and its output
+   is byte-identical (regression: same graph-sequence hash as F11/F12; tested). With an engine, only the dispatch
+   decision and the post-execution handoff rule differ; arrivals, execution noise and injection draws are the same
+   fixed-size streams, so closed-loop runs of different variants on one (seed, draw) are paired.
+2. **Order inside a step.** Task arrivals are drawn first (unchanged); `task_demand[t]` for all offloaders is
+   written; then the step's graph is built from the live arrays and the frozen trust head is run once for all RSUs;
+   then each offloader dispatches. The graph at step t therefore carries exactly what the training graphs carried.
+3. **Candidate set (Task 1).** RSUs that are active and in range, and whose straight-line dwell estimate
+   (`graph.dwell_estimate_s`, the vehicle's own speed and heading, observable) is at least that RSU's advertised
+   completion time for the task. If no in-range RSU satisfies this, all in-range RSUs are candidates (the vehicle
+   still has to try) and the decision is flagged `dwell_fallback`. No candidate in range = unserved, as before.
+4. **Handoff (Task 5), relay rule.** The result returns at dispatch time + completion time. Using the trace
+   velocity, the vehicle's position at that moment is extrapolated. (a) still inside the serving RSU's coverage:
+   no change; (b) outside it but inside an active RSU r' that covers it: the result is relayed r -> r' over the
+   backhaul, adding the one-way backhaul latency of `links.py` for the r-r' distance; (c) outside every RSU's
+   coverage: the result is lost and the vehicle sees a timeout (observed time = deadline, deadline missed). The
+   vehicle cannot tell a lost result from a silent drop, so a (c) outcome is fed to the tracker like any miss.
+   `handoff: off` disables this rule and `dwell_filter: off` disables item 3; with both off, closed-loop variant A
+   reproduces the open-loop scenario exactly (tested).
+5. **Variant trust sources.** A: alpha = 0 (trust unread). B: the `cert_valid` feature column. B_oracle: D50.
+   C and D: the frozen per-seed checkpoint's output on the step's graph. E: as D.
+6. **Decision log (Task 6).** One JSON line per task that had at least one in-range RSU, schema version 1,
+   observable fields only: ids, time, vehicle, vehicle kinematics, task type/cycles/deadline, the weights, every
+   in-range candidate with its full RSU feature row, link latency/distance, dwell estimate, trust, trust source,
+   the three signed score terms and the total, dwell eligibility; the selected node and runner-up; `dwell_fallback`;
+   the outcome (advertised, observed, met, relayed). Sealed quantities (true completion, silent drop, lost-by-
+   handoff, behaviour class) go in the run's separate sealed file, joined on `decision_id` (= task index), so
+   the log can feed explanation and training code without importing ground truth (L4). Format is jsonl: no
+   pyarrow in the pinned environment, and nested candidate lists are natural in it.
+7. **Selection rule.** `selection.select` is used unchanged: argmax of `alpha*trust - beta*latency - gamma*load`,
+   no threshold on trust anywhere.
+
+**Alternatives:** a separate closed-loop simulator (duplicates 150 lines and risks drift from the open-loop
+world); parquet (not installed); dropping tasks whose result is lost (hides a real cost); candidate set = all
+in-range (ignores dwell as the brief asks).
+
+**Rationale:** one simulator with one hook keeps the world identical across modes, makes the open-loop/closed-loop
+equivalence a testable property, and keeps ground truth out of the observable log.
