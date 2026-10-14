@@ -1515,3 +1515,117 @@ Interpretation (what the numbers say, in the order of the hypotheses):
 Limits that apply to all of the above: simulation-only, one topology per seed, the injection model is the most attackable assumption (PROJECT_SPEC
 4.6), the trust heads were trained on A-dispatch (F21), the avoidance bar 0.75 is a stated assumption (D56), the vs-oracle rows are headroom and not a
 competing method, and the H4/H5 stage uses the D54 sample size (200 decisions, 400 explanations), not larger.
+
+### F28 — S9b Gate-C tuning grid on the tuning seed (RAW, recorded before the chosen tau is used anywhere)
+Date: 2026-10-14 | Session: S9b | Commit: see `git log` (code in the commit before this entry; D59 = 3710795)
+Config: `configs/demo.yaml`, tuning seed 100 (excluded from evaluation), rho 1.0, fraction 0.20, injection draws 0, 1, 2, closed loop, dwell filter and handoff on,
+seed-100 C checkpoint (F20), C's D52 weights (alpha 1, beta 0.25, gamma 0.6) | Protocol: D59 section 2, unchanged
+Command: `python scripts/s9b_gate.py tune` (results/s9b/tuning.json). 24 runs. Objective: deadline success of dispatched tasks over steps [400, 1200), mean over the 3 draws.
+```
+tau    objective   per-draw (0, 1, 2)            empty-set (fallback) rate   gate-removed-at-least-one rate
+0.2    0.8999   [0.9406, 0.8519, 0.9073]   0.0158   0.0642
+0.3    0.8998   [0.9406, 0.8516, 0.9071]   0.0254   0.0873
+0.4    0.8998   [0.9406, 0.8514, 0.9073]   0.0405   0.1155
+0.5    0.8997   [0.9404, 0.8516, 0.9071]   0.0526   0.1336
+0.6    0.9001   [0.9408, 0.8521, 0.9073]   0.0600   0.1432
+0.7    0.9000   [0.9410, 0.8514, 0.9075]   0.0626   0.1492
+0.8    0.9001   [0.9410, 0.8516, 0.9075]   0.0646   0.1582
+0.9    0.9004   [0.9415, 0.8521, 0.9078]   0.1031   0.4025
+reference (F20): Variant C, same seed, draws, weights, no gate: 0.8999, per-draw [0.9406, 0.8516, 0.9073]
+```
+Chosen by the D59 rule (highest objective, ties to the lowest tau): **tau = 0.9**, written to `configs/gate.yaml`.
+Interpretation: the whole grid lies within 0.0007 of C's un-gated 0.8999 (draw-to-draw spread on this seed is 0.09), so on the tuning seed a gate on C's own head changes the success rate by less than
+anything this seed can resolve; the choice of tau 0.9 rests on a 0.0005 margin and should not be read as a finding about thresholds. The fallback rate grows with tau (1.6% at 0.2 to 10.3% at 0.9)
+and at tau 0.9 the gate removes a candidate on 40% of decisions, so the gate is doing work there while the outcome stays flat.
+
+### F29 — S9b raw results: Gate-C (tau 0.9) vs weighted C vs A, the four fraction-sweep points, seeds 1-5 x draws 100-149 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-14 | Session: S9b | Commit: see `git log` (D59 = 3710795; tau from F28)
+Config: `configs/gate.yaml` over `configs/sweep.yaml` and `configs/demo.yaml`; C's D52 weights; frozen seed 1-5 C checkpoints; closed loop, dwell filter and handoff on; tau 0.9 for every seed and point.
+Command: `python scripts/s9b_gate.py run` then `python scripts/s9b_gate.py report` (results/s9b/report-raw.txt). 1000 tasks, 0 failed, about 7.5 min on 12 workers.
+Check: Variant C was recomputed in every one of the 1000 tasks and equals the stored S9 values bit-for-bit (wall time excepted): 0 mismatches at every point. Gate-C is paired per draw with the stored S9 C and A.
+Reading key: n_win = dispatches to degraded RSUs over [400,1200); the "n_win reduction in units of A" row is (Gate-C minus C) / A, so a negative value means Gate-C sent MORE tasks to degraded RSUs than C.
+```
+================================================================================================================
+S9b GATE-C (RAW: no labels, no verdict)   tau = 0.9   seeds [1, 2, 3, 4, 5]  draws 100-149  weights: C's (D52)
+mean +/- sd across the 5 seed means; closed loop; Gate-C paired per draw with the stored S9 Variant C; A from S9
+================================================================================================================
+
+D42-style accounting (draws attempted / failed / aggregated) and the C-recompute check
+  rho 1.00 frac 0.05: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.10: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.20: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.30: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+
+----------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.05   [K = 1: no correlated failure]
+  metric                                                           A          C (weighted)                Gate-C
+  H3 success post-onset                            0.9474 +/- 0.0028     0.9685 +/- 0.0029     0.9682 +/- 0.0033
+  dispatches to degraded, onset->avoidance              71.3 +/- 8.3          22.3 +/- 3.0          20.6 +/- 1.9
+  n_win: dispatches to degraded, [400,1200)            226.9 +/- 6.2          58.7 +/- 4.0          54.0 +/- 3.4
+  empty-candidate-set (fallback) rate, all steps : 0.04010 +/- 0.01399   steps >= 400 : 0.04774 +/- 0.01654
+  decisions where the gate removed >= 1 candidate: 0.3118 +/- 0.0448  (includes the fallback decisions)
+  PAIRED  C - Gate-C  success: +0.0003 (sd 0.0005) 95% [-0.0003, +0.0009]
+          Gate-C - A  success: +0.0208 (sd 0.0011) 95% [+0.0194, +0.0222]  (descriptive)
+          (Gate-C - C) n_win reduction in units of A: -0.021 [-0.031, -0.010]   n_av: -0.026 [-0.058, +0.007]   (positive = C sends fewer; descriptive)
+
+----------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.10
+  metric                                                           A          C (weighted)                Gate-C
+  H3 success post-onset                            0.9223 +/- 0.0024     0.9601 +/- 0.0027     0.9601 +/- 0.0030
+  dispatches to degraded, onset->avoidance            235.9 +/- 33.7          48.6 +/- 8.0          46.3 +/- 7.3
+  n_win: dispatches to degraded, [400,1200)            451.7 +/- 9.4        150.7 +/- 17.2        141.6 +/- 17.8
+  empty-candidate-set (fallback) rate, all steps : 0.04941 +/- 0.01494   steps >= 400 : 0.06172 +/- 0.01802
+  decisions where the gate removed >= 1 candidate: 0.3484 +/- 0.0401  (includes the fallback decisions)
+  PAIRED  C - Gate-C  success: +0.0001 (sd 0.0004) 95% [-0.0004, +0.0005]
+          Gate-C - A  success: +0.0378 (sd 0.0023) 95% [+0.0349, +0.0407]  (descriptive)
+          (Gate-C - C) n_win reduction in units of A: -0.020 [-0.026, -0.014]   n_av: -0.009 [-0.022, +0.003]   (positive = C sends fewer; descriptive)
+
+----------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.20   [shared operating point]
+  metric                                                           A          C (weighted)                Gate-C
+  H3 success post-onset                            0.8713 +/- 0.0026     0.9211 +/- 0.0100     0.9213 +/- 0.0102
+  dispatches to degraded, onset->avoidance           627.5 +/- 100.4        152.7 +/- 47.9        145.2 +/- 45.7
+  n_win: dispatches to degraded, [400,1200)           912.4 +/- 20.6        506.3 +/- 74.6        493.5 +/- 76.8
+  empty-candidate-set (fallback) rate, all steps : 0.08900 +/- 0.02182   steps >= 400 : 0.12114 +/- 0.02723
+  decisions where the gate removed >= 1 candidate: 0.3964 +/- 0.0321  (includes the fallback decisions)
+  PAIRED  C - Gate-C  success: -0.0002 (sd 0.0004) 95% [-0.0006, +0.0003]
+          Gate-C - A  success: +0.0500 (sd 0.0088) 95% [+0.0391, +0.0610]  (descriptive)
+          (Gate-C - C) n_win reduction in units of A: -0.014 [-0.019, -0.010]   n_av: -0.012 [-0.023, -0.002]   (positive = C sends fewer; descriptive)
+
+----------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.30
+  metric                                                           A          C (weighted)                Gate-C
+  H3 success post-onset                            0.8212 +/- 0.0023     0.8750 +/- 0.0129     0.8752 +/- 0.0131
+  dispatches to degraded, onset->avoidance          1065.0 +/- 195.5        250.0 +/- 70.6        231.2 +/- 67.8
+  n_win: dispatches to degraded, [400,1200)          1358.9 +/- 27.9       915.0 +/- 107.4       901.5 +/- 111.5
+  empty-candidate-set (fallback) rate, all steps : 0.13581 +/- 0.02334   steps >= 400 : 0.19138 +/- 0.02970
+  decisions where the gate removed >= 1 candidate: 0.4425 +/- 0.0336  (includes the fallback decisions)
+  PAIRED  C - Gate-C  success: -0.0003 (sd 0.0003) 95% [-0.0006, +0.0001]
+          Gate-C - A  success: +0.0541 (sd 0.0128) 95% [+0.0382, +0.0699]  (descriptive)
+          (Gate-C - C) n_win reduction in units of A: -0.010 [-0.014, -0.006]   n_av: -0.019 [-0.043, +0.004]   (positive = C sends fewer; descriptive)
+```
+
+### F30 — S9b verdict against D59 and interpretation (written after F29 was committed)
+Date: 2026-10-14 | Session: S9b | Commit: see `git log` | No tau, floor, bound, point, seed, draw or rule of D59 was changed.
+Correction to F29's reading key (F29 itself is not edited): the row "(Gate-C - C) n_win reduction in units of A" is (Gate-C count minus C count) / A's count with the sign of
+`relative_reduction(C, Gate-C, A)`, so a NEGATIVE value means Gate-C sent FEWER tasks to degraded RSUs than C, not more. F29's printed numbers are unchanged and correct; only its one-line gloss was wrong.
+Labels from `python scripts/s9b_gate.py report --verdict` (results/s9b/report-verdict.txt), D59 section 4 (effect = C minus Gate-C success; floor 0.01, bound 0.025):
+```
+fraction   C - Gate-C success difference [95% interval over seeds]     label
+0.05       +0.0003 [-0.0003, +0.0009]                                  NULL
+0.10       +0.0001 [-0.0004, +0.0005]                                  NULL
+0.20       -0.0002 [-0.0006, +0.0003]    (shared operating point)      NULL
+0.30       -0.0003 [-0.0006, +0.0001]                                  NULL
+WIN at 0 of 4, NEGATIVE at 0 of 4  ->  D59 verdict: NOT SEPARATED (all four labels NULL)
+```
+Interpretation:
+1. **The weighted rule is not shown to beat the gate on task success, and the gate is not shown to beat the weighted rule.** At every point the paired difference is below 0.001 in absolute value and every interval
+   lies inside +/-0.001, an order of magnitude below the 0.01 floor. NULL here rules out a weighted advantage of 0.025 or more (the D59 bound); because the lower ends of the intervals are above -0.0007 it also rules out a
+   gate advantage of 0.01 or more. Against no trust, Gate-C gains +0.021 to +0.054 over A, the same as C (+0.021 to +0.054). So the project's design statement that trust enters as a weighted term and not as a gate
+   (PROJECT_SPEC 5.5) is **not supported by a success-rate advantage in this scenario**; it stands as a design argument (a moderately trusted, much closer node can still win; an explanation of the score is exact), not as a measured gain.
+2. **Gate-C sends slightly fewer tasks to degraded RSUs than C**, consistently: n_win 493.5 vs 506.3 at the shared point, 54.0 vs 58.7, 141.6 vs 150.7, 901.5 vs 915.0 at the other fractions, i.e. 1.0-2.1% of A's count, with seed
+   intervals excluding 0 on n_win at all four points (n_av excludes 0 only at the shared point). That reduction does not translate into a success difference above 0.001. Descriptive only (D59: not gating).
+3. **The gate is not rare.** With tau 0.9 it removed at least one candidate on 31-44% of decisions and the empty-candidate-set (fallback) rate was 4.0% (5%), 4.9% (10%), 8.9% (20%), 13.6% (30%) over all steps, and
+   4.8%, 6.2%, 12.1% and 19.1% over steps >= 400. On those decisions Gate-C is C by construction. So the null is not an artefact of the gate never acting: it acts often and the outcome still matches C.
+4. Limits. tau was chosen on one seed from a flat grid (F28: all eight values within 0.0007, chosen on a 0.0005 margin); D59 forbids re-tuning on evaluation seeds, so a better tau, a gate on D's head, or a gate with different weights is not excluded
+   and would be a new, labelled post-hoc entry. A hypothesis, untested: C's weighted rule with alpha 1 already steers away from low-trust candidates, so a threshold adds little. The result is for this scenario and injection model only.
