@@ -133,7 +133,7 @@ def test_log_records_every_candidate_with_terms_that_sum_to_the_score(cfg, world
     ]
     for rec in log:
         json.dumps(rec)  # serialisable
-        assert rec["schema"] == 1 and rec["outcome"] is not None
+        assert rec["schema"] == 2 and rec["outcome"] is not None
         eligible = [c for c in rec["candidates"] if c["dwell_eligible"]]
         for c in rec["candidates"]:
             assert c["score"] == pytest.approx(c["trust_term"] + c["latency_term"] + c["load_term"])

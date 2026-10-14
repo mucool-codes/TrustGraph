@@ -1017,3 +1017,116 @@ F11). C is not behind D here (consistent with F17). The dwell filter removed an 
 fired twice, so both are live but rare on this seed. D's mean healthy-RSU trust drifts down to 0.90 late in the run
 (C: 0.96), a possible sign of the training/evaluation dispatch shift (F21 item 3); it is not investigated here.
 One scenario says nothing about H1/H3 magnitudes; those are S9's.
+
+### F23 — S7 Layer 1: exactness on every logged decision, what decides decisions, and four real explanations
+Date: 2026-10-14 | Session: S7 | Commit: see `git log`
+Config: `configs/demo.yaml`, seed 100, rho 1.0, fraction 0.20, injection draw 7, closed loop with the D52 weights; one run
+each of Variant A, C and D (decision logs, schema 2 per D53) | Commands: `python scripts/s6_run.py ... --variant <A|C|D> --weights-file
+configs/weights.yaml --log`; `python explain.py --survey --log <file>`; `python scripts/s7_examples.py`
+
+Exactness: `explain_decision` recomputes every candidate's `alpha*trust`, `-beta*latency`, `-gamma*load` from the logged inputs and
+requires bit-for-bit equality with the logged terms and score, and the selected node to be the rule's argmax. The survey ran it
+on all 6873 decisions of each of A, C and D (20,619 decisions): 0 failures. The unit tests also run it on every decision of
+smoke-scenario runs of A, B, B-oracle, C, D and E.
+
+What decides the winner-versus-runner-up margin (D53 rule: a term is decisive if it is >= 0.6 of the margin), seed 100 draw 7:
+```
+variant   decisions  single eligible RSU  decisive: latency  load   trust   mixed   winner has LOWER trust than runner-up
+A         6873       248                  1995               4276   -       354     - (trust unused, alpha = 0)
+C         6873       248                  1196               3329   1027    1073    857  (12.5%)
+D         6873       248                   759               2765   2150     951    1296 (18.9%)
+```
+Source of the S7 examples (selection rule fixed before reading them: the first decision at step >= 700 in each category).
+```
+##### Example: D - runner-up lost on trust  (decision 3993, Variant D)
+
+Decision 3993: step 700 (t = 700 s), vehicle 31, medium task, deadline 0.37 s - Variant D
+RSU-19 was selected over RSU-7 (score 1.387 vs 0.833, margin 0.554).
+Why: RSU-7 lost on trust: RSU-19's trust was 0.93 against RSU-7's 0.66, worth +0.532 of the 0.554 score margin (96%). The rest of the margin came from load (+0.060). RSU-7 had lower link latency (12.7 ms against 16.5 ms for RSU-19), worth 0.038 to RSU-7, but that was outweighed.
+
+Score = 2 * trust - 0.25 * latency - 0.6 * load   (weights as logged)
+   RSU      trust  alpha*trust  latency  -beta*lat   load  -gamma*load     score
+  *  19   0.926     +1.8526    0.662    -0.1654  0.500     -0.3000   +1.3873
+      7   0.660     +1.3208    0.509    -0.1273  0.600     -0.3600   +0.8335
+     10   0.325     +0.6507    0.608    -0.1521  0.700     -0.4200   +0.0786
+  (* selected, x excluded by the dwell filter)
+
+Other candidates:
+  RSU-10 lost on trust: RSU-19's trust was 0.93 against RSU-10's 0.33, worth +1.202 of the 1.309 score margin (92%). The rest of the margin came from load (+0.120). RSU-10 had lower link latency (15.2 ms against 16.5 ms for RSU-19), worth 0.013 to RSU-10, but that was outweighed.
+
+Logged behaviour record (context, not an attribution): RSU-19: promises kept 1.00, latency deviation 0.02; RSU-7: promises kept 0.63, latency deviation 0.32; RSU-10: promises kept 0.95, latency deviation 0.03.
+Why a node's trust has its value is not explained here (Layer 2).
+Outcome: deadline met (observed 0.161 s, advertised 0.176 s).
+
+##### Example: D - runner-up lost on latency; the winner had LOWER trust  (decision 4002, Variant D)
+
+Decision 4002: step 702 (t = 702 s), vehicle 26, light task, deadline 0.10 s - Variant D
+RSU-2 was selected over RSU-14 (score 1.492 vs 1.392, margin 0.100).
+Why: RSU-14 lost on latency: RSU-2's link latency was 5.6 ms against RSU-14's 16.5 ms, worth +0.109, more than the whole 0.100 score margin (the terms below offset part of it). RSU-14 had higher trust (0.99 against 0.98 for RSU-2), worth 0.009 to RSU-14, but that was outweighed.
+
+Score = 2 * trust - 0.25 * latency - 0.6 * load   (weights as logged)
+   RSU      trust  alpha*trust  latency  -beta*lat   load  -gamma*load     score
+  *   2   0.984     +1.9677    0.223    -0.0558  0.700     -0.4200   +1.4920
+     14   0.988     +1.9767    0.658    -0.1645  0.700     -0.4200   +1.3922
+     19   0.927     +1.8541    0.666    -0.1666  0.500     -0.3000   +1.3875
+     12   0.935     +1.8710    0.676    -0.1690  0.900     -0.5400   +1.1620
+      0   0.537     +1.0750    0.669    -0.1673  0.600     -0.3600   +0.5477
+  (* selected, x excluded by the dwell filter)
+
+Other candidates:
+  RSU-19 lost on trust: RSU-2's trust was 0.98 against RSU-19's 0.93, worth +0.114, more than the whole 0.104 score margin (the terms below offset part of it). The rest of the margin came from latency (+0.111). RSU-19 had lower advertised load (0.50 against 0.70 for RSU-2), worth 0.120 to RSU-19, but that was outweighed.
+  No single term decided it: RSU-2 led by 0.330 overall, from load (+0.120, 36%) and latency (+0.113, 34%) (RSU-2's advertised load was 0.70 against RSU-12's 0.90; RSU-2's link latency was 5.6 ms against RSU-12's 16.9 ms).
+  RSU-0 lost on trust: RSU-2's trust was 0.98 against RSU-0's 0.54, worth +0.893 of the 0.944 score margin (95%). The rest of the margin came from latency (+0.112). RSU-0 had lower advertised load (0.60 against 0.70 for RSU-2), worth 0.060 to RSU-0, but that was outweighed.
+
+Logged behaviour record (context, not an attribution): RSU-2: promises kept 0.97, latency deviation 0.02; RSU-0: promises kept 0.48, latency deviation 0.21; RSU-12: promises kept 0.91, latency deviation 0.02; RSU-14: promises kept 1.00, latency deviation 0.08; RSU-19: promises kept 1.00, latency deviation 0.02.
+Why a node's trust has its value is not explained here (Layer 2).
+Outcome: deadline met (observed 0.053 s, advertised 0.046 s).
+
+##### Example: C - winner chosen despite lower trust; load decisive  (decision 4030, Variant C)
+
+Decision 4030: step 707 (t = 707 s), vehicle 20, light task, deadline 0.11 s - Variant C
+RSU-0 was selected over RSU-12 (score 0.461 vs 0.253, margin 0.208).
+Why: RSU-12 lost on advertised load: RSU-0's advertised load was 0.40 against RSU-12's 0.90, worth +0.300, more than the whole 0.208 score margin (the terms below offset part of it). The rest of the margin came from latency (+0.003). RSU-12 had higher trust (0.96 against 0.86 for RSU-0), worth 0.095 to RSU-12, but that was outweighed.
+
+Score = 1 * trust - 0.25 * latency - 0.6 * load   (weights as logged)
+   RSU      trust  alpha*trust  latency  -beta*lat   load  -gamma*load     score
+  *   0   0.864     +0.8637    0.652    -0.1630  0.400     -0.2400   +0.4606
+     12   0.959     +0.9588    0.665    -0.1662  0.900     -0.5400   +0.2526
+      3   0.880     +0.8796    0.674    -0.1684  1.000     -0.6000   +0.1111
+  (* selected, x excluded by the dwell filter)
+
+Other candidates:
+  RSU-3 lost on advertised load: RSU-0's advertised load was 0.40 against RSU-3's 1.00, worth +0.360, more than the whole 0.349 score margin (the terms below offset part of it). The rest of the margin came from latency (+0.005). RSU-3 had higher trust (0.88 against 0.86 for RSU-0), worth 0.016 to RSU-3, but that was outweighed.
+
+Logged behaviour record (context, not an attribution): RSU-0: promises kept 0.85, latency deviation 0.21; RSU-3: promises kept 0.80, latency deviation 0.05; RSU-12: promises kept 0.98, latency deviation 0.02.
+Why a node's trust has its value is not explained here (Layer 2).
+Outcome: deadline met (observed 0.101 s, advertised 0.059 s).
+
+##### Example: A - trust unused  (decision 3993, Variant A)
+
+Decision 3993: step 700 (t = 700 s), vehicle 31, medium task, deadline 0.37 s - Variant A
+RSU-19 was selected over RSU-7 (score -0.465 vs -0.487, margin 0.022).
+Why: RSU-7 lost on advertised load: RSU-19's advertised load was 0.50 against RSU-7's 0.60, worth +0.060, more than the whole 0.022 score margin (the terms below offset part of it). RSU-7 had lower link latency (12.7 ms against 16.5 ms for RSU-19), worth 0.038 to RSU-7, but that was outweighed.
+Trust did not influence this decision: Variant A scores on latency and load only (alpha = 0).
+
+Score = - 0.25 * latency - 0.6 * load   (weights as logged; alpha = 0, trust unused)
+   RSU      trust  alpha*trust  latency  -beta*lat   load  -gamma*load     score
+  *  19     n/a     +0.0000    0.662    -0.1654  0.500     -0.3000   -0.4654
+      7     n/a     +0.0000    0.509    -0.1273  0.600     -0.3600   -0.4873
+     10     n/a     +0.0000    0.608    -0.1521  0.700     -0.4200   -0.5721
+  (* selected, x excluded by the dwell filter)
+
+Other candidates:
+  RSU-10 lost on advertised load: RSU-19's advertised load was 0.50 against RSU-10's 0.70, worth +0.120, more than the whole 0.107 score margin (the terms below offset part of it). RSU-10 had lower link latency (15.2 ms against 16.5 ms for RSU-19), worth 0.013 to RSU-10, but that was outweighed.
+
+Logged behaviour record (context, not an attribution): RSU-19: promises kept 1.00, latency deviation 0.01; RSU-7: promises kept 0.73, latency deviation 0.32; RSU-10: promises kept 0.97, latency deviation 0.04.
+Why a node's trust has its value is not explained here (Layer 2).
+Outcome: deadline met (observed 0.161 s, advertised 0.176 s).
+```
+Interpretation: Layer 1 reproduces the system's own scores exactly on every logged decision, for every variant, so what the
+explanation says is what the rule computed. Trust is a term, not a rule: under D it is the decisive term in 31% of decisions
+and under C in 15%, while load decides 40-62% and latency 11-29%, and the winner has lower trust than the runner-up in 13% (C)
+and 19% (D) of decisions - an explanation that said "highest trust wins" would be wrong for roughly one decision in five.
+Variant A's explanations never mention trust. A share above 100% in an example is a term worth more than the whole margin
+because another term offset part of it; the text says so. Layer 1 explains the score, not why a node's trust has its value:
+that, and the neighbourhood clause, are Layer 2's (S8).
