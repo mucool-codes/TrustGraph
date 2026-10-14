@@ -113,7 +113,9 @@ class SnapshotBuilder:
                 f"{(trace.num_steps, trace.num_vehicles)}"
             )
         self.rsu_features = rsu_features
-        self.rsu_active = rsu_active.astype(bool)
+        # No copy for a bool array: the S6 closed-loop engine passes arrays the simulator
+        # is still filling and reads step t only after it has been written.
+        self.rsu_active = np.asarray(rsu_active, dtype=bool)
         self.vehicle_task_demand = vehicle_task_demand
 
         self.link_age_norm_s = float(cfg_graph.get("link_age_norm_s", 60.0))

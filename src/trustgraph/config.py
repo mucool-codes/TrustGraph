@@ -77,6 +77,8 @@ class Config:
     degradation: dict[str, Any] = field(default_factory=dict)
     collusion: dict[str, Any] = field(default_factory=dict)
     cold_start: dict[str, Any] = field(default_factory=dict)
+    # S6: closed-loop offloading engine settings (offload.py validates them).
+    offload: dict[str, Any] = field(default_factory=dict)
 
     @property
     def seeds(self) -> SeedChain:
@@ -163,6 +165,7 @@ def load_config(path: str | Path) -> Config:
         degradation=raw.get("degradation") or {},
         collusion=raw.get("collusion") or {},
         cold_start=raw.get("cold_start") or {},
+        offload=raw.get("offload") or {},
     )
     _validate(cfg)
     return cfg
