@@ -43,7 +43,7 @@ TAB = S10 / "tables"
 
 # ------------------------------------------------------------------ one style for everything
 INK, MUTED, FAINT = "#1f2328", "#5b6470", "#d5d9de"
-COL = {"A": "#6b7280", "B": "#9ca3af", "B_oracle": "#2f855a", "C": "#2a6fb0", "D": "#c2571a", "E": "#c2571a"}
+COL = {"A": "#6b7280", "B": "#9ca3af", "B_oracle": "#2f855a", "C": "#2a6fb0", "D": "#c2571a", "E": "#c2571a", "Gate_C": "#7c5cbf"}
 NAME = {"A": "A  no trust", "B": "B  certificate", "B_oracle": "B-oracle  (upper bound)", "C": "C  node-local MLP",
         "D": "D  GNN", "E": "E  GNN + explanation"}
 ONSET, RAMP_END, WIN = 400, 700, 25
@@ -87,6 +87,28 @@ def load_paired() -> dict:
     for r in csv.DictReader((S9 / "paired_comparisons.csv").open(encoding="utf-8")):
         out[(round(float(r["rho"]), 2), round(float(r["fraction"]), 2), r["x"], r["ref"])] = {k: float(v) for k, v in r.items() if k.startswith("h")}
     return out
+
+
+def load_gate() -> dict:
+    """Gate-C (S9b, D59) at the four fraction-sweep points, from results/s9b/raw (read through s9b_gate's json loader; no sealed access).
+
+    Returns {"T": {(rho, frac): {metric: (mean, sd)}}, "paired": {(rho, frac): Effect of C minus Gate-C success}}.
+    """
+    if not (REPO_ROOT / "results" / "s9b" / "raw").exists():
+        raise SystemExit("results/s9b/raw missing: run `python scripts/s9b_gate.py run` first (S9b)")
+    import s9b_gate as G
+    from trustgraph import sweep_metrics as M
+
+    g = G.load_gate()
+    T, paired = {}, {}
+    for pt, d in G.load_arrays(g).items():
+        a = d["a"]
+        sm = lambda x: (float(np.mean(M.seed_means(x))), float(np.std(M.seed_means(x), ddof=1)))  # noqa: E731
+        key = (round(pt[0], 2), round(pt[1], 2))
+        T[key] = {"success_post_onset": sm(a["g_succ"]), "success_all": sm(a["g_all"]), "n_av": sm(a["g_nav"]), "n_win": sm(a["g_nwin"]),
+                  "never_avoided": sm(a["g_never"]), "fallback_all": sm(a["fb_all"]), "fallback_post": sm(a["fb_post"])}
+        paired[key] = M.h3_effect(a["c_succ"], a["g_succ"])
+    return {"T": T, "paired": paired, "tau": g["tau"]}
 
 
 def ensure_inputs(recompute: bool) -> None:
@@ -257,36 +279,42 @@ def fig_success_vs_fraction(T, P) -> None:
 
 
 # ------------------------------------------------------------------ Figure 4: ablation
-def fig_ablation(T, P) -> None:
+def fig_ablation(T, P, GT) -> None:
     S = T[SHARED]
-    variants = ["A", "B", "C", "D", "E"]
+    variants = ["A", "B", "C", "D", "E", "Gate_C"]
     src = {"E": "D"}
+    label = {"Gate_C": "Gate-C"}
     panels = [("success_post_onset", "task success rate after onset\n(axis starts at 0.80)", (0.80, 0.96), "{:.3f}", "h3", "{:+.3f}"),
               ("n_av", "tasks sent to degraded RSUs,\nonset to avoidance", (0, 760), "{:.0f}", "h1", "{:+.3f}"),
               ("n_win", "tasks sent to degraded RSUs,\nfixed window [400, 1200)", (0, 1050), "{:.0f}", None, None)]
     fig, ax = plt.subplots(1, 3, figsize=(16.5, 6.0), gridspec_kw={"wspace": 0.42})
     for a, (m, ylab, ylim, f, pk, pf) in zip(ax, panels):
         for i, v in enumerate(variants):
-            mean, sd = S[src.get(v, v)][m]
+            mean, sd = (GT["T"][SHARED] if v == "Gate_C" else S[src.get(v, v)])[m]
             a.bar(i, mean, 0.7, color=COL[v], hatch="//" if v == "E" else None, edgecolor="white" if v == "E" else COL[v], lw=0,
                   alpha=0.45 if v == "B" else 1.0, zorder=2)
             a.errorbar(i, mean, yerr=sd, color=INK, capsize=5, lw=1.8, zorder=3)
             a.text(i, mean + sd + (ylim[1] - ylim[0]) * 0.015, f.format(mean), ha="center", fontsize=11)
         om = S["B_oracle"][m][0]
         a.axhline(om, color=COL["B_oracle"], ls="--", lw=2.0, zorder=1)
-        a.text(4.5, om, "  oracle", color=COL["B_oracle"], ha="left", va="center", fontsize=11, clip_on=False)
-        a.set_xticks(range(5)); a.set_xticklabels(variants); a.set_ylim(*ylim); a.set_xlim(-0.6, 4.6); a.set_ylabel(ylab)
+        a.text(5.5, om, "  oracle", color=COL["B_oracle"], ha="left", va="center", fontsize=11, clip_on=False)
+        a.set_xticks(range(6)); a.set_xticklabels([label.get(v, v) for v in variants]); a.set_ylim(*ylim); a.set_xlim(-0.6, 5.6); a.set_ylabel(ylab)
         a.spines["bottom"].set_visible(True)
         a.add_patch(plt.Rectangle((1.55, ylim[0]), 1.9, ylim[1] - ylim[0], fc="#fff4c2", ec="none", alpha=0.75, zorder=0))
         a.text(2.5, 1.02, "C vs D: the structural test", transform=a.get_xaxis_transform(), ha="center", va="bottom", fontsize=11.5, fontweight="bold")
         if pk:
             d = P[(1.0, 0.2, "D", "C")]
-            a.set_xlabel(f"D minus C: {pf.format(d[pk + '_mean'])}  [{pf.format(d[pk + '_lo'])}, {pf.format(d[pk + '_hi'])}]", fontsize=11.5)
+            lab = f"D minus C: {pf.format(d[pk + '_mean'])}  [{pf.format(d[pk + '_lo'])}, {pf.format(d[pk + '_hi'])}]"
+            if pk == "h3":
+                e = GT["paired"][SHARED]
+                lab += f"\nC minus Gate-C: {e.mean:+.4f}  [{e.lo:+.4f}, {e.hi:+.4f}]"
+            a.set_xlabel(lab, fontsize=11.5)
         else:
             a.set_xlabel("(rule-free count, a guard on the middle panel)", fontsize=11, color=MUTED)
     fig.suptitle("Ablation at the shared operating point (rho 1.0, 20% degraded). Bars: mean over 5 seeds, whiskers: sd.\n"
-                 "B equals A and E equals D (identical decisions, asserted). Dashed green: B-oracle, an upper bound.",
-                 x=0.125, ha="left", fontsize=13.5, fontweight="bold", y=1.04)
+                 "B equals A and E equals D (identical decisions, asserted). Dashed green: B-oracle, an upper bound.\n"
+                 f"Gate-C: an extra baseline (frozen C head, candidates with trust below {GT['tau']:g} removed first, D59), run at the fraction-sweep points only.",
+                 x=0.125, ha="left", fontsize=13.5, fontweight="bold", y=1.08)
     save(fig, "fig4_ablation")
 
 
@@ -404,7 +432,7 @@ def pm(ms, nd=3):
     return f"{ms[0]:.{nd}f} ± {ms[1]:.{nd}f}"
 
 
-def tables(T, P) -> None:
+def tables(T, P, GT) -> None:
     S = T[SHARED]
     rows = []
     for v, src in (("A", "A"), ("B", "B"), ("B_oracle", "B_oracle"), ("C", "C"), ("D", "D"), ("E", "D")):
@@ -412,20 +440,27 @@ def tables(T, P) -> None:
         rows.append([{"B_oracle": "B-oracle", "E": "E (= D)"}.get(v, v), pm(s["success_post_onset"]), pm(s["success_all"]),
                      pm(s["n_av"], 0), pm(s["n_win"], 0), pm(s["never_avoided"], 2),
                      "never" if s["detected_fraction"][0] == 0 else pm(s["latency"], 0), pm(s["detected_fraction"], 2)])
+    g = GT["T"][SHARED]
+    rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["success_all"]), pm(g["n_av"], 0), pm(g["n_win"], 0),
+                 pm(g["never_avoided"], 2), "not reported (D59)", "not reported (D59)"])
     write_table("ablation_shared_point",
                 ["Variant", "Success after onset", "Success, all steps", "To degraded, onset to avoidance", "To degraded, [400,1200)",
                  "Runs never avoiding", "Detection latency (steps)", "Degraded RSUs detected"], rows,
                 "Ablation at the shared operating point (rho 1.0, 20% degraded): mean ± sd across 5 seeds (50 draws each)",
                 "B decides identically to A in this scenario and E identically to D (both asserted); B-oracle reads the sealed fault state and is an upper bound, "
-                "not a method. Detection latency is censored at 399 steps; A and B cannot detect by construction.")
+                "not a method. Detection latency is censored at 399 steps; A and B cannot detect by construction. Gate-C is an extra baseline: the frozen C head with candidates "
+                f"below trust {GT['tau']:g} removed before the same rule (D59); it was run at the four fraction-sweep points only and its detection figures are not reported.")
     pts = [(1.0, 0.05), (1.0, 0.10), (1.0, 0.20), (1.0, 0.30), (0.0, 0.20), (0.25, 0.20), (0.5, 0.20), (0.75, 0.20)]
     rows = []
     for rho, fr in pts:
         for v in ("A", "B_oracle", "C", "D"):
             s = T[(rho, fr)][v]
             rows.append([f"{rho:g}", f"{fr:.2f}", {"B_oracle": "B-oracle"}.get(v, v), pm(s["success_post_onset"]), pm(s["n_av"], 0), pm(s["n_win"], 0)])
+        if (round(rho, 2), round(fr, 2)) in GT["T"]:
+            gg = GT["T"][(round(rho, 2), round(fr, 2))]
+            rows.append([f"{rho:g}", f"{fr:.2f}", "Gate-C (extra baseline)", pm(gg["success_post_onset"]), pm(gg["n_av"], 0), pm(gg["n_win"], 0)])
     write_table("ablation_all_points", ["rho", "fraction", "Variant", "Success after onset", "To degraded, onset to avoidance", "To degraded, [400,1200)"],
-                rows, "All sweep points: mean ± sd across 5 seeds", "Rho sweep at fraction 0.20, fraction sweep at rho 1.0; the (1.0, 0.20) rows are shared. B = A and E = D throughout.")
+                rows, "All sweep points: mean ± sd across 5 seeds", "Rho sweep at fraction 0.20, fraction sweep at rho 1.0; the (1.0, 0.20) rows are shared. B = A and E = D throughout. Gate-C was run at the four fraction-sweep points only.")
 
     verdict = json.loads((S9 / "summary-verdict.json").read_text(encoding="utf-8"))["verdicts"]
     rows = []
@@ -433,9 +468,12 @@ def tables(T, P) -> None:
         e = verdict["1.00/0.20"][f"{x}_vs_{ref}"]
         rows.append([f"{x} vs {ref}".replace("B_oracle", "B-oracle"), f"{e['H3']['mean']:+.4f} [{e['H3']['lo']:+.4f}, {e['H3']['hi']:+.4f}]", e["H3"]["label"],
                      f"{e['H1']['mean']:+.3f} [{e['H1']['lo']:+.3f}, {e['H1']['hi']:+.3f}]", e["H1"]["label"]])
+    e = GT["paired"][SHARED]
+    rows.append(["C vs Gate-C (extra baseline)", f"{e.mean:+.4f} [{e.lo:+.4f}, {e.hi:+.4f}]", e.label, "not gating (see F29)", "-"])
     write_table("paired_effects_shared_point", ["Comparison", "H3 success difference [95% CI]", "H3 label", "H1 reduction [95% CI]", "H1 label"], rows,
                 "Paired effects at the shared point (per draw, seed means, Student-t over 5 seeds); labels from the rule fixed in D56/D57",
-                "H1 reduction = (n_ref - n_X) / n_A. D vs C is the closed-loop secondary check of H2 and never gates.")
+                "H1 reduction = (n_ref - n_X) / n_A. D vs C is the closed-loop secondary check of H2 and never gates. C vs Gate-C is the D59 comparison (WIN would mean the weighted rule beats the gate; "
+                "floor 0.01); its label is the shared-point label, the D59 verdict uses all four fraction points (NOT SEPARATED, F30).")
 
     o = json.loads((S9 / "overhead.json").read_text(encoding="utf-8"))
     rows = []
@@ -466,11 +504,11 @@ def main() -> int:
     ap.add_argument("--recompute", action="store_true", help="rebuild the cached closed-loop inputs of Figures 2 and 6")
     a = ap.parse_args()
     ensure_inputs(a.recompute)
-    T, P = load_table(), load_paired()
+    T, P, GT = load_table(), load_paired(), load_gate()
     print("figures:")
-    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P); fig_ablation(T, P); fig_s4_gap(); fig_explanation()
+    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P); fig_ablation(T, P, GT); fig_s4_gap(); fig_explanation()
     print("tables:")
-    tables(T, P)
+    tables(T, P, GT)
     return 0
 
 

@@ -1696,3 +1696,16 @@ Records the review answers to the S9 decision request. D56-D58 and F26/F27 are n
 **Alternatives:** presenting D as the headline (contradicted by F17 and F27); pooling the two H4 passes into one interval (a post-hoc test); a rescue study of D (D47); quoting n_av alone (A's censoring makes it look larger than the rule-free count supports).
 
 **Rationale:** each choice reports the measured result at its measured strength. The H4 decision-change gap straddles the floor across two honest passes, so "borderline, with both numbers" is what the data supports; the headline and the H1 rules keep the paper from claiming more than F26/F27 show.
+
+### D61 — Gate-C added to the ablation figure and tables as a labelled extra baseline (amends the variant list of D58 items 2-5 only)
+Date: 2026-10-14 | Session: S9b (record completion) | Status: active
+Adds the S9b result to the S10 outputs. D58 is not edited and every number of the existing variants is unchanged (the regenerated tables reproduce the previous rows exactly).
+
+**Decision:** Figure 4 and the ablation tables show **Gate-C** (frozen C head, candidates with trust below tau = 0.9 removed first, C's D52 weights, un-gated fallback; D59/F28-F30) as a clearly labelled extra baseline:
+its own colour, drawn like the other variants, not highlighted (the highlight stays on C vs D), with the caption stating what it is and that it was run at the four fraction-sweep points only. In the tables it appears in the shared-point ablation,
+in the all-points table at the four fraction-sweep points, and in the paired-effects table as "C vs Gate-C" with the shared-point D59 label (the D59 verdict itself uses all four points: NOT SEPARATED, F30). Its detection figures are not shown ("not reported", D59 section 4).
+Data are read from `results/s9b/raw` and the stored S9 files; `make_figures.py` stops with a message if they are missing. Figure 3 is not changed.
+
+**Alternatives:** leaving Gate-C out of the figures (the paper would then omit the baseline a reviewer is most likely to ask for); showing it highlighted (would present a null as a finding).
+
+**Rationale:** the comparison is part of the record (F29/F30) and the figures must stay current with it, in the same style as the other variants.
