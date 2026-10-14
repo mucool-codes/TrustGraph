@@ -18,4 +18,4 @@ points:
   - {rho: 1.0, fraction: 0.30}
 
 # Written by `s9b_gate.py tune --write` from the tuning-seed grid; null until then.
-tau: null
+tau: 0.9

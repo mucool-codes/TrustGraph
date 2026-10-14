@@ -1515,3 +1515,25 @@ Interpretation (what the numbers say, in the order of the hypotheses):
 Limits that apply to all of the above: simulation-only, one topology per seed, the injection model is the most attackable assumption (PROJECT_SPEC
 4.6), the trust heads were trained on A-dispatch (F21), the avoidance bar 0.75 is a stated assumption (D56), the vs-oracle rows are headroom and not a
 competing method, and the H4/H5 stage uses the D54 sample size (200 decisions, 400 explanations), not larger.
+
+### F28 — S9b Gate-C tuning grid on the tuning seed (RAW, recorded before the chosen tau is used anywhere)
+Date: 2026-10-14 | Session: S9b | Commit: see `git log` (code in the commit before this entry; D59 = 3710795)
+Config: `configs/demo.yaml`, tuning seed 100 (excluded from evaluation), rho 1.0, fraction 0.20, injection draws 0, 1, 2, closed loop, dwell filter and handoff on,
+seed-100 C checkpoint (F20), C's D52 weights (alpha 1, beta 0.25, gamma 0.6) | Protocol: D59 section 2, unchanged
+Command: `python scripts/s9b_gate.py tune` (results/s9b/tuning.json). 24 runs. Objective: deadline success of dispatched tasks over steps [400, 1200), mean over the 3 draws.
+```
+tau    objective   per-draw (0, 1, 2)            empty-set (fallback) rate   gate-removed-at-least-one rate
+0.2    0.8999   [0.9406, 0.8519, 0.9073]   0.0158   0.0642
+0.3    0.8998   [0.9406, 0.8516, 0.9071]   0.0254   0.0873
+0.4    0.8998   [0.9406, 0.8514, 0.9073]   0.0405   0.1155
+0.5    0.8997   [0.9404, 0.8516, 0.9071]   0.0526   0.1336
+0.6    0.9001   [0.9408, 0.8521, 0.9073]   0.0600   0.1432
+0.7    0.9000   [0.9410, 0.8514, 0.9075]   0.0626   0.1492
+0.8    0.9001   [0.9410, 0.8516, 0.9075]   0.0646   0.1582
+0.9    0.9004   [0.9415, 0.8521, 0.9078]   0.1031   0.4025
+reference (F20): Variant C, same seed, draws, weights, no gate: 0.8999, per-draw [0.9406, 0.8516, 0.9073]
+```
+Chosen by the D59 rule (highest objective, ties to the lowest tau): **tau = 0.9**, written to `configs/gate.yaml`.
+Interpretation: the whole grid lies within 0.0007 of C's un-gated 0.8999 (draw-to-draw spread on this seed is 0.09), so on the tuning seed a gate on C's own head changes the success rate by less than
+anything this seed can resolve; the choice of tau 0.9 rests on a 0.0005 margin and should not be read as a finding about thresholds. The fallback rate grows with tau (1.6% at 0.2 to 10.3% at 0.9)
+and at tau 0.9 the gate removes a candidate on 40% of decisions, so the gate is doing work there while the outcome stays flat.
