@@ -71,10 +71,11 @@ def all_tasks(seeds):
 _STATE: dict = {}
 
 
-def _init(config_path: str, seeds: list[int]) -> None:
+def _init(config_path: str, seeds: list[int], threads: int = 1, out_dir: str | None = None) -> None:
     import torch
 
-    torch.set_num_threads(1)
+    torch.set_num_threads(threads)
+    _STATE["out_dir"] = Path(out_dir) if out_dir else OUT_DIR
     from trustgraph.config import load_config, with_overrides
     from trustgraph.model import build_trust_head
     from trustgraph.scenario import build_world
@@ -115,8 +116,9 @@ def _run(task):
 
     seed, kind, rho, placement, draw = task
     key = task_key(seed, kind, rho, placement, draw)
-    out = OUT_DIR / f"{key}.npz"
-    bad = OUT_DIR / f"{key}.infeasible"
+    out_dir = _STATE["out_dir"]
+    out = out_dir / f"{key}.npz"
+    bad = out_dir / f"{key}.infeasible"
     if out.exists() or bad.exists():
         return key, "cached"
 
@@ -147,6 +149,7 @@ def _run(task):
         except ValueError as exc:
             if "infeasible" not in str(exc):
                 raise
+            out_dir.mkdir(parents=True, exist_ok=True)
             bad.write_text(str(exc), encoding="utf-8")
             return key, "infeasible"
         SCEN_DIR.mkdir(parents=True, exist_ok=True)
@@ -175,7 +178,7 @@ def _run(task):
         rec[f"plateau_{variant}"] = trust[in_plat].mean(axis=0)
     assert np.array_equal(sub.steps[(sub.steps < TRUST_STEPS[1])], np.arange(*TRUST_STEPS))
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
         out,
         seed=seed,
@@ -200,6 +203,8 @@ def main() -> int:
     ap.add_argument("--config", required=True)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5])
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--threads", type=int, default=1, help="torch threads per worker (S5 check 3)")
+    ap.add_argument("--out-dir", default=None, help="raw output dir (default results/s4/raw)")
     args = ap.parse_args()
 
     tasks = all_tasks(args.seeds)
@@ -207,7 +212,7 @@ def main() -> int:
     t0 = time.time()
     counts: dict[str, int] = {}
     ctx = mp.get_context("spawn")
-    with ctx.Pool(args.workers, initializer=_init, initargs=(args.config, args.seeds)) as pool:
+    with ctx.Pool(args.workers, initializer=_init, initargs=(args.config, args.seeds, args.threads, args.out_dir)) as pool:
         for i, (key, status) in enumerate(pool.imap_unordered(_run, tasks, chunksize=4), 1):
             counts[status] = counts.get(status, 0) + 1
             if i % 100 == 0 or i == len(tasks):
