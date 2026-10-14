@@ -891,3 +891,96 @@ three threads) is not tested and stays a stated limitation of F15.
 
 Conclusion: neither check finds a defect, so the S4 NEGATIVE (F17) stands unmodified. Under the S5 brief's second
 branch the paper moves to the H2 fallback framing (D49).
+
+### F20 — S6 tuning grid on the tuning seed (RAW, recorded before the weights are used anywhere)
+Date: 2026-10-14 | Session: S6 | Commit: see `git log` for the commit that adds this entry
+Config: `configs/demo.yaml`, tuning seed 100 (excluded from all later evaluation), rho 1.0, fraction 0.20,
+injection draws 0, 1, 2, closed loop with the dwell filter and handoff on (D51) | Protocol: D50 item 4, unchanged
+Models: seed-100 C and D trained once with the D45 settings (`python scripts/s3_train.py --config configs/demo.yaml --seed 100`):
+  C stopped epoch 48 (best 46, val BCE 0.1762), D stopped epoch 105 (best 97, val BCE 0.1607), both by patience;
+  D edge probe 0.0853 / 0.0561 (>= 0.01, D44 PASS); held-out AUC [450,650) 1.0000 for both (one scenario).
+Command: `python scripts/s6_tune.py --config configs/demo.yaml --workers 12 --write-weights` (results/s6/tuning-grid.json)
+Objective: deadline success of dispatched tasks over steps [400,1200), mean over the three draws. 432 runs.
+
+Numbers (all grid points):
+```
+A  (rows: beta, gamma; columns: alpha; value: mean post-onset deadline success over draws 0,1,2)
+   beta gamma | a=0    
+   0.25 0.15  | 0.8559 
+   0.25 0.3   | 0.8633 
+   0.25 0.6   | 0.8670 
+   0.5  0.15  | 0.8511 
+   0.5  0.3   | 0.8559 
+   0.5  0.6   | 0.8633 
+   1    0.15  | 0.8462 
+   1    0.3   | 0.8511 
+   1    0.6   | 0.8559 
+   chosen (alpha,beta,gamma) = (0, 0.25, 0.6), objective 0.8670, per-draw [0.8834, 0.8416, 0.876]
+
+B_oracle  (rows: beta, gamma; columns: alpha; value: mean post-onset deadline success over draws 0,1,2)
+   beta gamma | a=0.25   a=0.5    a=1      a=2      a=4    
+   0.25 0.15  | 0.8957   0.8957   0.8957   0.8957   0.8957 
+   0.25 0.3   | 0.8995   0.8995   0.8995   0.8995   0.8995 
+   0.25 0.6   | 0.8996   0.9009   0.9009   0.9009   0.9009 
+   0.5  0.15  | 0.8920   0.8925   0.8925   0.8925   0.8925 
+   0.5  0.3   | 0.8943   0.8957   0.8957   0.8957   0.8957 
+   0.5  0.6   | 0.8962   0.8995   0.8995   0.8995   0.8995 
+   1    0.15  | 0.8776   0.8892   0.8895   0.8895   0.8895 
+   1    0.3   | 0.8812   0.8920   0.8925   0.8925   0.8925 
+   1    0.6   | 0.8854   0.8943   0.8957   0.8957   0.8957 
+   chosen (alpha,beta,gamma) = (0.5, 0.25, 0.6), objective 0.9009, per-draw [0.9432, 0.8516, 0.9078]
+
+C  (rows: beta, gamma; columns: alpha; value: mean post-onset deadline success over draws 0,1,2)
+   beta gamma | a=0.25   a=0.5    a=1      a=2      a=4    
+   0.25 0.15  | 0.8949   0.8973   0.8986   0.8992   0.8987 
+   0.25 0.3   | 0.8951   0.8982   0.8992   0.8993   0.8991 
+   0.25 0.6   | 0.8923   0.8985   0.8999   0.8999   0.8994 
+   0.5  0.15  | 0.8872   0.8945   0.8968   0.8980   0.8988 
+   0.5  0.3   | 0.8889   0.8949   0.8973   0.8986   0.8992 
+   0.5  0.6   | 0.8878   0.8951   0.8982   0.8992   0.8993 
+   1    0.15  | 0.8733   0.8851   0.8933   0.8963   0.8972 
+   1    0.3   | 0.8758   0.8872   0.8945   0.8968   0.8980 
+   1    0.6   | 0.8780   0.8889   0.8949   0.8973   0.8986 
+   chosen (alpha,beta,gamma) = (1, 0.25, 0.6), objective 0.8999, per-draw [0.9406, 0.8516, 0.9073]
+
+D  (rows: beta, gamma; columns: alpha; value: mean post-onset deadline success over draws 0,1,2)
+   beta gamma | a=0.25   a=0.5    a=1      a=2      a=4    
+   0.25 0.15  | 0.8906   0.8922   0.8920   0.8915   0.8912 
+   0.25 0.3   | 0.8910   0.8930   0.8938   0.8926   0.8919 
+   0.25 0.6   | 0.8878   0.8919   0.8937   0.8938   0.8926 
+   0.5  0.15  | 0.8814   0.8891   0.8912   0.8912   0.8909 
+   0.5  0.3   | 0.8838   0.8906   0.8922   0.8920   0.8915 
+   0.5  0.6   | 0.8838   0.8910   0.8930   0.8938   0.8926 
+   1    0.15  | 0.8685   0.8788   0.8867   0.8891   0.8896 
+   1    0.3   | 0.8722   0.8814   0.8891   0.8912   0.8912 
+   1    0.6   | 0.8746   0.8838   0.8906   0.8922   0.8920 
+   chosen (alpha,beta,gamma) = (2, 0.25, 0.6), objective 0.8938, per-draw [0.9347, 0.8471, 0.8997]
+
+```
+B is not tuned separately (D50): its trust term is the constant cert_valid = 1, so it takes A's weights.
+E takes D's weights. Chosen weights are in `configs/weights.yaml`.
+Interpretation: the weights matter much less than the choice of trust source - the best A point (0.8670) is
+0.03 below the weakest-tuned trust variant, while within C, D and B-oracle the surface is flat (best vs
+config default (1, 0.5, 0.3): C 0.8999 vs 0.8973, D 0.8938 vs 0.8922, B-oracle 0.9009 vs 0.8957), and several points tie
+to four decimals (ties go to the first grid point, D50).
+All three trust-bearing variants sit near 0.89-0.90 and B-oracle is only about 0.001-0.007 above C and D on the
+tuning seed, so on this seed a learned trust head recovers nearly all of what perfect fault knowledge could.
+One seed, three draws; per-draw values differ by up to 0.09, so differences of ~0.005 between variants here are
+inside the draw-to-draw spread and say nothing about evaluation seeds.
+
+### F21 — S6 engine checks and limitations
+Date: 2026-10-14 | Session: S6 | Commit: see `git log`
+1. Equivalence (tests/test_offload.py, and a full-size check on seed 1, rho 1.0, fraction 0.2, draw 0, 1200 steps,
+   6957 tasks): closed-loop A and B with the dwell filter and handoff off reproduce the open-loop task stream, RSU
+   features and task demand exactly; the open-loop generator still gives graph-sequence hash f3f247ac...30de7
+   (F11) after the simulator change. B's decisions equal A's, as D50 states.
+2. The dwell filter and the handoff rule are inert on that scenario: over 6880 decisions, dwell exclusions 0,
+   fallbacks 0, relayed 0, lost 0 (same deadline success, 0.9036, as the open loop). With a 400 m radius, speeds
+   <= 22 m/s and completions <= 1 s, a task seldom outlives its vehicle's dwell. Both rules are implemented and
+   unit-tested on hand-made geometry (tests/test_offload.py); their counters are reported with every closed-loop
+   run (`EngineCounters`), so any later claim that they matter must show the counts.
+3. Limitation (D50 item 5): the trust heads were trained on Baseline-A open-loop dispatch; the closed loop changes
+   which RSUs receive tasks and so which RSUs' `success_ewma` and `latency_dev` keep being updated (an RSU that
+   stops receiving tasks stops producing evidence, so its features freeze). That is a distribution shift between
+   training and evaluation. True load does not respond to dispatch in this world (D32), so the shift is in the
+   observation and feedback distribution, not in load.
