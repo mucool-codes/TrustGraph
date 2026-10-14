@@ -49,6 +49,10 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s6_run.py",  # closed-loop run + sealed side files (D51)
         "s6_tune.py",  # weight tuning on the tuning seed (D50)
         "s6_demo.py",  # the S6 demo plot
+        "s8_common.py",  # S8 shared sample and closed-loop helpers
+        "s8_fidelity.py",  # H4 fidelity, stability, neighbour-clause rate (D54)
+        "s8_timing.py",  # H5 timing (D54)
+        "s8_example.py",  # the merged example (D54)
     }
 )
 

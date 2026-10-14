@@ -1418,3 +1418,104 @@ examples; a single sentence with no contrast (the point of L11 is the contrast).
 
 **Rationale:** the selection score is linear, so the winner-runner-up margin is an identity in three terms; testing it
 bit-for-bit makes any divergence between what the system did and what it says it did a failing test.
+
+### D54 — S8 pre-registration: Layer 2 attribution, the H4 fidelity test, stability, the neighbour clause, H5 timing, and the merged example
+Date: 2026-10-14 | Session: S8 | Status: active — **FROZEN. Do not revise after any fidelity, stability or timing number exists.**
+Written before any S8 code ran on the sample; no attribution, fidelity, stability or timing figure exists when this is committed
+(only a one-explanation API smoke test on the seed-100 demo scenario, whose numbers were discarded).
+
+**1. What is explained, and how.** The trust head only, never the selection rule (L11). For a logged decision, Layer 2 explains
+the trust of the **winner** and of the **top runner-up** at the decision's step: why that RSU's trust is what it is. Variant E is
+D-based; C is explained too for the fidelity comparison (it can only attribute to its own features). GNNExplainer from
+`torch_geometric.explain` with PyG defaults (100 epochs, lr 0.01), `explanation_type="model"`, `mode="regression"`,
+`return_type="raw"` on the head's sigmoid output, `node_mask_type="attributes"`, `edge_mask_type="object"` for D and none for C.
+The graph of the decision's step is rebuilt from the closed-loop observable scenario and trace; the rebuilt head's trust must
+reproduce the logged trust of every candidate (max difference reported). The mask-initialisation seed is
+`run_seed*1_000_003 + decision_id*101 + rsu`, with primary run_seed 0.
+
+**2. Units and attribution.** A *unit* is one `(node, feature)` pair in the receptive field of the explained RSU v - nodes within
+2 hops of v (breadth-first on the step's edges, independent of any mask) - using only valid feature slots (an RSU row's 6 RSU
+features, a vehicle row's 3 vehicle features; zero-padded slots are not units). A unit's importance is its GNNExplainer node-mask
+value. **Top** = the single highest-importance unit (ties to the lowest (node, feature)); **top-3** is used for stability.
+**Low pool** = the units in the bottom half by importance within that explanation (inside the receptive field, so units that are
+unreachable by construction are not counted as "low"); one unit is drawn uniformly from the pool with `default_rng(20261015+seed)`
+in explanation order. A mask cannot see an input that is exactly zero (zero gradient); that blind spot is part of what is tested.
+
+**3. Perturbation and what counts as a change.** One scalar is moved by delta = 0.3 toward the other end of its [0, 1] range
+(x -> x + 0.3 if x < 0.5, else x - 0.3), identically for the top and the low unit. *Trust change*: the explained RSU's trust moves
+by at least 0.05 (absolute). *Decision change*: after perturbing, trust is recomputed for every RSU on the whole graph and the
+rule is re-run on the logged latency and load with the logged weights; the decision changes if the selected RSU differs.
+
+**4. Sample.** Evaluation seeds 1-5, rho 1.0, fraction 0.20, injection draw 100, closed loop with the D52 weights; one run each of
+Variant D (D head) and Variant C (C head). Decisions with step >= 400 (degradation present) and at least two dwell-eligible
+candidates; 40 per seed drawn without replacement from the sorted decision ids with `default_rng(20261014+seed)`; each explains its
+winner and its runner-up: 80 explanations per seed, 400 per head. Both perturbations are applied to the same explanation (paired).
+
+**5. The fidelity criterion** (per head; unit of analysis = seed, as in D43). Per seed: top-perturbation change rate, random-low
+change rate, and gap = top - low, over that seed's 80 explanations. Mean gap over the 5 seeds with a 95% Student-t interval
+(df 4, t = 2.776). **Primary metric = trust change**: FAITHFUL if the interval's lower bound is > 0 and the mean gap >= 0.20;
+WEAK if lower bound > 0 but mean gap < 0.20; NOT SUPPORTED otherwise. **Secondary = decision change** (the H4 wording): same rule
+with floor 0.05, reported alongside, never instead. The top rate, the low rate and the gap are always reported together.
+The floors are stated assumptions, not derived quantities.
+
+**6. Stability.** GNNExplainer is stochastic, so the primary explanations are repeated with run_seed 0, 1, 2 on all 400
+explanations per head. Reported: the fraction of explanations whose top unit is identical in all three runs; mean pairwise
+top-unit agreement; mean pairwise Jaccard of the top-3 units; the same for the top *node* (own vs which neighbour). The masks are
+called **stable** if the all-three top-unit agreement is >= 0.80, otherwise **unstable**, and the report says which.
+
+**7. The neighbour clause is conditional.** A same-segment neighbour is an RSU joined to v by an RSU-RSU edge with
+`same_segment = 1`. Node mass = the sum of importance over a node's units; share = node mass / total mass in the receptive field.
+The clause is **included only if** the same-segment RSU neighbours' summed share is >= 0.30; it then names up to two such
+neighbours with share >= 0.05, by mass. Direction is measured, not inferred: the named neighbour's RSU feature row is replaced by the
+median RSU row at that step and the change in v's trust is reported ("lowers"/"raises" if |change| >= 0.01, else "no measurable
+effect"). Own-evidence clause: the highest-importance own feature plus a second if its share of v's own mass is >= 0.25, with
+the same occlusion for direction (median RSU value at that step). The rate at which the clause is included is reported plainly,
+overall and split by whether the explained RSU is degraded (sealed class, used only by the evaluation, never by the explanation).
+If neighbours rarely drive the score, no neighbour story is templated.
+
+**8. H5 timing**, on the same sample (decisions, same steps), per decision, four components separately: (a) trust inference - one
+forward pass of the head over the step's graph; (b) selection - `select` over the decision's eligible candidates; (c) Layer 1 -
+`explain_decision` + `render_text`; (d) Layer 2 - GNNExplainer for the winner and the runner-up plus clause construction and
+occlusions (also per single explanation). Median, mean and 95th percentile in ms, `time.perf_counter`, after a warm-up, one decision
+at a time, no other job running; hardware and torch thread count named in FINDINGS. Practicality is judged against a stated
+assumption of 100 ms per decision (the order of a vehicular safety-message latency budget): Layer 2 is **synchronous-practical** if
+its median per decision is <= 100 ms, otherwise **asynchronous only**.
+
+**9. The merged example** is the first decision in the seed-100 / injection-draw-7 Variant D log with step >= 700 whose runner-up
+is a degraded RSU sharing its backhaul segment with at least one other degraded RSU, with at least two eligible candidates, and
+with trust the decisive term of Layer 1 (D53). The sealed class is used only to choose the decision. It is shown whether or not the
+neighbour clause is supported.
+
+**Alternatives:** thresholds chosen after seeing masks; random units from the whole subgraph as the low pool (unreachable units
+make the gap trivially large); one perturbation size per unit tuned to flip the decision; a single GNNExplainer run (hides mask
+noise); templating a neighbour clause unconditionally (the rejected "neighbour story the attribution does not support").
+
+**Rationale:** H4 needs a rule that fixes what "top" and "random-low" mean and what gap counts before any rate exists; the
+low pool is restricted to the receptive field and the units are perturbed identically so that the gap measures the attribution, not
+the perturbation or the geometry. Seed-level intervals match D43; the stability check and the conditional clause keep the explanation
+from claiming more than a stochastic mask supports.
+
+### D55 — What Layer 2 may claim, given the H4, stability, clause-rate and timing results
+Date: 2026-10-14 | Session: S8 | Status: active
+Records the consequences of F24/F25. D54 and the S8 numbers are unchanged.
+
+**Decision:**
+1. **H4 is reported as measured:** Layer 2 on the GNN head is *weakly* faithful (trust-change gap +0.16, decision-change gap +0.03; both
+   verdicts WEAK against D54's floors), and the C-head result is reported with its structural caveat (the random-low pool is unreadable by C),
+   so it is not offered as evidence that C's explanations are better. Top, random-low and gap are always quoted together.
+2. **The neighbour clause** is stated as conditional and rare (10% of D explanations; 16% for degraded RSUs), never as the general
+   behaviour of the system. The paper may say a graph model *can* name neighbouring evidence and show a real instance; it may not say
+   the system routinely does, and it must not use the clause as evidence for the graph claim beyond what these rates support. This is
+   consistent with the S4 result and D49's fallback framing.
+3. **GNNExplainer's masks are unstable** (top-unit agreement 0.22 for D); every Layer 2 explanation is reported with its run seed
+   (seed 0 in this project) and described as one draw. No fix is made in this session: averaging masks over runs, more epochs or a
+   different explainer would each be a new, labelled-post-hoc entry evaluated against D54's criterion, never a replacement for it.
+4. **Layer 2 is asynchronous only** (307-598 ms per decision on the stated laptop against a stated 100 ms assumption): it is generated
+   after the decision, off the dispatch path; Layer 1 (0.09 ms) is cheap enough to run inline.
+5. Variant E is D with Layer 1 + Layer 2; E's decisions are D's by construction, so no E-versus-D decision difference exists to measure.
+
+**Alternatives:** tuning epochs/lr or the thresholds until the gap clears 0.20 (choice after outcome); hiding the weak clause rate;
+presenting C's FAITHFUL verdict as better explanations.
+
+**Rationale:** H4 asks for rates and a gap; D54 fixed what counts. The honest summary is a measured, modest fidelity with an unstable
+explainer and a rarely supported neighbour clause, which is what a reviewer will check first.

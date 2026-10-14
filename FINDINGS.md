@@ -1130,3 +1130,126 @@ and 19% (D) of decisions - an explanation that said "highest trust wins" would b
 Variant A's explanations never mention trust. A share above 100% in an example is a term worth more than the whole margin
 because another term offset part of it; the text says so. Layer 1 explains the score, not why a node's trust has its value:
 that, and the neighbourhood clause, are Layer 2's (S8).
+
+### F24 — S8 raw results: H4 fidelity, GNNExplainer stability, neighbour-clause rate, H5 timing, merged example (RAW - no verdict recorded here)
+Date: 2026-10-14 | Session: S8 | Commit: 47d5622 (protocol D54 committed in aa97280 before any number)
+Config: `configs/demo.yaml`; heads C and D; evaluation seeds 1-5, rho 1.0, fraction 0.20, injection draw 100, closed loop with the D52
+weights (one run per head per seed); sample = 40 decisions per seed (step >= 400, >= 2 eligible candidates), the winner and the
+runner-up explained: 400 explanations per head | GNNExplainer (PyG 2.8.0), 100 epochs, run_seed 0 primary, 1 and 2 for stability
+Commands: `python scripts/s8_fidelity.py collect`, `python scripts/s8_fidelity.py report` (raw only), `python scripts/s8_timing.py`,
+`python scripts/s8_example.py` (results/s8/*; not committed)
+Hardware for H5: Windows 10.0.26300 laptop, 13th Gen Intel Core i5-13450HX (10 cores, 16 logical), 24 GB RAM, CPU only (no GPU used),
+torch 2.6.0, default 10 intra-op threads and a 1-thread rerun; nothing else running during the timing.
+
+Rebuild check (both heads): the graph rebuilt from the closed-loop scenario reproduces every logged trust exactly (max difference
+0.0) and the rule re-run on it reproduces every logged selection (0 mismatches in 200 decisions per head).
+
+H4 fidelity (perturb one (node, feature) unit by 0.3; per-seed rates over 80 explanations; mean over 5 seeds, 95% t-interval):
+```
+HEAD D                         top rate         random-low rate   gap (top - low)   gap 95% CI          per-seed gaps
+trust change  (>= 0.05)        0.205 (sd 0.095) 0.045 (sd 0.027)  +0.160 (sd 0.094) [+0.0431, +0.2769]  .1375 .100 .100 .1375 .325
+decision change                0.065 (sd 0.041) 0.032 (sd 0.019)  +0.0325 (sd 0.026) [+0.0003, +0.0647] .050 .000 .0375 .0125 .0625
+HEAD C                         top rate         random-low rate   gap               gap 95% CI          per-seed gaps
+trust change  (>= 0.05)        0.580 (sd 0.112) 0.000 (sd 0.000)  +0.580 (sd 0.112) [+0.4405, +0.7195]  .5625 .6625 .4875 .4625 .725
+decision change                0.163 (sd 0.029) 0.000 (sd 0.000)  +0.163 (sd 0.029) [+0.1261, +0.1989]  .1625 .1375 .150 .150 .2125
+per-seed top / low trust-change rates, D: s1 .150/.013, s2 .138/.037, s3 .150/.050, s4 .225/.087, s5 .362/.037
+per-seed top / low decision-change rates, D: s1 .100/.050, s2 .013/.013, s3 .050/.013, s4 .050/.037, s5 .113/.050
+pooled over explanations, D: trust-change top 0.205 low 0.045; decision-change top 0.065 low 0.033; mean |trust delta| top 0.043, low 0.009
+pooled, C: trust-change top 0.580 low 0.000; decision-change top 0.163 low 0.000; mean |trust delta| top 0.136, low 0.000
+where the units are: D top unit is the RSU's own feature in 47.7% of explanations, the random-low unit in 3.0%;
+                     C top unit is own in 100%, the random-low unit in 0.0% (the low pool, drawn from the graph's 2-hop
+                     receptive field, holds only units on other nodes, which C's architecture cannot read)
+```
+GNNExplainer stability (run_seed 0, 1, 2 on the same 400 explanations per head):
+```
+                                                   D       C
+top unit identical in all three runs               0.223   0.370
+mean pairwise top-unit agreement                   0.303   0.496
+top node identical in all three runs               0.297   1.000
+mean pairwise Jaccard of the top-3 units           0.253   0.548
+```
+Neighbour clause (D54 section 7: same-segment RSU neighbours carry >= 30% of the attribution and a neighbour has >= 5%):
+```
+HEAD D: included in 10.2% of 400 explanations; mean same-segment share 0.189, mean share on the RSU's own units 0.070
+        explained RSU degraded (n=80, sealed class used by the evaluation only): clause 16.3%, mean same-segment share 0.214
+        explained RSU not degraded (n=320): clause 8.7%, mean same-segment share 0.182
+        every explained RSU had at least one same-segment RSU neighbour (100%)
+HEAD C: included in 0.0% (same-segment share 0.000, own share 1.000 by construction)
+```
+H5 timing, ms per decision (median / mean / 95th percentile), 200 decisions per head, Layer 2 = winner + runner-up
+(per explanation in the last column):
+```
+head / torch threads  trust inference          selection              Layer 1                Layer 2 per decision          Layer 2 per explanation
+D, 10 threads         0.771 / 0.846 / 1.280    0.041 / 0.044 / 0.055  0.091 / 0.095 / 0.134  598.412 / 603.443 / 666.889   295.134 / 301.718 / 337.988
+D, 1 thread           0.286 / 0.326 / 0.620    0.041 / 0.044 / 0.055  0.091 / 0.095 / 0.138  307.423 / 308.836 / 331.501   153.594 / 154.415 / 167.846
+C, 10 threads         0.089 / 0.100 / 0.185    0.042 / 0.043 / 0.055  0.089 / 0.096 / 0.141  231.389 / 231.574 / 255.720   115.510 / 115.784 / 131.246
+C, 1 thread           0.074 / 0.086 / 0.160    0.038 / 0.041 / 0.051  0.085 / 0.086 / 0.134  141.362 / 143.861 / 159.514    70.695 / 71.928 / 82.870
+```
+Merged explanation (D54 section 9 rule; first of 457 qualifying decisions): decision 3993, seed 100, draw 7, Variant D. The runner-up RSU-7
+is degraded, on backhaul segment 3 with degraded RSUs 0, 5, 7, 16. Layer 2 numbers: RSU-19 trust 0.926, share on its own units 0.063,
+same-segment RSU neighbours [2, 14], same-segment share 0.129, clause False; RSU-7 trust 0.660, own share 0.089, same-segment neighbours
+[5, 10, 16], same-segment share 0.205, clause False. The full text is in the next entry.
+
+### F25 — S8 verdicts against D54, interpretation, and the merged example (written after F24 was committed in 3487836)
+Date: 2026-10-14 | Session: S8 | Commit: 3487836 (numbers)
+Command: `python scripts/s8_fidelity.py report --verdict`
+
+Verdicts, as D54 section 5-6 define them:
+```
+Head D  trust change   gap +0.160, 95% CI [+0.043, +0.277], floor 0.20   -> WEAK       (CI above 0, mean below the floor)
+Head D  decision change gap +0.033, 95% CI [+0.0003, +0.065], floor 0.05 -> WEAK       (CI barely above 0, mean below the floor)
+Head C  trust change   gap +0.580, 95% CI [+0.441, +0.720], floor 0.20   -> FAITHFUL   (but see the low-pool artefact below)
+Head C  decision change gap +0.163, 95% CI [+0.126, +0.199], floor 0.05  -> FAITHFUL   (same caveat)
+GNNExplainer masks (all-three top-unit agreement, threshold 0.80): D 0.223, C 0.370 -> UNSTABLE for both heads.
+```
+Post-hoc, exploratory (not part of D54, computed from the F24 rows, labelled as such): for head D, when the top unit is the RSU's own
+feature (191 explanations) perturbing it changes trust in 34.6% of cases (mean |change| 0.070); when the top unit sits on a neighbour (209
+explanations) it changes trust in 7.7% (mean |change| 0.018), against 3.9% for the random-low units (388 of 400 are on neighbours; the 12 own
+ones change trust in 25%).
+
+Interpretation: (1) The attribution is only weakly faithful for the GNN head. Perturbing D's top-attributed unit changes the trust of the
+explained RSU in 20.5% of cases against 4.5% for a random low unit, a gap of 0.16 that is clearly above zero but below the 0.20 floor fixed in
+advance; for the decision itself the gap is 0.033 (top 6.5%, low 3.2%) and its interval touches zero, so a decision rarely flips because of any
+single input. (2) Most of D's measured fidelity comes from its own features: top-own units move trust in 35% of cases, top-neighbour units in 8%,
+barely above the 4% of random neighbour units. The part of the explanation that only a graph model can give - which neighbours drive the score -
+is the least supported part. (3) C's gap is large but not comparable: its low pool, taken from the graph's receptive field as D54 specified,
+consists entirely of units on other nodes that C cannot read, so its random-low rate is 0.000 by construction; the honest reading is that C's
+own-feature attribution is sound and that the C-versus-D comparison on H4 is not informative. D54 is not changed. (4) The masks are unstable:
+GNNExplainer's top unit agrees across three seeds for only 22% (D) and 37% (C) of explanations, and the top node for 30% (D), so the same
+decision can be explained by a different leading feature on another run; explanations should carry their run seed and be read as one draw.
+(5) The neighbour clause is rarely supported: 10.2% of D explanations (16.3% when the explained RSU is degraded, 8.7% otherwise) meet the 30%
+same-segment-share rule, although every explained RSU has at least one same-segment neighbour. TECHNICAL_AND_NOVELTY.md 3.4 presents the
+neighbour clause as evidence for the graph claim; on these numbers the claim is thinly supported, consistent with S4 (D is not better than C).
+(6) H5: Layer 2 costs 307 ms per decision (two GNNExplainer runs, 1 thread, D) or 598 ms at 10 threads, against 0.3-0.8 ms for trust
+inference, 0.04 ms for selection and 0.09 ms for Layer 1 - three orders of magnitude more than the decision itself and 3-6 times the stated
+100 ms budget; Layer 2 is asynchronous only (explain after the decision, off the dispatch path). It is faster on one thread than on ten for
+graphs this small. C's explanation costs 141-231 ms per decision.
+
+Merged explanation, the first qualifying decision under D54 section 9 (not the best-looking one). The neighbour clause is NOT produced because
+the attribution does not support it (20% < 30%) - the text says so instead of telling a neighbour story:
+```
+##### Merged explanation - first qualifying decision (D54 section 9): decision 3993, seed 100, draw 7, Variant D; 457 qualifying decisions at step >= 700
+(runner-up RSU-7 is degraded, on backhaul segment 3 with degraded RSUs [0, 5, 7, 16]; sealed class used only to choose the decision)
+
+Decision 3993: step 700 (t = 700 s), vehicle 31, medium task, deadline 0.37 s - Variant D
+RSU-19 was selected over RSU-7 (score 1.387 vs 0.833, margin 0.554).
+Why: RSU-7 lost on trust: RSU-19's trust was 0.93 against RSU-7's 0.66, worth +0.532 of the 0.554 score margin (96%). The rest of the margin came from load (+0.060). RSU-7 had lower link latency (12.7 ms against 16.5 ms for RSU-19), worth 0.038 to RSU-7, but that was outweighed.
+
+Score = 2 * trust - 0.25 * latency - 0.6 * load   (weights as logged)
+   RSU      trust  alpha*trust  latency  -beta*lat   load  -gamma*load     score
+  *  19   0.926     +1.8526    0.662    -0.1654  0.500     -0.3000   +1.3873
+      7   0.660     +1.3208    0.509    -0.1273  0.600     -0.3600   +0.8335
+     10   0.325     +0.6507    0.608    -0.1521  0.700     -0.4200   +0.0786
+  (* selected, x excluded by the dwell filter)
+
+Other candidates:
+  RSU-10 lost on trust: RSU-19's trust was 0.93 against RSU-10's 0.33, worth +1.202 of the 1.309 score margin (92%). The rest of the margin came from load (+0.120). RSU-10 had lower link latency (15.2 ms against 16.5 ms for RSU-19), worth 0.013 to RSU-10, but that was outweighed.
+
+Logged behaviour record (context, not an attribution): RSU-19: promises kept 1.00, latency deviation 0.02; RSU-7: promises kept 0.63, latency deviation 0.32; RSU-10: promises kept 0.95, latency deviation 0.03.
+Outcome: deadline met (observed 0.161 s, advertised 0.176 s).
+
+RSU-19 selected over RSU-7. Primary factors: RSU-19 trust score 0.93, the attribution rests on its own advertised load 0.50 (lowers trust by 0.01 compared with a typical value), neighbouring RSUs did not drive this score (same-segment neighbours carry 13% of the attribution, below the 30% needed to name them); RSU-7 trust score 0.66, the attribution rests on its own latency deviation 0.32 (lowers trust by 0.29 compared with a typical value), neighbouring RSUs did not drive this score (same-segment neighbours carry 20% of the attribution, below the 30% needed to name them).
+(Layer 2: GNNExplainer on the trust head. Own-evidence and neighbour effects are measured by replacing the evidence with the step's median RSU value; a neighbour is named only when same-segment neighbours carry at least 30% of the attribution.)
+[Layer 2 numbers, RSU-19: trust 0.926, own share 0.063, same-segment RSU neighbours [2, 14], same-segment share 0.129, clause False]
+[Layer 2 numbers, RSU-7: trust 0.660, own share 0.089, same-segment RSU neighbours [5, 10, 16], same-segment share 0.205, clause False]
+```

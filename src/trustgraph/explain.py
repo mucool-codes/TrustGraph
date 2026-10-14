@@ -290,7 +290,7 @@ def trust_note(e: Explanation) -> str:
     return ""
 
 
-def render_text(e: Explanation) -> str:
+def render_text(e: Explanation, layer2_note: bool = True) -> str:
     w = e.candidate(e.winner)
     task = TASK_NAMES[e.task_type] if 0 <= e.task_type < len(TASK_NAMES) else f"type {e.task_type}"
     out = [
@@ -334,7 +334,8 @@ def render_text(e: Explanation) -> str:
     ctx = [f"{_rsu(c.rsu)}: promises kept {c.success_ewma:.2f}, latency deviation {c.latency_dev:.2f}"
            for c in sorted(e.candidates, key=lambda c: (c.rsu != e.winner, c.rsu))]
     out.append("Logged behaviour record (context, not an attribution): " + "; ".join(ctx) + ".")
-    out.append("Why a node's trust has its value is not explained here (Layer 2).")
+    if layer2_note:
+        out.append("Why a node's trust has its value is not explained here (Layer 2).")
     if e.outcome:
         o = e.outcome
         verdict = "met" if o["met_deadline"] else "missed"

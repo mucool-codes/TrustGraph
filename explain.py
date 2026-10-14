@@ -10,6 +10,9 @@ log is the S6 closed-loop output, e.g.
 
     python explain.py --survey --log <file>      # which decisions are decided by which term
 
+    # Layer 1 + Layer 2 (why the trust scores are what they are; needs the run's config, seed, checkpoint):
+    python explain.py --decision 4120 --layer 2 --config configs/demo.yaml --seed 100 --log <file>
+
 Layer 1 reads only the log: no config, no weights file, no model, no ground truth.
 """
 
@@ -48,6 +51,12 @@ def main() -> int:
     ap.add_argument("--log", default=None, help="decision log (jsonl); default: the only one under scenarios/s6/")
     ap.add_argument("--json", action="store_true", help="print the decomposition as JSON instead of text")
     ap.add_argument("--survey", action="store_true", help="count decisions by deciding term and list examples")
+    ap.add_argument("--layer", type=int, choices=(1, 2), default=1, help="1: score decomposition; 2: + trust attribution")
+    ap.add_argument("--config", default=None, help="(layer 2) the run's config, e.g. configs/demo.yaml")
+    ap.add_argument("--seed", type=int, default=None, help="(layer 2) the run's seed (selects the frozen head)")
+    ap.add_argument("--scenario", default=None, help="(layer 2) closed-loop observable .npz; default: next to the log")
+    ap.add_argument("--trace", default=None, help="(layer 2) mobility trace .npz; default: traces/<config>-seed<seed>.npz")
+    ap.add_argument("--checkpoint-dir", default="checkpoints", help="(layer 2) where s3-seed<n>-<head>.pt live")
     args = ap.parse_args()
     if args.decision is None and not args.survey:
         ap.error("give --decision <id> or --survey")
@@ -67,7 +76,20 @@ def main() -> int:
             print(f"  winner has LOWER trust than the runner-up: {len(s.lower_trust_winner)}   "
                   + ", ".join(f"#{i} ({m:.3f})" for i, m in top))
             return 0
-        explanation = explain_decision(find_decision(log, args.decision))
+        record = find_decision(log, args.decision)
+        if args.layer == 2:
+            if args.config is None or args.seed is None:
+                ap.error("--layer 2 needs --config and --seed")
+            from trustgraph.explain_layer2 import explain_record_layer2, render_merged
+
+            scenario = args.scenario or str(log).replace(".decisions.jsonl", ".observed.npz")
+            layer1, layer2 = explain_record_layer2(
+                record, config_path=args.config, seed=args.seed, observed_path=scenario,
+                trace_path=args.trace, checkpoint_dir=args.checkpoint_dir,
+            )
+            print(render_merged(layer1, layer2))
+            return 0
+        explanation = explain_decision(record)
     except (KeyError, ExplanationError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
