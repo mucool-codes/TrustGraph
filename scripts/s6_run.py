@@ -36,7 +36,7 @@ from trustgraph.trace import default_trace_path, load_trace  # noqa: E402
 
 OUT_DIR = REPO_ROOT / "scenarios" / "s6"
 # E selects exactly as D, and B has no weights of its own (its trust term is constant): D50.
-WEIGHT_ALIAS = {"E": "D", "B": "A"}
+WEIGHT_ALIAS = {"E": "D", "B": "A", "Gate_C": "C"}
 
 
 def load_weights(path: str | Path, variant: str) -> tuple[float, float, float]:

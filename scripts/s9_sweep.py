@@ -160,7 +160,7 @@ def _seed_state(seed: int) -> dict:
     return cache[seed]
 
 
-def run_one_variant(sw: dict, base, world, trace, models, variant: str, seed, rho, fraction, draw) -> dict:
+def run_one_variant(sw: dict, base, world, trace, models, variant: str, seed, rho, fraction, draw, **settings_overrides) -> dict:
     """One closed-loop run and its D56 metrics. Also returns the task arrays for stream comparisons."""
     from s6_run import load_weights
     from trustgraph.config import with_overrides
@@ -169,8 +169,8 @@ def run_one_variant(sw: dict, base, world, trace, models, variant: str, seed, rh
 
     cfg = with_overrides(base, seed=seed, rho=rho, fraction=fraction, draw=draw)
     weights = load_weights(REPO_ROOT / sw["weights_file"], variant)
-    settings = build_offload_settings(cfg, variant=variant, weights=weights, record_trust=True)
-    model = models.get("C" if variant == "C" else "D") if variant in ("C", "D", "E") else None
+    settings = build_offload_settings(cfg, variant=variant, weights=weights, record_trust=True, **settings_overrides)
+    model = models.get("C" if variant in ("C", "Gate_C") else "D") if variant in ("C", "D", "E", "Gate_C") else None
     t0 = time.perf_counter()
     sc = run_closed_loop(cfg, world, trace, settings, model=model)
     wall = time.perf_counter() - t0
@@ -201,6 +201,12 @@ def run_one_variant(sw: dict, base, world, trace, models, variant: str, seed, rh
                      "dwell_fallback": c.dwell_fallback, "relayed": c.relayed, "handoff_lost": c.handoff_lost},
         "wall_s": wall,
     }
+    if variant == "Gate_C":  # D59 section 1: the gate's own accounting (written only for this variant)
+        fb = sc.extras["gate_fallback_steps"]
+        metrics["gate"] = {
+            "dispatched": int(tasks.dispatched.sum()), "excluded": c.gate_excluded, "fallback": c.gate_fallback,
+            "fallback_post_onset": int((fb >= onset).sum()),
+        }
     return metrics, {"rsu": tasks.rsu, "met": tasks.met_deadline}, gt
 
 

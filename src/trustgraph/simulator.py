@@ -351,6 +351,7 @@ def generate_scenario(
             "decision_log": engine.log,
             "counters": engine.counters,
             "trust_history": np.asarray(engine.trust_history) if engine.trust_history else None,
+            "gate_fallback_steps": np.asarray(engine.gate_fallback_steps, dtype=np.int64),
         }
     return Scenario(observed=observed, ground_truth=ground_truth, extras=extras)
 

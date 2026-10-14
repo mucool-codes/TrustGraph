@@ -37,7 +37,7 @@ from .selection import Decision, select
 from .topology import pairwise_distances
 from .train import load_checkpoint
 
-VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E")
+VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E", "Gate_C")
 HANDOFF_MODES: tuple[str, ...] = ("relay", "off")
 LOG_SCHEMA_VERSION = 2  # 2: candidates carry `load`, the exact value the score used (D53)
 
@@ -49,6 +49,7 @@ TRUST_SOURCE = {
     "C": "model_C",
     "D": "model_D",
     "E": "model_D",  # E = D + explanation; selection is identical to D (D50)
+    "Gate_C": "model_C",  # C's head, plus a trust threshold before selection (D59)
 }
 
 
@@ -67,6 +68,8 @@ class OffloadSettings:
     log_decisions: bool = False
     # Score every RSU at every step and keep the history (for plots); changes no outcome.
     record_trust: bool = False
+    # Gate_C only (D59): candidates with trust < tau are removed before the L1 rule; none left -> un-gated set.
+    trust_gate_tau: float | None = None
 
     def __post_init__(self) -> None:
         if self.variant not in VARIANTS:
@@ -75,6 +78,10 @@ class OffloadSettings:
             raise ValueError(f"unknown handoff mode {self.handoff!r}; expected {HANDOFF_MODES}")
         if min(self.alpha, self.beta, self.gamma) < 0:
             raise ValueError("selection weights must be non-negative")
+        if (self.variant == "Gate_C") != (self.trust_gate_tau is not None):
+            raise ValueError("trust_gate_tau is required for Gate_C and meaningless for every other variant")
+        if self.trust_gate_tau is not None and not 0.0 < self.trust_gate_tau <= 1.0:
+            raise ValueError("trust_gate_tau must be in (0, 1]")
 
     @property
     def effective_alpha(self) -> float:
@@ -122,6 +129,8 @@ class EngineCounters:
     dwell_fallback: int = 0
     relayed: int = 0
     handoff_lost: int = 0
+    gate_excluded: int = 0  # Gate_C: decisions where the gate removed at least one candidate
+    gate_fallback: int = 0  # Gate_C: decisions where no candidate passed and the un-gated set was used
 
 
 @dataclass
@@ -136,6 +145,7 @@ class OffloadEngine:
     def __post_init__(self) -> None:
         self.log: list[dict] = []
         self.trust_history: list[np.ndarray] = []
+        self.gate_fallback_steps: list[int] = []
         self._builder: SnapshotBuilder | None = None
         self._trust = np.zeros(0)
         self._t = -1
@@ -222,6 +232,20 @@ class OffloadEngine:
                 fallback = True
         candidates = in_range[eligible]
 
+        gate_pass = None
+        gate_fallback = False
+        if s.trust_gate_tau is not None and candidates.size:
+            passed = self._trust[candidates] >= s.trust_gate_tau
+            self.counters.gate_excluded += int(not passed.all())
+            if passed.any():
+                gate_pass = {int(r): bool(ok) for r, ok in zip(candidates, passed)}
+                candidates = candidates[passed]
+            else:  # nobody passes: the decision proceeds on the un-gated set (D59 section 1)
+                gate_fallback = True
+                gate_pass = {int(r): False for r in candidates}
+                self.counters.gate_fallback += 1
+                self.gate_fallback_steps.append(int(t))
+
         self.counters.decisions += 1
         self.counters.dwell_fallback += int(fallback)
         self.counters.dwell_excluded += int(bool((~eligible).any()))
@@ -247,6 +271,11 @@ class OffloadEngine:
                 latency_ms_row, latency_norm_row, adv_load, cycles, deadline_s, type_idx,
                 decision, fallback,
             )
+            if gate_pass is not None:
+                record["gate_tau"] = s.trust_gate_tau
+                record["gate_fallback"] = gate_fallback
+                for c in record["candidates"]:
+                    c["gate_pass"] = gate_pass.get(c["rsu"])
             self.log.append(record)
         return decision, record
 
@@ -350,7 +379,7 @@ class OffloadEngine:
 
 def load_frozen_head(cfg: Config, settings: OffloadSettings) -> torch.nn.Module:
     """The seed's frozen checkpoint for the variant's trust head (C, or D for D/E)."""
-    head = "C" if settings.variant == "C" else "D"
+    head = "C" if settings.variant in ("C", "Gate_C") else "D"
     path = Path(settings.checkpoint_dir) / f"s3-seed{cfg.seed}-{head}.pt"
     if not path.exists():
         raise FileNotFoundError(

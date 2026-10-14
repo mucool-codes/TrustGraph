@@ -61,7 +61,7 @@ def test_closed_loop_is_deterministic(cfg, world, trace):
 
 
 def test_variants_and_trust_sources_cover_the_d50_list():
-    assert set(VARIANTS) == {"A", "B", "B_oracle", "C", "D", "E"}
+    assert set(VARIANTS) == {"A", "B", "B_oracle", "C", "D", "E", "Gate_C"}  # Gate_C added in S9b (D59)
     assert TRUST_SOURCE["E"] == TRUST_SOURCE["D"] == "model_D"
     with pytest.raises(ValueError):
         OffloadSettings(variant="F")
