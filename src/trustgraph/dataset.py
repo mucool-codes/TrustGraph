@@ -55,6 +55,61 @@ def next_task_labels(observed: ObservedScenario) -> tuple[np.ndarray, np.ndarray
     return y, valid
 
 
+# S15 (D72): the forward-looking objective. Fixed in D72 before any number existed.
+HORIZON_STEPS = 150
+HORIZON_THRESHOLD = 0.75
+HORIZON_MIN_TASKS = 5
+OBJECTIVES = ("next", "horizon")
+
+
+def horizon_labels(
+    observed: ObservedScenario,
+    horizon: int = HORIZON_STEPS,
+    threshold: float = HORIZON_THRESHOLD,
+    min_tasks: int = HORIZON_MIN_TASKS,
+) -> tuple[np.ndarray, np.ndarray]:
+    """(z, valid), both (num_steps, num_rsus): the D72 horizon objective.
+
+    For RSU `v` at step `t`, f is the fraction of the tasks dispatched to `v` at steps in
+    (t, t + horizon] (truncated at the last step) that met their deadline. D72 defines
+    y = 1 when f < threshold ("about to fail"); the models' output is trust (high =
+    healthy), so the target returned here is z = 1 - y, 1.0 where f >= threshold. BCE of
+    trust against z is the same loss as BCE of (1 - trust) against y. `valid` is False
+    where `v` has fewer than `min_tasks` tasks in the window or is not active at `t`.
+
+    Built from the observable task stream only (L4); the sealed class is never read.
+    """
+    tasks = observed.tasks
+    num_steps, num_rsus = observed.rsu_active.shape
+    z = np.zeros((num_steps, num_rsus), dtype=np.float32)
+    valid = np.zeros((num_steps, num_rsus), dtype=bool)
+    t_axis = np.arange(num_steps)
+    for v in range(num_rsus):
+        mine = np.flatnonzero(tasks.rsu == v)  # generation order = step order
+        if mine.size == 0:
+            continue
+        steps_v = tasks.step[mine]
+        cum_met = np.concatenate([[0], np.cumsum(tasks.met_deadline[mine].astype(np.int64))])
+        lo = np.searchsorted(steps_v, t_axis, side="right")  # first task at step >= t + 1
+        hi = np.searchsorted(steps_v, t_axis + horizon, side="right")  # one past step t + horizon
+        count = hi - lo
+        frac = (cum_met[hi] - cum_met[lo]) / np.maximum(count, 1)
+        ok = count >= min_tasks
+        z[ok, v] = (frac[ok] >= threshold).astype(np.float32)
+        valid[:, v] = ok
+    valid &= observed.rsu_active
+    return z, valid
+
+
+def labels_for(observed: ObservedScenario, objective: str = "next") -> tuple[np.ndarray, np.ndarray]:
+    """The (target, valid) pair of the named training objective (`next` is L3, `horizon` is D72)."""
+    if objective == "next":
+        return next_task_labels(observed)
+    if objective == "horizon":
+        return horizon_labels(observed)
+    raise ValueError(f"unknown objective {objective!r}; expected one of {OBJECTIVES}")
+
+
 @dataclass(frozen=True)
 class GraphSet:
     """Cached graphs of one scenario at a stride, with labels.
@@ -79,6 +134,7 @@ def build_graphset(
     config_path: str | Path,
     stride: int = 4,
     step_range: tuple[int, int] | None = None,
+    objective: str = "next",
 ) -> GraphSet:
     """Load the observable scenario and trace for `cfg` from disk and cache every
     `stride`-th graph."""
@@ -93,6 +149,7 @@ def build_graphset(
         stride=stride,
         step_range=step_range,
         name=observed_path.name.removesuffix(".observed.npz"),
+        objective=objective,
     )
 
 
@@ -104,6 +161,7 @@ def graphset_from(
     stride: int = 4,
     step_range: tuple[int, int] | None = None,
     name: str = "",
+    objective: str = "next",
 ) -> GraphSet:
     """Cache every `stride`-th graph of an in-memory (world, trace, observable) triple.
 
@@ -111,7 +169,7 @@ def graphset_from(
     only the retained graphs are kept.
     """
     builder = build_snapshot_builder(cfg, world, trace, observed)
-    y_all, valid_all = next_task_labels(observed)
+    y_all, valid_all = labels_for(observed, objective)
     num_rsus = world.topology.num_rsus
 
     lo, hi = (0, trace.num_steps) if step_range is None else step_range
