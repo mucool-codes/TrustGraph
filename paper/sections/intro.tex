@@ -6,7 +6,7 @@ A certificate is evidence about identity: it says who a node is.
 Whether the node is \emph{currently working correctly} is a different question, and one that observed task outcomes can speak to.
 This paper calls the difference between the two the certificate-versus-behaviour gap.
 
-As a published illustration that V2X software can stop working, three CVE records describe denial of service in the open-source Vanetza V2X implementation:
+As a published illustration that V2X software can stop working:
 % src: A26; CVE_VERIFICATION.md (read 2026-10-15). Wording of A26 only (X13, X20): nothing about ITS-G5, radio range, deployed RSUs, field use, certificate holders or SCMS.
 CVE-2026-37554, CVE-2026-43988 and CVE-2026-44905 are published CVE records of denial-of-service vulnerabilities (CVSS 3.1 base 7.5) in the open-source Vanetza V2X implementation ($\le$ 26.02), in each of which a remote unauthenticated network attacker can terminate the process through an uncaught exception (CWE-248): the first in ECC point validation in GeoNetworking packet processing (published 2026-05-01), the second in ASN.1/OER parsing and the third in the cryptographic verification path (both published 2026-05-26)~\cite{cve1,cve2,cve3}.
 The records were read from the CVE Program record service on 2026-10-15.

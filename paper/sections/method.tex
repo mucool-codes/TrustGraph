@@ -13,7 +13,7 @@ A trust head turns the current graph into one scalar $\text{trust}_v\in[0,1]$ pe
 \end{figure*}
 
 \subsection{Trust heads C and D}
-Both heads are trained on the identical self-supervised objective over the identical features; they differ only in whether the head aggregates over neighbours.
+Both heads are trained on the identical self-supervised objective and read the same RSU feature rows; the difference is whether the head also aggregates over neighbours (with the edge features) by message passing.
 % src: PROJECT_SPEC 3 (C and D trained on identical objective and features); A2
 \emph{C} is a node-local MLP over the RSU's own six feature values and never sees a neighbour.
 \emph{D} is a 2-layer GINEConv over the graph, with message passing along all four edge features; C is matched to D in depth and width.
