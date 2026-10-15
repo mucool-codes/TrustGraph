@@ -1774,3 +1774,23 @@ rho 1.00, fraction 0.30
   (descr.) detection latency C - H: -5.1 steps [-23.9, +13.7]   (negative = C detects earlier)
   (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.003 [-0.003, +0.008]   n_av +0.018 [-0.020, +0.056]
 ```
+
+### F34 — S13 Experiment 1 verdict against D65 and interpretation (written after F33 was committed in 9926c5d)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` | No weight, floor, bound, point, seed, draw or rule of D65 was changed.
+Labels from `python scripts/s13_h.py report --verdict` (results/s13/h/report-verdict.txt), D65 section 1.4 (effect = C minus H post-onset deadline success; floor 0.01; NULL = whole interval inside +-0.025):
+```
+fraction   C - H success [95% interval over seeds]      label
+0.05       +0.0034 [+0.0027, +0.0041]                   NULL
+0.10       +0.0035 [+0.0028, +0.0042]                   NULL
+0.20       +0.0038 [+0.0032, +0.0045]   (shared point)  NULL
+0.30       +0.0045 [+0.0033, +0.0057]                   NULL
+WIN at 0 of 4, NEGATIVE at 0 of 4  ->  D65 overall verdict: NOT SEPARATED (all four labels NULL)
+```
+Rule applied: per point, NEGATIVE needs hi < 0 and mean <= -0.01 (no); WIN needs lo > 0 and mean >= 0.01 (lo > 0 holds at all four, but the mean is 0.003-0.005, below the floor); NULL needs lo > -0.025 and hi < 0.025 (yes). Overall: LEARNING HELPS needs WIN at >= 2 (0), HEURISTIC BETTER needs NEGATIVE at >= 2 (0), so NOT SEPARATED.
+Interpretation:
+1. Under the pre-registered rule learning is not shown to help: the learned head's advantage over the node's own success_ewma is positive and its interval excludes 0 at every point, but it is 0.003-0.005 in absolute success, below the 0.01 floor, and a difference of 0.025 or more is ruled out in either direction. The label is a statement about the floor, not about the sign; the sign is stated here as measured.
+2. Descriptively, H recovers most of C's gain over no trust: H - A is +0.0177 / +0.0344 / +0.0460 / +0.0493 against C - A +0.0211 / +0.0379 / +0.0498 / +0.0538 (5% to 30%).
+3. n_av, n_win and the never-avoided rate (together, D60 Q4): at the shared point C 152.7 / 506.3 / 0.028, H 155.1 / 510.7 / 0.028, A 627.5 / 912.4 / 0.468; the C-vs-H difference in units of A's count is +0.005 [-0.002, +0.012] (n_win) and +0.003 [-0.015, +0.021] (n_av), intervals including 0 at all four points. At 30% H never avoids in 0.8% of runs against C's 0.0%.
+4. Detection latency (descriptive): C 5-10 steps earlier than H at every point, intervals [-34, +15] to [-24, +14] all including 0; all degraded RSUs are detected by both.
+5. D42: every point 250 attempted, 0 failed, 250 aggregated; the C recompute matched S9 bit-for-bit on all 1000 tasks.
+Limits: H's weights were tuned on one seed like every other variant (F32; the surface is flat, spread within draw-to-draw noise); the result is for this scenario and injection model only; it does not revise F17, F27 or any H2 verdict; no mechanism for why the head adds so little is tested.
