@@ -1823,3 +1823,17 @@ D65 is untouched; these fill gaps in it. Items 1-3 were fixed before the number 
 **Alternatives:** editing RELATED_WORK.md in place (rejected: CLAIMS.md must not be edited this session and RELATED_WORK.md's verification record is cited by it); recomputing trust inside the analysis (rejected: slower and no more reproducible).
 
 **Rationale:** each choice is the smallest implementation consistent with D65's text; stating them keeps the pre-registration auditable.
+
+### D67 — Resolution of the S13 decision request: CLAIMS.md re-issued with S13 results (A23-A27, X17-X20), H added to the figures and tables, S14 deferred
+Date: 2026-10-15 | Session: S13b (after S13 design review) | Status: active
+Records the review answers to the S13 decision request. D65, D66, F32-F40 are not edited; nothing is re-run (the figure script only reads stored results).
+
+**Decision:**
+- **Q1: adopt the proposed CLAIMS changes as drafted, with one addition.** New ALLOWED entries A23 (H vs C, NULL, NOT SEPARATED), A24 (mechanism check), A25 (D vs C under staggered onset, NEGATIVE at rho 1.0 and rho 0), A26 (the three verified CVE records, with the wording limits of CVE_VERIFICATION.md), and **A27 (added by review): H - A is +0.018 to +0.049 against C - A at +0.021 to +0.054, so a non-learned behavioural monitor recovers most of the trust-aware gain (F33)**. A20 loses "staggered onset" (tested); A9, A10, A11 gain a cross-reference to A25; A4, A16, A19 gain the H / D65 / S13 limits; X13 is lifted only for the three records and only with A26's wording; new FORBIDDEN X17-X20. CLAIMS.md is re-issued, not silently edited, under this entry.
+- **Q2: report A23 as drafted, and add H as a labelled extra baseline** (own colour, "extra baseline", not highlighted) to Figures 3 and 4 and to the ablation tables (shared point with its detection figures, all-points at the four fraction points, paired effects "C vs H" with the shared-point D65 label), through `scripts/make_figures.py` only. H appears at the four fraction-sweep points only, as Gate-C does; no existing number changes (the regenerated rows equal the previous ones), and the byte-identical re-run test passes. This extends D61/D62 to H; it does not change them.
+- **Q3: the dilution hypothesis (F19) is to be tested as one labelled, pre-registered study in a separate session, S14, not in S13b.** Its design is fixed by design review and was not included in the review message that carries this answer; S14 is not started, and no design is assumed here. Until it runs, dilution stays an untested hypothesis (A20, X10).
+- **Q4: the process disclosure is accepted.** The per-epoch printed AUC window mismatch under staggered onset is recorded in F41 as print-only (never in loss, early stopping or selection). Experiment 1's 112-minute wall time is a machine-sharing fact (D66 item 6), not a result.
+
+**Alternatives:** adopting without A26/X13 lift (rejected by review); drawing H only in the tables (rejected: Figures 3 and 4 are where a reviewer will look for it); running the S14 test now (deferred by review).
+
+**Rationale:** the claims gate must carry the S13 verdicts at their measured strength, including the uncomfortable one (H recovers most of the gain), before any paper text is drafted.
