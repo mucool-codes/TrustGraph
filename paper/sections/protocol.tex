@@ -1,0 +1,56 @@
+\section{Experimental Protocol}
+\label{sec:protocol}
+
+\paragraph*{Pre-registration}
+Each comparison in this paper has a rule that was written down, with its metric, windows, floor, bound and verdict labels, in the project's decision log (\texttt{DECISIONS.md}) and committed to the repository \emph{before} the numbers it judges were committed.
+% src: A16, R6
+Table~\ref{tab:prereg} lists the six pre-registrations, what each fixed, and the commits that establish the order.
+The order is evidenced by commit hashes and commit-log times only (all times $+0530$, 2026-10-13 to 2026-10-15).
+% src: A16 as amended by the S12 addendum: commit hashes and commit-log times only; file-timestamp and script-log times are not used.
+
+\begin{table*}[t]
+\centering
+\caption{Pre-registrations. ``Rule'' is the commit that introduced the decision entry; ``numbers'' is the first commit that records a number the rule judges.}
+\label{tab:prereg}
+\small
+\begin{tabular}{@{}lp{6.6cm}p{3.3cm}p{4.4cm}@{}}
+\toprule
+Entry & What it fixed & Rule (commit, time) & Numbers (commit, time) \\
+\midrule
+% src: git log (commit hashes and commit-log times), DECISIONS.md D43, D54, D56, D57, D59, D65, D68; A16
+D43 & H2 conditions, the diagnostic-AUC metric over steps $[450,650)$, the verdict rule (WIN needs, among further conditions, a paired gain $\ge 0.02$ at $\rho=1$; NEGATIVE needs $\le -0.02$; NULL rules out $0.05$), seeds 1--5, draws 100--149 & 291a764, 10-13 10:57:40 (before any training) & 09cc126 (F16), 10-14 00:02:28 \\
+D54 & Layer-2 attribution protocol: units, perturbation size $0.3$, floors $0.20$ and $0.05$, stability threshold $0.80$, the neighbour-clause rule, a $100$\,ms timing assumption & aa97280, 10-14 15:57:15 & 3487836 (F24), 10-14 16:15:56 \\
+D56 + D57 & the sweeps, the H1 and H3 metrics, the comparisons and the WIN/NULL/NOISY rule; D57 only re-normalised the H1 effect by A's count, because the oracle's count is zero by construction, and the entry records that it was written before any evaluation draw produced a result & 26e6e79 (D56), 10-14 16:53:33; 9f2a8f9 (D57), 10-14 17:05:45 & 0b6585e (F26), 10-14 17:59:53 \\
+D59 & Gate-C: the $\tau$ grid and its tuning, the evaluation points, the ``weighted beats gate'' criterion & 3710795, 10-14 19:26:16 & 86b3a20 (first Gate-C code), 19:29:33; eead7f1 (F28, tuning grid), 19:29:55; ea44011 (F29, results), 19:37:51 \\
+D65 & heuristic H (weights by the D52 procedure; verdict rule), staggered onset ($S=300$), the mechanism check that gates Experiment 2, the latency rule with a $\pm 20$-step band & 245705b, 10-15 09:16:12 & 776beff (F32, H tuning grid), 09:21:52; b2c09c7 (F35, mechanism check), 12:06:23 \\
+D68 & the contained head D2 (architecture, parameter counts), draws 250--299, the primary latency rule ($\pm 20$ steps), no further architecture experiment & ac72b82, 10-15 13:34:48 & fd167d5 (F43, tuning grids), 14:37:34; e74a1a0 (F44, results), 17:22:46 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+D57 was a correction made before the evaluation, not a change of rule after it: the harness smoke test (reserved debugging draws, not results) had exposed a zero denominator in the H1 formula, and the amendment changes only that formula; every floor, bound and window of D56 stands.
+% src: A16 (D57 = single amendment made before any evaluation draw ran), X14 (describe D57 only as a pre-evaluation correction); D57 text
+For the staggered-onset and D2 experiments, D65 and D68 additionally fix a single pre-declared extension if a primary verdict is NOISY; it was not triggered in either.
+% src: D65 section 2.5, D68 section 4; A25 (extension not triggered), F45
+
+\paragraph*{Seeds, draws, labels}
+Seeds 1--5 with frozen checkpoints; evaluation draws 100--149 (the sweeps), 200--249 (staggered onset) and 250--299 (D2); training draws are below 100; the tuning seed (100) and the demo draw (seed 100, draw 7) are excluded from every evaluation.
+% src: A16, A25, A28
+The unit of analysis is the seed: per-seed means of per-draw paired differences, with 95\% Student-$t$ intervals over 5 seeds (4 degrees of freedom).
+We use no $p$-values and no multiplicity correction; ``the interval excludes $0$'' and ``lies above the floor'' are the only inferential statements.
+% src: A16, X11
+Draws within a seed share a model and traffic and are not independent samples, so no draw-level standard error is reported.
+Every sweep point reports 250 draws attempted, 0 failed and 250 aggregated, except where a section states otherwise (draws with no late-onset RSU are not aggregated in the staggered latency primary).
+% src: A16 (D42 accounting: 250 attempted, 0 failed, 250 aggregated); A25, A28 (164 / 183 aggregated at rho 0)
+
+\paragraph*{Verdict labels}
+The rules share one form, with the exact conditions in the cited entries: with a floor $f$ and a bound $b$ fixed in advance, an effect with interval $[lo,hi]$ is WIN if $lo>0$ and the mean is at least $f$; NEGATIVE if $hi<0$ and the mean is at most $-f$; NULL if neither holds and the interval rules out an effect of size $b$; and NOISY otherwise.
+% src: D43 section 4, D56 section 4, D59 section 4, D65 sections 1.4 and 2.5, D68 section 4 (the shared form; floors differ per metric)
+The floors are $0.02$ (AUC), $0.01$ (success), $0.10$ of A's count (dispatches) and $20$ steps (latency), and are stated assumptions.
+% src: D43 (0.02), D56 (H3 floor 0.01, H1 floor 0.10), D65/D68 (20 steps)
+We quote each label together with the signed difference and its interval, and a label that is NULL under a floor is not a statement that the difference is zero.
+% src: R4, X18 (the NULL label states a floor, not a sign)
+
+\paragraph*{Disclosure}
+The S14 session was interrupted once after the closed-loop runs and raw tables had been produced and before their raw results were committed; the results were regenerated from the stored files by the same commands, and nothing was re-run or re-tuned.
+% src: D69 item 6 (process disclosure). NOT an A-entry: see S12 report.

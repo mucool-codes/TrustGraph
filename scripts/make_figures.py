@@ -446,23 +446,31 @@ def fig_explanation() -> None:
 
 
 # ------------------------------------------------------------------ tables
-def write_table(name: str, header: list[str], rows: list[list[str]], caption: str, note: str = "") -> None:
+def write_table(name: str, header: list[str], rows: list[list[str]], caption: str, note: str = "", wide: bool = False) -> None:
     TAB.mkdir(parents=True, exist_ok=True)
+    plain = [[c.replace("\n", " ") for c in r] for r in rows]  # a newline inside a cell is a two-line cell in the .tex only
     with (TAB / f"{name}.csv").open("w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh); w.writerow(header); w.writerows(rows)
+        w = csv.writer(fh); w.writerow(header); w.writerows(plain)
     md = [f"**{caption}**", "", "| " + " | ".join(header) + " |", "|" + "|".join("---" for _ in header) + "|"]
-    md += ["| " + " | ".join(r) + " |" for r in rows]
+    md += ["| " + " | ".join(r) + " |" for r in plain]
     if note:
         md += ["", note]
     (TAB / f"{name}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     esc = lambda s: s.replace("%", r"\%").replace("&", r"\&").replace("_", r"\_").replace("±", r"$\pm$").replace("✓", r"\checkmark").replace("✗", "--")  # noqa: E731
-    tex = [r"\begin{table}[t]", r"\centering", rf"\caption{{{esc(caption)}}}", rf"\begin{{tabular}}{{l{'r' * (len(header) - 1)}}}", r"\toprule",
-           " & ".join(esc(h) for h in header) + r" \\", r"\midrule"]
-    tex += [" & ".join(esc(c) for c in r) + r" \\" for r in rows]
+    paper = name.startswith("paper_")  # S12 paper tables: labelled, and shrunk to the column / page width only if wider than it
+    env = "table*" if wide else "table"  # wide = two-column paper layout (S12); the default layout is unchanged
+    tex = [rf"\begin{{{env}}}[t]", r"\centering", rf"\caption{{{esc(caption)}}}"]
+    tex += [rf"\label{{tab:{name}}}"] if paper else []
+    fit = r"\textwidth" if wide else r"\columnwidth"
+    tex += [r"\resizebox{\ifdim\width>" + fit + " " + fit + r"\else\width\fi}{!}{%"] if paper else []
+    tex += [rf"\begin{{tabular}}{{l{'r' * (len(header) - 1)}}}", r"\toprule", " & ".join(esc(h) for h in header) + r" \\", r"\midrule"]
+    cell = lambda c: (r"\shortstack[r]{" + r" \\[0pt] ".join(esc(x) for x in c.split("\n")) + "}") if "\n" in c else esc(c)  # noqa: E731
+    tex += [" & ".join(cell(c) for c in r) + r" \\" for r in rows]
     tex += [r"\bottomrule", r"\end{tabular}"]
+    tex += ["}"] if paper else []
     if note:
         tex += [rf"\par\smallskip\footnotesize {esc(note)}"]
-    tex += [r"\end{table}"]
+    tex += [rf"\end{{{env}}}"]
     (TAB / f"{name}.tex").write_text("\n".join(tex) + "\n", encoding="utf-8")
     print(f"  wrote results/s10/tables/{name}.md .csv .tex")
 
@@ -552,6 +560,197 @@ def tables(T, P, GT, HH) -> None:
                 "The structure-aware mark for this work records that message passing is implemented, not that it helped: H2 was tested and not supported (S4).")
 
 
+# ------------------------------------------------------------------ S12: tables of the paper (tables only; no figure is redrawn)
+import re  # noqa: E402
+
+S13 = REPO_ROOT / "results" / "s13"
+S14 = REPO_ROOT / "results" / "s14"
+_NUM = r"([+-]?\d+\.\d+)"
+_CI = rf"{_NUM} \(sd [\d.]+\) 95% \[{_NUM}, {_NUM}\]"
+
+
+def _ci(m_, lo, hi) -> str:
+    return f"{m_} [{lo}, {hi}]"
+
+
+def _read_report(path: Path) -> list[str]:
+    if not path.exists():
+        raise SystemExit(f"{path} missing: it is written by the S13/S14 report commands (scripts/s13_stag.py, scripts/s14_d2.py)")
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def _latency_blocks(path: Path, who: str) -> dict:
+    """{rho: {"C": str, who: str, "diff": "m [lo, hi]", "label": str, "auc": "m [lo, hi] or None"}} from a stored staggered-onset report.
+
+    Strings are copied verbatim from the report, so the table cannot differ from the report in rounding.
+    """
+    out, rho = {}, None
+    for ln in _read_report(path):
+        h = re.match(r"rho (\d)\s+\((CONTROL|TEST)\)", ln)
+        if h:
+            rho = h.group(1)
+            out[rho] = {"auc": None}
+            continue
+        if rho is None:
+            continue
+        m_ = re.search(rf"detection latency .*: C ([\d.]+) \+/- [\d.]+\s+{who} ([\d.]+) \+/- [\d.]+", ln)
+        if m_:
+            out[rho]["C"], out[rho][who] = m_.group(1), m_.group(2)
+        m_ = re.search(rf"PRIMARY\s+{who} - C latency: {_CI}\s+(\w+)", ln)
+        if m_:
+            out[rho]["diff"], out[rho]["label"] = _ci(*m_.group(1, 2, 3)), m_.group(4)
+        m_ = re.search(rf"\(secondary\) window AUC: .*{who} - C {_NUM} \(sd [\d.]+\) 95% \[{_NUM}, {_NUM}\]", ln)
+        if m_:
+            out[rho]["auc"] = _ci(*m_.group(1, 2, 3))
+    return out
+
+
+def _shared_auc(path: Path) -> dict:
+    """{rho: ("m [lo, hi]", label)} for S14 secondary (a), D2 minus C diagnostic AUC on the shared regime."""
+    out, rho, on = {}, None, False
+    for ln in _read_report(path):
+        on = on or "SECONDARY (a)" in ln
+        h = re.match(r"rho (\d)\s", ln)
+        if on and h:
+            rho = h.group(1)
+        m_ = re.search(rf"D2 - C: {_CI}\s+(\w+)", ln)
+        if on and rho is not None and m_:
+            out[rho] = (_ci(*m_.group(1, 2, 3)), m_.group(4))
+    return out
+
+
+def _s14_closed(path: Path) -> dict:
+    """{regime: {"diff": "m [lo, hi]", "label": str, "A"/"C"/"D2": (n_av, n_win, never)}} from the S14 closed-loop verdict report."""
+    out, reg = {}, None
+    for ln in _read_report(path):
+        h = re.match(r"--- regime (\w+):", ln)
+        if h:
+            reg = h.group(1)
+            out[reg] = {}
+            continue
+        if reg is None:
+            continue
+        m_ = re.search(rf"^\s+D2 - C: {_CI}\s+(\w+)", ln)
+        if m_:
+            out[reg]["diff"], out[reg]["label"] = _ci(*m_.group(1, 2, 3)), m_.group(4)
+        m_ = re.match(r"\s+(A|C|D2)\s+n_av\s+([\d.]+) \+/-\s+[\d.]+\s+n_win\s+([\d.]+) \+/-\s+[\d.]+\s+never-avoided ([\d.]+)", ln)
+        if m_:
+            out[reg][m_.group(1)] = m_.group(2, 3, 4)
+    return out
+
+
+def _s13_closed(path: Path) -> dict:
+    """{rho: "m [lo, hi]"} of D minus C closed-loop post-onset success under staggered onset (descriptive, no label)."""
+    out, rho = {}, None
+    for ln in _read_report(path):
+        h = re.match(r"rho (\d)\s+attempted", ln)
+        if h:
+            rho = h.group(1)
+        m_ = re.search(rf"^\s+D - C: {_CI}", ln)
+        if m_ and rho is not None:
+            out[rho] = _ci(*m_.group(1, 2, 3))
+    return out
+
+
+def paper_tables(T, GT, HH) -> None:
+    S = T[SHARED]
+    # (1) ablation at the shared point, H1 triplet always together (R2)
+    rows = []
+    for v, src in (("A", "A"), ("B", "B"), ("B_oracle", "B_oracle"), ("C", "C"), ("D", "D"), ("E", "D")):
+        s = S[src]
+        rows.append([{"B_oracle": "B-oracle (upper bound)", "E": "E (= D)", "B": "B (= A here)"}.get(v, v), pm(s["success_post_onset"]), pm(s["n_av"], 0),
+                     pm(s["n_win"], 0), pm(s["never_avoided"], 2), "never" if s["detected_fraction"][0] == 0 else pm(s["latency"], 0),
+                     pm(s["detected_fraction"], 2)])
+    g = GT["T"][SHARED]
+    rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["n_av"], 0), pm(g["n_win"], 0), pm(g["never_avoided"], 2), "not reported", "not reported"])
+    h = HH["T"][SHARED]
+    rows.append(["H (extra baseline)", pm(h["success_post_onset"]), pm(h["n_av"], 0), pm(h["n_win"], 0), pm(h["never_avoided"], 2), pm(h["latency"], 0),
+                 pm(h["detected_fraction"], 2)])
+    write_table("paper_ablation_shared_point",
+                ["Variant", "Success after onset", "n_av", "n_win", "Never avoided", "Detection latency (steps)", "Degraded RSUs detected"], rows,
+                "Closed-loop dispatch at the shared point (rho 1.0, 20% degraded), in this simulation: mean ± sd across 5 seeds",
+                "n_av: dispatches to degraded RSUs from onset to the run's own avoidance step; n_win: the same over the fixed window [400, 1200); never avoided: fraction of runs "
+                "that never reach the avoidance rule (the three are always read together). Detection latency is descriptive and censored at 399 steps; A and B cannot detect by construction. "
+                "Source: results/s10/tables/ablation_shared_point (F26, F29, F33).", wide=True)
+
+    # (2) effects against the references at the four fraction-sweep points
+    verdict = json.loads((S9 / "summary-verdict.json").read_text(encoding="utf-8"))["verdicts"]
+    fr = (0.05, 0.10, 0.20, 0.30)
+    eff = lambda e: f"{e['mean']:+.4f}\n[{e['lo']:+.4f}, {e['hi']:+.4f}] {e['label']}"  # noqa: E731
+    rows = [[f"{x} minus {ref}".replace("B_oracle", "B-oracle")] + [eff(verdict[f"1.00/{f:.2f}"][f"{x}_vs_{ref}"]["H3"]) for f in fr]
+            for x, ref in (("C", "A"), ("D", "A"), ("C", "B_oracle"), ("D", "B_oracle"), ("D", "C"))]
+    rows.append(["C minus Gate-C (extra baseline)"] + [f"{e.mean:+.4f}\n[{e.lo:+.4f}, {e.hi:+.4f}] {e.label}" for e in (GT["paired"][(1.0, round(f, 2))] for f in fr)])
+    rows.append(["C minus H (extra baseline)"] + [f"{m_:+.4f}\n[{lo:+.4f}, {hi:+.4f}] {lab}" for m_, lo, hi, lab in (HH["paired"][(1.0, round(f, 2))] for f in fr)])
+    rows.append(["H minus A (descriptive)"] + [f"{e.mean:+.4f}\n[{e.lo:+.4f}, {e.hi:+.4f}]" for e in (HH["vs_a"][(1.0, round(f, 2))] for f in fr)])
+    write_table("paper_fraction_effects", ["Paired difference in post-onset success"] + [f"{int(f * 100)}% degraded" for f in fr], rows,
+                "Paired differences in post-onset deadline success at rho 1.0, in this simulation: mean [95% t-interval over 5 seeds] and the pre-registered label",
+                "Labels from the rules fixed in D56 (rows 1-5), D59 (Gate-C) and D65 (H); floor 0.01. D minus C is the closed-loop secondary check of H2 and is never gating. "
+                "H minus A is descriptive (no pre-registered label). Source: results/s10/tables/paired_effects_shared_point and results/s9, results/s9b, results/s13/h (F26, F27, F29, F33).", wide=True)
+
+    # (2b) the rho sweep at 20% degraded: success only (Gate-C and H were not run at these points, D59 and D65)
+    rows = []
+    for rho in (0.0, 0.25, 0.5, 0.75, 1.0):
+        s_ = T[(round(rho, 2), 0.20)]
+        rows.append([f"{rho:g}"] + [pm(s_[v]["success_post_onset"]) for v in ("A", "B_oracle", "C", "D")])
+    write_table("paper_rho_sweep", ["rho", "A", "B-oracle (upper bound)", "C", "D"], rows,
+                "Post-onset deadline success along the correlation sweep (20% degraded), in this simulation: mean ± sd across 5 seeds",
+                "Gate-C and H were run at the four fraction-sweep points only (D59, D65) and are not part of this sweep. B = A and E = D. "
+                "Source: results/s10/tables/ablation_all_points (F26).")
+
+    # (3) every graph-versus-node-local test, in the order it was run
+    S4j = json.loads((S4 / "summary-5seeds.json").read_text(encoding="utf-8"))["sweep"]
+    d43 = lambda r: f"{S4j[r]['delta'][0]:+.4f} [{S4j[r]['delta'][2]:+.4f}, {S4j[r]['delta'][3]:+.4f}]"  # noqa: E731
+    sh = verdict["1.00/0.20"]["D_vs_C"]["H3"]
+    sh0 = verdict["0.00/0.20"]["D_vs_C"]["H3"]
+    L13 = _latency_blocks(S13 / "stag" / "report-eval-verdict.txt", "D")
+    L14 = _latency_blocks(S14 / "report-eval-verdict-5seeds.txt", "D2")
+    A14 = _shared_auc(S14 / "report-eval-verdict-5seeds.txt")
+    C14 = _s14_closed(S14 / "report-closed-verdict.txt")
+    C13 = _s13_closed(S13 / "stag" / "report-closed.txt")
+    rows = [
+        ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "1.0", d43("1.00"), "NEGATIVE (D43)"],
+        ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "0", d43("0.00"), "no separate label (D43 judges rho 1.0)"],
+        ["S9", "shared", "D minus C", "closed-loop post-onset success", "1.0", f"{sh['mean']:+.4f} [{sh['lo']:+.4f}, {sh['hi']:+.4f}]", f"{sh['label']} (D56, secondary)"],
+        ["S9", "shared", "D minus C", "closed-loop post-onset success", "0", f"{sh0['mean']:+.4f} [{sh0['lo']:+.4f}, {sh0['hi']:+.4f}]", f"{sh0['label']} (D56, secondary)"],
+        ["S13", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "1.0", L13["1"]["diff"], f"{L13['1']['label']} (D65)"],
+        ["S13", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "0", L13["0"]["diff"], f"{L13['0']['label']} (D65)"],
+        ["S13", "staggered", "D minus C", "closed-loop post-onset success", "1.0", C13["1"], "descriptive"],
+        ["S13", "staggered", "D minus C", "closed-loop post-onset success", "0", C13["0"], "descriptive"],
+        ["S14", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "1.0", L14["1"]["diff"], f"{L14['1']['label']} (D68, primary)"],
+        ["S14", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "0", L14["0"]["diff"], f"{L14['0']['label']} (D68)"],
+        ["S14", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "1.0", A14["1"][0], f"{A14['1'][1]} (D68)"],
+        ["S14", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "0", A14["0"][0], f"{A14['0'][1]} (D68)"],
+        ["S14", "shared", "D2 minus C", "closed-loop post-onset success", "1.0", C14["shared"]["diff"], f"{C14['shared']['label']} (D68)"],
+        ["S14", "staggered", "D2 minus C", "closed-loop post-onset success", "1.0", C14["stag"]["diff"], f"{C14['stag']['label']} (D68)"],
+    ]
+    write_table("paper_graph_tests", ["Session", "Onset", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
+                "Every test of a graph head against the node-local head C, in this simulation (5 seeds; 95% t-interval over seeds)",
+                "Negative latency means the first-named model detects earlier. The S4, S9, S13 and S14 rules were fixed in D43, D56, D65 and D68 before their numbers. "
+                "The staggered-regime heads of S13 and S14 were trained on the staggered regime; the S4 and S9 heads on the shared-onset regime. Sources: F17, F26/F27, F37/F38, F40, F44/F45 "
+                "(results/s4/summary-5seeds.json, results/s9/summary-verdict.json, and the stored S13/S14 report files).", wide=True)
+
+    # (4) H1 triplet for D2 in both regimes (A28)
+    rows = []
+    for reg, name in (("shared", "shared onset"), ("stag", "staggered onset")):
+        for v in ("A", "C", "D2"):
+            n_av, n_win, nv = C14[reg][v]
+            rows.append([name, v, n_av, n_win, nv])
+    write_table("paper_d2_dispatch", ["Regime", "Variant", "n_av", "n_win", "Never avoided"], rows,
+                "Dispatches to degraded RSUs at the shared point, draws 250-299, in this simulation (mean over 5 seeds of per-seed means; n_av, n_win and the never-avoided rate together)",
+                "D2 is the contained graph head of D68; D was not run on draws 250-299. A is identical in both regimes. Source: results/s14/report-closed-verdict.txt (F44, F45).")
+
+    # (5) per-decision time by component (A14), medians only
+    o = json.loads((S9 / "overhead.json").read_text(encoding="utf-8"))["timing"]
+    comp = [("trust_inference", "Trust inference"), ("selection", "Selection (rule)"), ("layer1", "Layer 1"), ("layer2_per_decision", "Layer 2")]
+    rows = []
+    for c, lab in comp:
+        f = (lambda v: f"{v:.0f}") if c == "layer2_per_decision" else (lambda v: f"{v:.2f}")
+        rows.append([lab, f(o["threads1"][c]["median"]), f(o["threads10"][c]["median"])])
+    write_table("paper_latency", ["Component", "Median, 1 thread (ms)", "Median, 10 threads (ms)"], rows,
+                "Per-decision time by component, median over 200 decisions at the shared point, in this simulation",
+                "13th Gen Intel i5-13450HX, CPU only, one decision at a time. Layer 2 is judged against a stated 100 ms assumption: asynchronous only. Source: results/s10/tables/latency_breakdown (F24, F26).")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--recompute", action="store_true", help="rebuild the cached closed-loop inputs of Figures 2 and 6")
@@ -562,6 +761,7 @@ def main() -> int:
     fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P, GT, HH); fig_ablation(T, P, GT, HH); fig_s4_gap(); fig_explanation()
     print("tables:")
     tables(T, P, GT, HH)
+    paper_tables(T, GT, HH)
     return 0
 
 

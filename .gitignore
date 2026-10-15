@@ -57,3 +57,9 @@ plots/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ---- Local tools (S12) ----
+tools/
+paper/*.aux
+paper/*.log
+paper/*.out
