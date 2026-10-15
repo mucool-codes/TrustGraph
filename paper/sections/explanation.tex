@@ -33,7 +33,7 @@ This describes how the fixed rule behaved in this one scenario; it carries no in
 \label{sec:layer2}
 Layer 2 applies GNNExplainer to the trust head only, never to the selection rule, and attributes the trust of the winner and of the runner-up to input units; it is an attribution, not a causal account.
 % src: A13 (L11); D54 section 1
-\TODO{cite GNNExplainer (not in the verified reference set of RELATED\_WORK.md)}
+GNNExplainer is that of Ying et al.~\cite{ying}, as implemented in PyTorch Geometric~\cite{fey}.
 The fidelity test (D54, fixed before any number) perturbs one (node, feature) unit by $0.3$ toward the other end of its range and asks whether the explained RSU's trust moves by at least $0.05$ (\emph{trust change}) or whether the dispatch decision flips (\emph{decision change}); the \emph{top} unit is compared with a random unit drawn from the lower half of the receptive field, and the gap between the two rates is the result.
 % src: D54 sections 2, 3 and 5
 The floors are $0.20$ for the trust-change gap and $0.05$ for the decision-change gap, and both are stated assumptions.

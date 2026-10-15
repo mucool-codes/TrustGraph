@@ -1,19 +1,19 @@
 \begin{abstract}
-% Every claim here is an ALLOWED entry of CLAIMS.md; sources in comments.
+% Every claim here is an ALLOWED entry of CLAIMS.md; sources in comments. At most 250 words (checked by the S12b build notes).
 A certificate says who a roadside fog node is, not whether it is working correctly now.
 We study task offloading from vehicles to roadside fog nodes (RSUs) with a behavioural trust layer:
 a trust head, trained self-supervised from observed task outcomes, scores each RSU,
 and a fixed weighted rule over trust, latency and load selects the target; each selection has an exactly decomposable explanation. % src: A1, A2, A12
-All evaluation rules were fixed and committed before the numbers they judge. % src: A16 (commit order)
+Each primary comparison's evaluation rule was committed before the numbers it judges. % src: A16 (commit order)
 In this simulation (synthetic road grid, 20 RSUs, 60 vehicles, injected per-segment degradation, 5 seeds), % src: A3
-both a node-local head (C) and a graph neural network head (D) raise post-onset deadline success over a tuned no-trust baseline at all four degraded fractions, % src: A5
-by 0.021 to 0.054 for C and 0.016 to 0.039 for D, % src: A5; F26
+a node-local head (C) and a graph neural network head (D) both raise post-onset deadline success over a tuned no-trust baseline at all four degraded fractions % src: A5
+(C by 0.021--0.054, D by 0.016--0.039), % src: A5; F26
 and C comes within 0.001--0.003 of a perfect-knowledge oracle. % src: A6; F27
-Graph structure was tested and is not supported: D did not beat C on the pre-registered diagnostic, in the closed loop, or under staggered onset, and a contained graph head was not distinguishable from C. % src: A9, A10, A25, A28
-A non-learned heuristic that uses each RSU's own success EWMA comes within 0.003--0.005 of C (pre-registered verdict: not separated), % src: A23
-and removing candidates below a trust threshold performed equivalently to the weighted rule on task success. % src: A15
+The graph head D was worse than C on the pre-registered diagnostic and under staggered onset, and not better in the closed loop; a contained graph head was not distinguishable from C. % src: A9, A10, A25, A28
+A non-learned behavioural monitor, using each RSU's own success EWMA, recovers most of the trust-aware gain and comes within 0.003--0.005 of C (pre-registered verdict: not separated). % src: A27, A23
+Removing candidates below a trust threshold performed equivalently to the weighted rule on task success. % src: A15
 The attribution layer on the trust head is weakly faithful, unstable across runs, and asynchronous only (about 310~ms per decision). % src: A13, A14
-We report these null and negative results at the same level of detail as the positive ones.
+Null and negative results are reported at the same level of detail as positive ones.
 \end{abstract}
 
 \begin{IEEEkeywords}

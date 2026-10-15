@@ -18,7 +18,7 @@ Both heads are trained on the identical self-supervised objective and read the s
 \emph{C} is a node-local MLP over the RSU's own six feature values and never sees a neighbour.
 \emph{D} is a 2-layer GINEConv over the graph, with message passing along all four edge features; C is matched to D in depth and width.
 % src: A4 (C node-local MLP; D 2-layer GINEConv); D44 (C matches D's depth and width); A9 ("capacity-matched node-local head")
-\TODO{cite GINEConv (not in the verified reference set of RELATED\_WORK.md)}
+The edge-aware GIN layer (GINEConv) follows~\cite{hu}, and the heads and the explainer are implemented with PyTorch Geometric~\cite{fey}.
 Both emit trust through a sigmoid.
 The target is next-task success: whether the RSU completes the next task assigned to it within its deadline.
 The loss is binary cross-entropy, and the injected behaviour class never enters a loss or a feature vector.
