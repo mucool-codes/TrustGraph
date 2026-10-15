@@ -14,7 +14,8 @@ NEEDED = [REPO / "results" / "s9" / "results_table.csv", REPO / "results" / "s9b
           REPO / "results" / "s10" / "timeline.npz", REPO / "results" / "s10" / "example.json"]
 FIGURES = ["fig1_architecture", "fig2_trust_timeline", "fig3_success_vs_fraction", "fig4_ablation",
            "fig5_s4_gap_vs_correlation", "fig6_explanation"]
-TABLES = ["ablation_shared_point", "ablation_all_points", "paired_effects_shared_point", "latency_breakdown", "related_work"]
+TABLES = ["ablation_shared_point", "ablation_all_points", "paired_effects_shared_point", "latency_breakdown", "related_work",
+          "paper_ablation_shared_point", "paper_fraction_effects", "paper_rho_sweep", "paper_graph_tests", "paper_d2_dispatch", "paper_latency"]
 
 
 def _hashes():
