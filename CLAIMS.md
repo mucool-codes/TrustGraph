@@ -1,7 +1,7 @@
 # CLAIMS.md
 
 **What this paper may and may not say.** Written in S11a from F16-F31 and D43-D62 (and the locked decisions
-L1-L12 of PROJECT_SPEC.md); extended in S13b with the S13 results (F32-F40) under D67; extended in S14b with the S14 results (F42-F45) under D70. Status: **DRAFT for design review. S12 must not start until this file is approved.**
+L1-L12 of PROJECT_SPEC.md); extended in S13b with the S13 results (F32-F40) under D67; extended in S14b with the S14 results (F42-F45) under D70; extended in S15b with the S15 results (F46-F49) under D74. Status: **DRAFT for design review. S12 must not start until this file is approved.**
 Once approved, a change needs a new numbered DECISIONS entry (the next free number) saying what changed and why;
 this file is then re-issued, never silently edited.
 
@@ -199,6 +199,14 @@ Descriptive: the pre-registered comparison is A23.
 **A28. D2, a contained graph head, was not distinguishable from C.** In this simulation, a contained graph head D2 (C's node-local branch plus a mean over same-segment RSU neighbours only, no vehicle nodes, neighbour weights initialised to zero, 1570 parameters against C's 1313) was not distinguishable from C. D2 minus C detection latency of late-onset RSUs under staggered onset is -1.7 [-7.0, +3.5] steps at rho 1.0 and -0.8 [-4.0, +2.5] at rho 0, both labelled NULL, so a 20-step difference either way is ruled out. Shared-onset diagnostic AUC D2 minus C is +0.0012 [-0.0018, +0.0043] (rho 1.0) and -0.0008 [-0.0043, +0.0026] (rho 0), NULL. Closed-loop post-onset success D2 minus C is +0.0003 [-0.0002, +0.0009] (shared) and +0.0004 [-0.0001, +0.0008] (staggered), NULL (95% t-intervals over 5 seeds). n_av, n_win and the never-avoided rate are quoted together (R2): shared regime C 132.9 / 499.3 / 0.004, D2 116.9 / 479.2 / 0.004; staggered regime C 217.0 / 561.5 / 0.004, D2 232.3 / 577.7 / 0.004 (A 627.1 / 907.1 / 0.488 in both). D42: 250 draws attempted and 0 failed at every point; aggregated 250 except the rho 0 latency control (183, draws with no late-onset RSU are not aggregated). Draws 250-299, 5 seeds, pre-registered in D68. Descriptively, the unconstrained D trailed C under staggered onset (A25, draws 200-249), while D2, which keeps C's own-node branch, matched C (draws 250-299). D and D2 were not compared directly on the same draws.
 *Sources:* F42-F45; D68, D69, D70.
 
+### S15: a forward-looking objective (pre-registered in D72)
+
+**A29. D2-h was not distinguishable from C-h under a forward-looking objective.** In this simulation, with heads trained on a forward-looking objective (label 1 if the fraction of an RSU's tasks meeting their deadline in the next 150 steps is below 0.75, windows with fewer than 5 tasks excluded) under staggered onset (S = 300; draws 300-349, 5 seeds), D2-h was not distinguishable from C-h: D2-h minus C-h detection latency of late-onset RSUs is -4.1 [-12.0, +3.7] steps at rho 1.0 and -2.0 [-8.1, +4.1] at rho 0, both labelled NULL, so a 20-step difference either way is ruled out. D42: rho 1.0 250 attempted, 0 failed, 250 aggregated; rho 0 250 / 0 / 166. Descriptively, the closed-loop post-onset success difference D2-h minus C-h is +0.0020 [+0.0007, +0.0033] (no label), with n_av / n_win / never-avoided A 589.6 / 903.7 / 0.468, C-h 224.8 / 559.9 / 0.020, D2-h 224.0 / 556.9 / 0.020 (always together, R2). D2-h's output depended on its neighbour block in 4 of 5 evaluation seeds (seed 1 did not: 0.0014).
+*Sources:* F46-F49; D72, D73.
+
+**A30. The horizon objective and the node-local head's detection (descriptive).** In this simulation, C-h detected 37.4 steps earlier than C [21.2, 53.5] at rho 1.0 and 34.9 steps earlier [14.1, 55.8] at rho 0 (C-h minus C on the same draws, 300-349; C is the original staggered C of S13 trained on the next-task objective). Descriptive, not pre-registered; each model uses its own pre-onset threshold; false-alarm rates on healthy RSUs were not measured; a confirmatory test follows in S16. No label and no mechanism.
+*Sources:* F48, F49.
+
 ### Protocol
 
 **A16. Pre-registration and statistics.** The H2 rule (D43), the explanation protocol (D54), the sweep, metrics and verdict rule
@@ -209,7 +217,7 @@ of analysis is the seed: per-seed means of per-draw paired differences, 95% Stud
 seeds. No multiplicity correction. D42: the sweeps contain no cold-start RSU; every sweep point reports 250 draws attempted, 0 failed, 250 aggregated
 (S4's cold-start conditions report attempted / infeasible / aggregated per D42). The S13 experiments were pre-registered in D65 (commit 245705b, commit log, 2026-10-15 09:16:12 +0530)
 before any of their numbers: the first Experiment 1 number (the H tuning grid) was produced at 09:20:31 (first-number log written by the script) and recorded in F32 (776beff, commit log, 09:21:52); the first Experiment 2
-number (the mechanism check) at 12:05:28 (first-number log), recorded in F35 (b2c09c7, commit log, 12:06:23). The S14 experiment was pre-registered in D68 (ac72b82, commit log, 2026-10-15 13:34:48 +0530); its first evaluation number (open-loop trust on draws 250-299) was logged by the script at 08:58:01Z = 14:28:01 +0530 (`results/s14/first_number.json`), after the seed-100 tuning grid (14:21:57 +0530, draws 0-2), and its results commit is e74a1a0 (commit log, 17:22:46 +0530). D66 records the implementation choices D65 left open.
+number (the mechanism check) at 12:05:28 (first-number log), recorded in F35 (b2c09c7, commit log, 12:06:23). The S14 experiment was pre-registered in D68 (ac72b82, commit log, 2026-10-15 13:34:48 +0530); its first evaluation number (open-loop trust on draws 250-299) was logged by the script at 08:58:01Z = 14:28:01 +0530 (`results/s14/first_number.json`), after the seed-100 tuning grid (14:21:57 +0530, draws 0-2), and its results commit is e74a1a0 (commit log, 17:22:46 +0530). The S15 experiment was pre-registered in D72 (e7c7d54, commit log, 2026-10-15 18:51:15 +0530); its first evaluation number (open-loop trust on draws 300-349) was logged by the script at 13:33:17Z = 19:03:17 +0530 (`results/s15/first_number.json`), after the seed-100 tuning grid (13:31:56Z), and its raw-results commit is da1b039 (commit log, 19:08:09 +0530). D66 records the implementation choices D65 left open.
 *Sources:* D43, D54, D56, D57, D59, D65, D66, D68, D42; F16, F26, F29, F32, F35, F44; commit log; file timestamps and first-number logs as named.
 
 **A17. Reproducibility.** Every run is reproducible from (config file, seed); figures and tables regenerate from one command and are
@@ -229,13 +237,12 @@ degraded RSUs (D31). The trust heads were trained on Baseline-A (open-loop) disp
 shift (D50 item 5, F21 item 3). Collusion models never saw colluders in training. B-oracle reads sealed truth. The avoidance bar of 0.75 is a stated
 assumption. Seed 1 was trained at the default thread count and seeds 2-5 at 3 threads (D47; inference is not thread-sensitive, F18 check 3).
 Layer 2 uses one explainer run per explanation and a 200-decision sample. Training and evaluation share a seed's traffic and differ only in injection draws (D44). Staggered onset was tested at S = 300 only, with independent uniform
-onsets, one scenario per seed and heads trained on open-loop dispatch (A25). H's weights were tuned on one seed (A23). D2 was tested once, with one neighbour construction, S = 300 and open-loop-trained heads (A28); its weights were tuned on one seed.
+onsets, one scenario per seed and heads trained on open-loop dispatch (A25). H's weights were tuned on one seed (A23). D2 was tested once, with one neighbour construction, S = 300 and open-loop-trained heads (A28); its weights were tuned on one seed. The horizon objective was tested once (H = 150, threshold 0.75, minimum 5 tasks), under staggered onset S = 300, with one D2 construction and weights tuned on one seed (A29).
 *Sources:* PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18.
 
 **A20. Untested future work (stated as such, as hypotheses).** An observation-count feature (D38(d)); other architectures;
-training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a possible cause of D trailing C; the self-supervised objective
-(L3, next-task success of the node itself) rewards current behaviour only, so neighbour evidence that predicts a later failure may have no way to improve the objective (not tested); dilution of D's own-node signal by its aggregation over many neighbours (F19), which was tested for one contained construction in S14 (A28), while dilution in general is untested; cold-start and collusion conditions where a graph model might help; gating a different head.
-None of these, other than the single D2 construction of A28, was run and none may be reported as a finding. (Staggered onset, D31(c), was tested in S13: A24, A25.)
+training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a possible cause of D trailing C; the next-task objective (L3) was departed from once (A29): a forward-looking objective did not let the one D2 construction detect earlier than C-h, and other horizons, thresholds, regression targets and architectures are untested; dilution of D's own-node signal by its aggregation over many neighbours (F19), which was tested for one contained construction in S14 (A28), while dilution in general is untested; cold-start and collusion conditions where a graph model might help; gating a different head.
+None of these, other than the single D2 construction of A28 and the single horizon objective of A29, was run and none may be reported as a finding. (Staggered onset, D31(c), was tested in S13: A24, A25.)
 *Sources:* D47, D49, D60 (Q3), F19, F21, D68, F45.
 
 ### Contribution statement
@@ -308,6 +315,8 @@ where the graph helps / does not help" generalisation.
 
 **X22.** Describing the opposite-signed n_av differences between C and D2 across the two regimes (D57-normalised +0.027 shared, -0.024 staggered, F45) as an effect: they are descriptive, carry no label and come with no success difference.
 
+
+**X23.** That a forward-looking objective lets a graph head use neighbour evidence, or rules out that one for any horizon, threshold or architecture; that the horizon objective improves trust or dispatch in general (A30 is detection latency under one rule); any mechanism for why it moved C-h.
 ---
 
 ## REPORTING CONVENTIONS
