@@ -2492,3 +2492,89 @@ D42 counts: rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs p
 Closed loop, n_av / n_win / never-avoided together (F48): A 589.6 / 903.7 / 0.468, C-h 224.8 / 559.9 / 0.020, D2-h 224.0 / 556.9 / 0.020; D57-normalised (n_C-h - n_D2-h)/n_A +0.001 [-0.013, +0.015] on n_av and +0.003 [-0.001, +0.008] on n_win (descriptive, no label). Success differences against A (descriptive): C-h - A +0.0365 [+0.0268, +0.0463], D2-h - A +0.0385 [+0.0298, +0.0473]. The D2-h - C-h success interval lies above 0 and below the 0.01 floor of the D56 H3 rule; no label is applied to it (D72 section 5).
 Neighbour-block probe (F46): D2-h output depended on the neighbour block (>= 0.01) in 4 of the 5 evaluation seeds and in the tuning seed; seed 1 was 0.0014, below the threshold (reported as D72 prescribes).
 Interpretation (one line): trained to predict the coming 150-step window rather than the next task, a head that sees same-segment RSU neighbours (D2-h) did not detect later-onset RSUs earlier than the node-local head trained the same way (NULL at rho 1.0 and rho 0; 20 steps either way ruled out), so the A20 hypothesis that the next-task objective alone left neighbour evidence nothing to improve is not supported in this simulation for this one horizon objective, threshold and D2 construction. Separately and descriptively, the horizon objective itself moved the node-local head's detection earlier by 35-37 steps against the original C (the two latencies use each model's own pre-onset 1st-percentile threshold, so this is a statement about these models under the D65 rule, not about a threshold-free quantity), with no graph involved. This experiment does not revise F17, F26, F37 or F45 or any H2 verdict, and no mechanism is tested here for why the objective change helps C or why D2-h did not exceed C-h.
+
+### F50 - S16 raw results: frozen C-h (S15, horizon objective) and C (S13, next-task objective), staggered onset, draws 350-399, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Commit: this entry | Pre-registration D76 = 96246a8 (2026-10-15 22:24:12 +0530, commit log; branch pushed before any number). Script: `scripts/s16_confirm.py` at efbe107 (`gen`, `check`, `trust`, `eval`, `closed`, `report`). No training, no tuning: C = checkpoints/s13/s3-seed{1..5}-C.pt, C-h = checkpoints/s15/s3-seed{1..5}-C.pt; weights A and C from weights_staggered.yaml (S13), C-h from weights_horizon.yaml (S15). Harness check before any number (seed 1, rho 1.0, draw 300, an S15 draw, not a result): the S16 open-loop path reproduces the stored S15 C-h and C trust arrays exactly and the S16 closed-loop path the stored S15 C-h closed-loop result exactly. Script-logged UTC times (results/s16/first_number.json): **first evaluation number (open-loop trust on draws 350-399) 2026-10-15T16:59:34Z (= 22:29:34 +0530)**; first closed-loop evaluation result 2026-10-15T17:04:03Z. Each number below was produced once; nothing was changed after the first number.
+D42 counts are in the tables (every point: 250 draws attempted, 0 failed, 250 aggregated; 1000 degraded and 4000 healthy RSUs per rho; closed loop 250 / 0 / 250 per model). Inactive share of RSU-steps in [100, 400): 0 at every seed and rho.
+
+Open loop (CO-PRIMARIES 1 and 2):
+
+```
+======================================================================================================================
+S16 CO-PRIMARIES: staggered onset (S = 300), open-loop frozen C-h (horizon objective, S15) and C (next-task, S13), draws 350-399, fraction 0.20, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a degraded RSU) / degraded RSUs / healthy RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8832 C 0.8461  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 2: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8967 C 0.8602  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 3: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.9270 C 0.8137  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 4: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8530 C 0.8598  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 5: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8680 C 0.8682  inactive share of RSU-steps in [100, 400) 0.0000
+  detection latency, ALL degraded RSUs (steps after own onset, censored 399): C-h 90.9 +/- 6.8   C 129.1 +/- 9.1
+  detected fraction: C-h 1.000  C 1.000
+  CO-PRIMARY 1  C-h - C latency: -38.2 (sd 12.2) 95% [-53.4, -23.1]
+     per seed: [-39.7, -42.2, -55.5, -30.3, -23.5]
+  false-alarm rate, healthy RSUs, any crossing in [100, 1200): C-h 0.3162 +/- 0.1176   C 0.4428 +/- 0.1777
+     (descriptive split) first crossing starting in [100, 400): C-h 0.1077  C 0.1103;   only inside [400, 1200): C-h 0.2085  C 0.3325
+  CO-PRIMARY 2  C-h - C false-alarm rate: -0.1265 (sd 0.2688) 95% [-0.4602, +0.2072]
+     per seed: [-0.0112, 0.0475, 0.0288, -0.1013, -0.5962]
+
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a degraded RSU) / degraded RSUs / healthy RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8832 C 0.8461  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 2: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8967 C 0.8602  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 3: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.9270 C 0.8137  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 4: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8530 C 0.8598  inactive share of RSU-steps in [100, 400) 0.0000
+    seed 5: attempted 50  failed 0  aggregated 50  degraded RSUs 200  healthy RSUs 800  tau C-h 0.8680 C 0.8682  inactive share of RSU-steps in [100, 400) 0.0000
+  detection latency, ALL degraded RSUs (steps after own onset, censored 399): C-h 93.1 +/- 7.1   C 128.9 +/- 9.7
+  detected fraction: C-h 1.000  C 1.000
+  CO-PRIMARY 1  C-h - C latency: -35.7 (sd 14.2) 95% [-53.4, -18.1]
+     per seed: [-36.7, -37.7, -57.6, -26.4, -20.3]
+  false-alarm rate, healthy RSUs, any crossing in [100, 1200): C-h 0.3257 +/- 0.1284   C 0.4430 +/- 0.1842
+     (descriptive split) first crossing starting in [100, 400): C-h 0.1100  C 0.1110;   only inside [400, 1200): C-h 0.2158  C 0.3320
+  CO-PRIMARY 2  C-h - C false-alarm rate: -0.1173 (sd 0.2814) 95% [-0.4667, +0.2322]
+     per seed: [0.0037, 0.0575, 0.0587, -0.0988, -0.6075]
+```
+
+Closed loop (SECONDARY), rho 1.0:
+
+```
+======================================================================================================================
+S16 SECONDARY: closed-loop post-onset success, staggered, rho 1.0, fraction 0.20, draws 350-399, seeds [1, 2, 3, 4, 5] (RAW, descriptive: no labels)
+======================================================================================================================
+weights (alpha, beta, gamma): A (0.0, 0.25, 0.6)  C (2.0, 0.25, 0.15)  C-h (0.25, 0.25, 0.3)  (no new tuning)
+D42: attempted 250 per model  failed 0  aggregated 250
+  A    success 0.8972 +/- 0.0046
+  C    success 0.9346 +/- 0.0065
+  C_h  success 0.9338 +/- 0.0073
+  C_h - C: -0.0008 (sd 0.0012) 95% [-0.0023, +0.0007]
+  C - A: +0.0374 (sd 0.0040) 95% [+0.0324, +0.0424]
+  C_h - A: +0.0366 (sd 0.0049) 95% [+0.0305, +0.0427]
+  n_av / n_win / never-avoided (mean +/- sd over seeds of per-seed means), always together (D60 Q4):
+    A    n_av   589.5 +/-  116.2   n_win   907.1 +/-   17.2   never-avoided 0.440 +/- 0.150
+    C    n_av   245.4 +/-   29.8   n_win   576.5 +/-   42.0   never-avoided 0.024 +/- 0.036
+    C_h  n_av   237.2 +/-   39.9   n_win   565.0 +/-   44.8   never-avoided 0.024 +/- 0.036
+  D57-normalised (n_C - n_C-h)/n_A on n_av: +0.018 [-0.023, +0.058]  (positive = C-h sends fewer to degraded RSUs; descriptive)
+  D57-normalised (n_C - n_C-h)/n_A on n_win: +0.013 [+0.001, +0.025]  (positive = C-h sends fewer to degraded RSUs; descriptive)
+```
+
+### F51 - S16 verdict against D76 and interpretation (written after F50 was committed in f2eb79d)
+Date: 2026-10-15 | Rules exactly as in D76; no rule, threshold, hold, floor, bound, window, draw, model or weight changed. Output: `scripts/s16_confirm.py eval --verdict` (results/s16/report-eval-verdict-5seeds.txt).
+
+| item | quantity (C-h minus C, paired per draw) | mean [95% t, df 4] | D76 label |
+|---|---|---|---|
+| **CO-PRIMARY 1, rho 1.0** | detection latency, all degraded RSUs (steps) | -38.2 [-53.4, -23.1] (C-h 90.9, C 129.1) | **EARLIER** (hi < 0 and mean <= -20) |
+| **CO-PRIMARY 2, rho 1.0** | false-alarm rate, healthy RSUs | -0.1265 [-0.4602, +0.2072] (C-h 0.316, C 0.443) | **NOT ACCEPTABLE** (hi = +0.207 > 0.05) |
+| **OVERALL, rho 1.0** | | | **NOT CONFIRMED** |
+| control, rho 0, co-primary 1 | latency (steps) | -35.7 [-53.4, -18.1] (C-h 93.1, C 128.9) | EARLIER |
+| control, rho 0, co-primary 2 | false-alarm rate | -0.1173 [-0.4667, +0.2322] (C-h 0.326, C 0.443) | NOT ACCEPTABLE |
+| control, rho 0, overall | | | NOT CONFIRMED |
+| SECONDARY, closed loop, rho 1.0 | post-onset success | -0.0008 [-0.0023, +0.0007] (C-h 0.9338, C 0.9346, A 0.8972) | none (descriptive) |
+
+**Verdict (D76 section 6): NOT CONFIRMED.** Co-primary 1 is EARLIER at rho 1.0, but co-primary 2 is NOT ACCEPTABLE, so OBJECTIVE HELPS is not reached; the rho 0 control has the same two labels. No extension was run (D76 section 6 allows none).
+Why co-primary 2 fails: its point estimate is negative (C-h raised fewer false alarms on average), but the interval is wide and its upper end, +0.207, is above the 0.05 bound, so up to about 21 percentage points more false alarms for C-h are not ruled out at 5 seeds. Per-seed C-h - C false-alarm rate at rho 1.0: -0.011, +0.048, +0.029, -0.101, -0.596 (seed 5 carries most of the mean; two seeds positive); at rho 0: +0.004, +0.058, +0.059, -0.099, -0.608. Per-seed C-h - C latency at rho 1.0: -39.7, -42.2, -55.5, -30.3, -23.5 (all five negative); at rho 0: -36.7, -37.7, -57.6, -26.4, -20.3.
+D42 counts: every open-loop point 250 attempted / 0 failed / 250 aggregated, 1000 degraded and 4000 healthy RSUs per rho (4 degraded and 16 healthy per draw); detected fraction 1.000 for both models at both rho; closed loop 250 / 0 / 250 per model.
+Closed loop, n_av / n_win / never-avoided together (F50): A 589.5 / 907.1 / 0.440, C 245.4 / 576.5 / 0.024, C-h 237.2 / 565.0 / 0.024; D57-normalised (n_C - n_C-h)/n_A +0.018 [-0.023, +0.058] on n_av and +0.013 [+0.001, +0.025] on n_win (descriptive, no label). C - A +0.0374 [+0.0324, +0.0424], C-h - A +0.0366 [+0.0305, +0.0427] (descriptive).
+Descriptive facts that bear on reading the rule (no label): (i) under the D65/D76 rule (per-model pre-onset 1st percentile, 10-step hold) a large share of healthy RSUs cross at some step in [100, 1200): C 0.443 and C-h 0.316 at rho 1.0, of which about 0.11 for both models first cross before step 400. This is the first time the rule's false-alarm rate has been measured; it was not measured for D, D2, D2-h or H. (ii) Within a seed, both models' trust over steps 100-399 is identical across the 50 draws and both rho (checked after F50 on seeds 1 and 5, three draws per rho), so tau is a per-seed constant (equal to the F48 values) and the same healthy RSUs account for pre-onset crossings in every draw where they are healthy; the per-draw false-alarm rates within a seed are therefore strongly dependent, and the seed, as pre-registered, is the unit of analysis.
+Interpretation (one line): on fresh draws and over all degraded RSUs, the horizon-trained node-local head again detected degradation earlier than the next-task head by a margin like A30's (38 steps at rho 1.0, 36 at rho 0, EARLIER at both), but the pre-registered condition that this comes without more false alarms is not met at 5 seeds (the false-alarm difference is between -0.46 and +0.21), so the confirmatory verdict is NOT CONFIRMED; the closed-loop success of the two heads did not differ. No mechanism is tested, and this does not revise F17, F26, F37, F45, F49 or any earlier verdict.
