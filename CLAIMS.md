@@ -1,7 +1,7 @@
 # CLAIMS.md
 
 **What this paper may and may not say.** Written in S11a from F16-F31 and D43-D62 (and the locked decisions
-L1-L12 of PROJECT_SPEC.md); extended in S13b with the S13 results (F32-F40) under D67. Status: **DRAFT for design review. S12 must not start until this file is approved.**
+L1-L12 of PROJECT_SPEC.md); extended in S13b with the S13 results (F32-F40) under D67; extended in S14b with the S14 results (F42-F45) under D70. Status: **DRAFT for design review. S12 must not start until this file is approved.**
 Once approved, a change needs a new numbered DECISIONS entry (the next free number) saying what changed and why;
 this file is then re-issued, never silently edited.
 
@@ -73,7 +73,7 @@ B-oracle is described as an upper bound that reads sealed ground truth.
 from onset to the run's own effective-avoidance step), n_win (the fixed window, steps 400-1200, which does not depend on
 the avoidance rule) and the never-avoided rate (fraction of runs that never reach the avoidance rule). At the shared point:
 A n_av 627.5 +/- 100.4, n_win 912 +/- 21, never-avoided 0.47 +/- 0.12; C 153 +/- 48, 506 +/- 75, 0.03 +/- 0.04;
-D 211 +/- 84, 610 +/- 84, 0.03 +/- 0.04; B-oracle 24 +/- 26, 395 +/- 90, 0.01 +/- 0.03. Relative to A (in units of A's count)
+D 210.6 +/- 84.5, 610 +/- 84, 0.03 +/- 0.04; B-oracle 24 +/- 26, 395 +/- 90, 0.01 +/- 0.03. Relative to A (in units of A's count)
 the n_av reduction is +0.756 [+0.676, +0.836] for C and +0.664 [+0.523, +0.806] for D (WIN), and the fixed-window reduction
 is smaller, +0.446 [+0.351, +0.541] and +0.331 [+0.221, +0.442]. Against B-oracle both are NEGATIVE (the oracle is better by
 0.205 and 0.296 of A's count). Detection latency (descriptive, never gating): C 151 +/- 22 steps, D 220 +/- 25 steps after
@@ -194,18 +194,23 @@ the trust-aware gain (F33). Per fraction (5%, 10%, 20%, 30%): H minus A +0.0177,
 Descriptive: the pre-registered comparison is A23.
 *Sources:* F33; D65, D67.
 
+### S14: a contained graph head (pre-registered in D68)
+
+**A28. D2, a contained graph head, was not distinguishable from C.** In this simulation, a contained graph head D2 (C's node-local branch plus a mean over same-segment RSU neighbours only, no vehicle nodes, neighbour weights initialised to zero, 1570 parameters against C's 1313) was not distinguishable from C. D2 minus C detection latency of late-onset RSUs under staggered onset is -1.7 [-7.0, +3.5] steps at rho 1.0 and -0.8 [-4.0, +2.5] at rho 0, both labelled NULL, so a 20-step difference either way is ruled out. Shared-onset diagnostic AUC D2 minus C is +0.0012 [-0.0018, +0.0043] (rho 1.0) and -0.0008 [-0.0043, +0.0026] (rho 0), NULL. Closed-loop post-onset success D2 minus C is +0.0003 [-0.0002, +0.0009] (shared) and +0.0004 [-0.0001, +0.0008] (staggered), NULL (95% t-intervals over 5 seeds). n_av, n_win and the never-avoided rate are quoted together (R2): shared regime C 132.9 / 499.3 / 0.004, D2 116.9 / 479.2 / 0.004; staggered regime C 217.0 / 561.5 / 0.004, D2 232.3 / 577.7 / 0.004 (A 627.1 / 907.1 / 0.488 in both). D42: 250 draws attempted and 0 failed at every point; aggregated 250 except the rho 0 latency control (183, draws with no late-onset RSU are not aggregated). Draws 250-299, 5 seeds, pre-registered in D68. Descriptively, the unconstrained D trailed C under staggered onset (A25, draws 200-249), while D2, which keeps C's own-node branch, matched C (draws 250-299). D and D2 were not compared directly on the same draws.
+*Sources:* F42-F45; D68, D69, D70.
+
 ### Protocol
 
 **A16. Pre-registration and statistics.** The H2 rule (D43), the explanation protocol (D54), the sweep, metrics and verdict rule
 (D56, with the single amendment D57 made before any evaluation draw ran) and the Gate-C protocol (D59) were each committed before the
-numbers they judge (verified from commit order for D59: D59 = 3710795 at 19:26, first Gate-C code = 86b3a20, first Gate-C number (F28) = eead7f1 at 19:29, evaluation results at 19:33).
+numbers they judge (verified for D59 from two clocks. Commit log: D59 = 3710795 at 19:26:16; first Gate-C code = 86b3a20 at 19:29:33; F28 = eead7f1 at 19:29:55; F29 results commit = ea44011 at 19:37:51. File timestamps: the first Gate-C number is `results/s9b/tuning.json` at 19:29:43; the first evaluation result file, `results/s9b/raw/rho1.00-frac0.05/seed1-draw100.json`, at 19:30:06).
 Seeds 1-5 with frozen checkpoints; evaluation draws 100-149; tuning seed 100 and the demo draw excluded from every evaluation. The unit
 of analysis is the seed: per-seed means of per-draw paired differences, 95% Student-t intervals over 5 seeds (df 4). Mean +/- sd is across
 seeds. No multiplicity correction. D42: the sweeps contain no cold-start RSU; every sweep point reports 250 draws attempted, 0 failed, 250 aggregated
-(S4's cold-start conditions report attempted / infeasible / aggregated per D42). The S13 experiments were pre-registered in D65 (commit 245705b, 2026-10-15 09:16:12 +0530)
-before any of their numbers: the first Experiment 1 number (the H tuning grid) was produced at 09:20:31 and recorded in F32 (776beff, 09:21:52); the first Experiment 2
-number (the mechanism check) at 12:05:28, recorded in F35 (b2c09c7, 12:06:23). D66 records the implementation choices D65 left open.
-*Sources:* D43, D54, D56, D57, D59, D65, D66, D42; F16, F26, F29, F32, F35; commit log.
+(S4's cold-start conditions report attempted / infeasible / aggregated per D42). The S13 experiments were pre-registered in D65 (commit 245705b, commit log, 2026-10-15 09:16:12 +0530)
+before any of their numbers: the first Experiment 1 number (the H tuning grid) was produced at 09:20:31 (first-number log written by the script) and recorded in F32 (776beff, commit log, 09:21:52); the first Experiment 2
+number (the mechanism check) at 12:05:28 (first-number log), recorded in F35 (b2c09c7, commit log, 12:06:23). The S14 experiment was pre-registered in D68 (ac72b82, commit log, 2026-10-15 13:34:48 +0530); its first evaluation number (open-loop trust on draws 250-299) was logged by the script at 08:58:01Z = 14:28:01 +0530 (`results/s14/first_number.json`), after the seed-100 tuning grid (14:21:57 +0530, draws 0-2), and its results commit is e74a1a0 (commit log, 17:22:46 +0530). D66 records the implementation choices D65 left open.
+*Sources:* D43, D54, D56, D57, D59, D65, D66, D68, D42; F16, F26, F29, F32, F35, F44; commit log; file timestamps and first-number logs as named.
 
 **A17. Reproducibility.** Every run is reproducible from (config file, seed); figures and tables regenerate from one command and are
 byte-identical on re-run.
@@ -224,14 +229,14 @@ degraded RSUs (D31). The trust heads were trained on Baseline-A (open-loop) disp
 shift (D50 item 5, F21 item 3). Collusion models never saw colluders in training. B-oracle reads sealed truth. The avoidance bar of 0.75 is a stated
 assumption. Seed 1 was trained at the default thread count and seeds 2-5 at 3 threads (D47; inference is not thread-sensitive, F18 check 3).
 Layer 2 uses one explainer run per explanation and a 200-decision sample. Training and evaluation share a seed's traffic and differ only in injection draws (D44). Staggered onset was tested at S = 300 only, with independent uniform
-onsets, one scenario per seed and heads trained on open-loop dispatch (A25). H's weights were tuned on one seed (A23).
+onsets, one scenario per seed and heads trained on open-loop dispatch (A25). H's weights were tuned on one seed (A23). D2 was tested once, with one neighbour construction, S = 300 and open-loop-trained heads (A28); its weights were tuned on one seed.
 *Sources:* PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18.
 
 **A20. Untested future work (stated as such, as hypotheses).** An observation-count feature (D38(d)); other architectures;
-training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a possible cause of D trailing C; D's aggregation over many healthy
-neighbours diluting its own-node signal (F19); cold-start and collusion conditions where a graph model might help; gating a different head.
-None of these was run and none may be reported as a finding. (Staggered onset, D31(c), was tested in S13: A24, A25.)
-*Sources:* D47, D49, D60 (Q3), F19, F21.
+training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a possible cause of D trailing C; the self-supervised objective
+(L3, next-task success of the node itself) rewards current behaviour only, so neighbour evidence that predicts a later failure may have no way to improve the objective (not tested); dilution of D's own-node signal by its aggregation over many neighbours (F19), which was tested for one contained construction in S14 (A28), while dilution in general is untested; cold-start and collusion conditions where a graph model might help; gating a different head.
+None of these, other than the single D2 construction of A28, was run and none may be reported as a finding. (Staggered onset, D31(c), was tested in S13: A24, A25.)
+*Sources:* D47, D49, D60 (Q3), F19, F21, D68, F45.
 
 ### Contribution statement
 
@@ -299,6 +304,10 @@ where the graph helps / does not help" generalisation.
 
 **X20.** Any CVE wording beyond A26: "ETSI ITS-G5", radio range, deployed RSU or vehicle products, field exploitation, attacks specific to certificate-holding nodes, or any statement from the CVE records about SCMS.
 
+**X21.** That dilution is the cause of D trailing C, or that dilution is ruled out in general; that the graph does not help in any architecture. A28 states only what the one D2 construction did.
+
+**X22.** Describing the opposite-signed n_av differences between C and D2 across the two regimes (D57-normalised +0.027 shared, -0.024 staggered, F45) as an effect: they are descriptive, carry no label and come with no success difference.
+
 ---
 
 ## REPORTING CONVENTIONS
@@ -310,7 +319,7 @@ head. (D60 Q1, D58.)
 **R4. Effect and interval.** Every difference carries its 95% interval over seeds and, where a pre-registered rule applies, its D43/D54/D56/D59 label.
 **R5. Scope.** "In this simulation" at least once per results paragraph; limitations in their own section but results never moved into it.
 **R6. Dated protocol.** The pre-registrations are described with their entries (D43, D54, D56 + D57, D59) and the fact that the rule preceded the numbers.
-**R7. Gate-C, H and B-oracle labelled.** Gate-C and H as extra baselines (H: the RSU's own `success_ewma`, no learning), B-oracle as an upper bound, B as equal to A in this scenario, E as D plus explanation.
+**R7. Gate-C, H and B-oracle labelled.** Gate-C and H as extra baselines (H: the RSU's own `success_ewma`, no learning), B-oracle as an upper bound, B as equal to A in this scenario, E as D plus explanation, D2 as an exploratory pre-registered variant (A28).
 **R8. Figures from the script.** Figures come from `figures/s10/` via `scripts/make_figures.py`; none is redrawn. Every number in the text matches a source entry cited in a LaTeX comment.
 
 ---
