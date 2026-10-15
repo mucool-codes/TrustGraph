@@ -183,7 +183,7 @@ def main() -> int:
         if variant == "D2":
             print(f"    neighbour probe (validation): {entry['neighbour_probe']}")
 
-    if len(report["variants"]) == 2:
+    if set(report["variants"]) == {"C", "D"}:
         pc, pd = (report["variants"][v]["parameters"] for v in ("C", "D"))
         report["parameter_ratio_D_over_C"] = pd / pc
         print(f"\nparameters: C {pc}, D {pd}, D/C = {pd / pc:.2f}x")
