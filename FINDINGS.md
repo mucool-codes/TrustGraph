@@ -1865,3 +1865,20 @@ rho 1  (TEST)
 
 (description) (D - C latency at rho 1.0) minus (at rho 0), per-seed paired: -25.8 (sd 15.7) 95% [-45.4, -6.3]
 ```
+
+### F38 — S13 Experiment 2 verdict against D65 and interpretation (written after F37 was committed in aaba1a3)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` | No S, floor, window, seed, draw or rule of D65 was changed.
+Labels from `python scripts/s13_stag.py eval --verdict` (results/s13/stag/report-eval-verdict.txt), D65 section 2.5 (primary: detection latency of late-onset RSUs, D - C, steps; WIN for D = hi < 0 and mean <= -20; NEGATIVE = lo > 0 and mean >= 20; NULL = interval inside +-20; else NOISY):
+```
+                          D - C latency [95% interval over 5 seeds]    label        C latency   D latency   detected C / D
+rho 1.0 (test)            +70.5 [+42.8, +98.2]                         NEGATIVE     126.5       197.0       1.000 / 0.968
+rho 0   (control)         +96.3 [+66.8, +125.9]                        NEGATIVE     130.1       226.4       1.000 / 0.946
+```
+Rule applied: at rho 1.0, WIN needs hi < 0 (hi = +98.2, no); NEGATIVE needs lo > 0 (+42.8 yes) and mean >= 20 (+70.5 yes) -> NEGATIVE. The label is not NOISY, so the D65 seeds-6-10 extension is not triggered and was not run. D65 reading of the control: the label at rho 1.0 is not WIN, so there is no structural reading to make; D is later than C at rho 0 as well, by more (+96.3 vs +70.5).
+Secondary, descriptive (no label): window AUC D - C = -0.0457 [-0.0996, +0.0081] at rho 1.0 and -0.1271 [-0.2044, -0.0498] at rho 0; (D - C latency at rho 1.0) minus (at rho 0), per-seed paired: -25.8 [-45.4, -6.3].
+Interpretation:
+1. Under staggered onset, where F35 shows neighbour evidence leading own evidence by about 90-100 steps, the GNN head D did not detect late-onset RSUs earlier than the node-local head C: D was 43-98 steps later (95% interval) at rho 1.0 and 67-126 later at rho 0, with all five seeds having D later at both rho (per seed +44.6 to +97.3 at rho 1.0). The pre-registered label is NEGATIVE (C beats D) at rho 1.0.
+2. D's deficit is smaller at rho 1.0 than at rho 0 (-25.8 [-45.4, -6.3] on the difference): the direction of F19's gap-narrowing with correlation, here with an interval excluding 0. It is a narrowing of a deficit, not an advantage, and was not a pre-registered test.
+3. So the F18/F19 boundary condition (shared onset removes the lead-time advantage) is not the whole explanation of why D trails C in this simulation: with a neighbour lead present (F35) and the same training protocol, D still trails C. That is a statement about these two heads trained under D44/D45 in this scenario; mechanisms (dilution by healthy neighbours F19, the D45 training budget, seed fit) are untested hypotheses, not findings. This result does not revise F17 or any H2 verdict; it is a separate regime.
+4. D42: rho 1.0: 250 draws attempted, 0 failed, 250 aggregated; rho 0: 250 attempted, 0 failed, 164 aggregated (draws with no late-onset RSU are not aggregated: 37/38/30/29/30 per seed), late-onset RSUs 194 in total at rho 0 against 642 at rho 1.0.
+Limits: one injection model, S = 300 only, one scenario per seed (topology and traffic), models trained on Baseline-A open-loop dispatch, latency tau is the 1st percentile of pre-onset trust (so C's and D's thresholds differ: C 0.81-0.87, D 0.60-0.74, F37), detection of a gradual ramp with a 10-step run rule; and secondary AUC windows that do not match the training diagnostic windows.
