@@ -154,7 +154,7 @@ def generate_scenario(
     # B_oracle (D50): a faulty RSU's cert_valid is 0 from the step its fault begins - the
     # onset step for a degraded RSU, step 0 for a compromised one. World-side by construction.
     fault_start = np.full(num_rsus, np.iinfo(np.int64).max, dtype=np.int64)
-    fault_start[plan.degraded] = plan.onset_step
+    fault_start[plan.degraded] = plan.onset_per_rsu()[plan.degraded]
     fault_start[plan.colluding] = 0
 
     if engine is not None:

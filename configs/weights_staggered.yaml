@@ -1,0 +1,16 @@
+comment: 'Staggered onset (D65 2.5): tuned on seed 100, rho 1.0, fraction 0.2, draws
+  0-2 by the D52 procedure on the seed-100 staggered models.'
+tuning_seed: 100
+weights:
+  A:
+    alpha: 0.0
+    beta: 0.25
+    gamma: 0.6
+  C:
+    alpha: 2.0
+    beta: 0.25
+    gamma: 0.15
+  D:
+    alpha: 2.0
+    beta: 0.25
+    gamma: 0.6

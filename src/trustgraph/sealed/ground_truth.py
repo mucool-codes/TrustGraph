@@ -67,6 +67,9 @@ class GroundTruth:
     true_queue_depth: np.ndarray | None = None
     task_true_completion_s: np.ndarray | None = None
     task_dropped: np.ndarray | None = None
+    # S13 (D65): per-RSU onset steps when `onset_spread_steps` > 0; None = every degraded RSU
+    # starts at `onset_step` (the shared onset of D31). `onset_step` stays the earliest possible onset.
+    onset_steps: np.ndarray | None = None
 
     # ------------------------------------------------------------------ membership
 
@@ -110,6 +113,12 @@ class GroundTruth:
 
     # ------------------------------------------------------------ time-varying state
 
+    def onset_per_rsu(self) -> np.ndarray:
+        """(num_rsus,) int: the step each RSU's degradation begins (meaningful for degraded RSUs)."""
+        if self.onset_steps is None:
+            return np.full(self.num_rsus, self.onset_step, dtype=np.int64)
+        return np.asarray(self.onset_steps, dtype=np.int64)
+
     def degradation_level(self, step: int) -> np.ndarray:
         """(num_rsus,) fault progress in [0, 1]: zero before onset, linear over the ramp.
 
@@ -117,7 +126,10 @@ class GroundTruth:
         onset is `1/R`, not 1 - the property the H2 test depends on, since a fault
         that lands all at once leaves nothing for neighbourhood evidence to anticipate.
         """
-        progress = np.clip((int(step) - self.onset_step) / self.ramp_steps, 0.0, 1.0)
+        if self.onset_steps is None:
+            progress = np.clip((int(step) - self.onset_step) / self.ramp_steps, 0.0, 1.0)
+        else:
+            progress = np.clip((int(step) - self.onset_steps) / self.ramp_steps, 0.0, 1.0)
         return np.where(self.degraded, progress, 0.0)
 
     def capacity_factor(self, step: int) -> np.ndarray:
@@ -151,8 +163,10 @@ class GroundTruth:
         path.parent.mkdir(parents=True, exist_ok=True)
         if self.true_load is None:
             raise ValueError("refusing to save a GroundTruth with no realised state")
+        extra = {} if self.onset_steps is None else {"onset_steps": np.asarray(self.onset_steps, dtype=np.int64)}
         np.savez_compressed(
             path,
+            **extra,
             sealed_format_version=np.int64(SEALED_FORMAT_VERSION),
             behavior_class=self.behavior_class,
             backhaul_segment_id=self.backhaul_segment_id,
@@ -200,6 +214,7 @@ def load_ground_truth(path: str | Path) -> GroundTruth:
             true_queue_depth=blob["true_queue_depth"],
             task_true_completion_s=blob["task_true_completion_s"],
             task_dropped=blob["task_dropped"],
+            onset_steps=blob["onset_steps"] if "onset_steps" in blob.files else None,
         )
 
 

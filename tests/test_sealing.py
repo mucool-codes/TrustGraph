@@ -55,6 +55,8 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s8_example.py",  # the merged example (D54)
         "s9_sweep.py",  # the sweep runner scores dispatches against the true degraded set (D56)
         "s9b_gate.py",  # Gate-C tuning and evaluation (D59)
+        "s13_h.py",  # heuristic-baseline tuning and evaluation (D65)
+        "s13_stag.py",  # staggered-onset mechanism check, evaluation and closed loop (D65)
         "s10_data.py",  # figure inputs that need closed-loop runs (timeline, worked example)
         "s9_overhead.py",  # H4/H5 serial stage (D56 section 7)
     }

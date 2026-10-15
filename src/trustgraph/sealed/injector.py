@@ -29,8 +29,13 @@ class DegradationConfig:
     ramp_steps: int = 1
     severity: float = 0.6
     drop_prob: float = 0.15
+    # S13 (D65): each degraded RSU's onset is drawn uniformly from [onset_step, onset_step + spread];
+    # 0 = the shared onset of D31 (the default; nothing changes).
+    onset_spread_steps: int = 0
 
     def __post_init__(self) -> None:
+        if self.onset_spread_steps < 0:
+            raise ValueError("degradation.onset_spread_steps must be >= 0")
         if not 0.0 <= self.fraction <= 1.0:
             raise ValueError("degradation.fraction must lie in [0, 1]")
         if not 0.0 <= self.rho <= 1.0:
@@ -87,7 +92,7 @@ class ColdStartConfig:
             )
 
 
-_INT_FIELDS = {"onset_step", "ramp_steps", "num_groups", "group_size", "num_nodes", "join_step"}
+_INT_FIELDS = {"onset_step", "onset_spread_steps", "ramp_steps", "num_groups", "group_size", "num_nodes", "join_step"}
 _STR_FIELDS = {"placement"}
 
 
@@ -109,7 +114,7 @@ def _build(cls, raw: dict | None, section: str):
     return cls(**{k: _coerce(k, v) for k, v in raw.items()})
 
 
-INJECTION_PURPOSES: tuple[str, ...] = ("degradation", "collusion", "cold_start")
+INJECTION_PURPOSES: tuple[str, ...] = ("degradation", "collusion", "cold_start", "onset")
 
 
 def injection_stream_name(purpose: str, draw: int) -> str:
@@ -250,6 +255,13 @@ def inject(
     join_step = np.zeros(n, dtype=np.int64)
     join_step[joiners] = cold.join_step
 
+    # S13 (D65): staggered onset. A fixed-size block from its own stream, drawn only when the option is on, so
+    # with the default 0 no stream is touched and every existing scenario is reproduced exactly.
+    onset_steps = None
+    if deg.onset_spread_steps > 0:
+        offsets = rngs["onset"].integers(0, deg.onset_spread_steps + 1, size=n)
+        onset_steps = np.where(degraded, deg.onset_step + offsets, deg.onset_step).astype(np.int64)
+
     behavior_class = np.full(n, RELIABLE, dtype=np.int64)
     behavior_class[degraded] = DEGRADED
     behavior_class[collusion_group >= 0] = COMPROMISED
@@ -267,4 +279,5 @@ def inject(
         collusion_group=collusion_group,
         under_report=col.under_report,
         join_step=join_step,
+        onset_steps=onset_steps,
     )

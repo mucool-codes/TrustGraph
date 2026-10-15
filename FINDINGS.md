@@ -1644,3 +1644,381 @@ fraction   fraction of runs never avoiding:    A                C               
 ```
 Consistency: the A and C columns equal F26's (0.056 / 0.264 / 0.468 / 0.656 and 0.000 / 0.000 / 0.028 / 0.000), as they must since they are read from the same S9 files.
 Interpretation: Gate-C's censoring is identical to C's at every point, so the n_av comparison between them is not distorted by different censoring; the large censoring is A's (up to 66% at 30% degraded), as F27 item 3 says.
+
+### F32 � S13 Experiment 1: tuning grid of the heuristic baseline H on the tuning seed (RAW, recorded before the chosen weights are used anywhere)
+Date: 2026-10-15 | Session: S13 | Commit: 9b5c139 (code); pre-registration D65 = 245705b (2026-10-15 09:16:12 +0530)
+Config: `configs/demo.yaml`, `configs/h.yaml`, tuning seed 100 (excluded from all evaluation), rho 1.0, fraction 0.20, injection draws 0, 1, 2, closed loop, dwell filter and handoff on | Protocol: D65 section 1.2 = D52 procedure, unchanged
+Variant H: trust_v = the RSU's own `success_ewma` (no model, no gate); weights alpha/beta/gamma tuned over alpha {0.25,0.5,1,2,4} x beta {0.25,0.5,1} x gamma {0.15,0.3,0.6}
+Command: `python scripts/s13_h.py tune --write` (results/s13/h/tuning.json; configs/weights_h.yaml). 135 runs, 1m32s on 12 workers. First result of Experiment 1 written 2026-10-15T03:50:31Z (09:20:31 +0530).
+Objective: deadline success of dispatched tasks over steps [400, 1200), mean over the 3 draws. Ties go to the first grid point in ascending (alpha, beta, gamma) order.
+```
+H  (rows: alpha, beta, gamma; value: mean post-onset deadline success over draws 0,1,2; per-draw in brackets)
+   alpha beta gamma | objective  per-draw
+   0.25  0.25 0.15  | 0.8922    [0.9304, 0.8458, 0.9006]
+   0.25  0.25 0.3   | 0.8929    [0.9282, 0.8495, 0.901]
+   0.25  0.25 0.6   | 0.8907    [0.9219, 0.8495, 0.9006]
+   0.25  0.5  0.15  | 0.8825    [0.9149, 0.8412, 0.8912]
+   0.25  0.5  0.3   | 0.8859    [0.9165, 0.846, 0.8954]
+   0.25  0.5  0.6   | 0.8862    [0.9145, 0.8479, 0.896]
+   0.25  1.0  0.15  | 0.8692    [0.8919, 0.8355, 0.8801]
+   0.25  1.0  0.3   | 0.8725    [0.8949, 0.8388, 0.8838]
+   0.25  1.0  0.6   | 0.8754    [0.8978, 0.8419, 0.8864]
+   0.5   0.25 0.15  | 0.8933    [0.9339, 0.8462, 0.8999]
+   0.5   0.25 0.3   | 0.8965    [0.936, 0.849, 0.9043]  <== chosen
+   0.5   0.25 0.6   | 0.8957    [0.9321, 0.8499, 0.9052]
+   0.5   0.5  0.15  | 0.8886    [0.9271, 0.8421, 0.8967]
+   0.5   0.5  0.3   | 0.8922    [0.9304, 0.8458, 0.9006]
+   0.5   0.5  0.6   | 0.8929    [0.9282, 0.8495, 0.901]
+   0.5   1.0  0.15  | 0.8796    [0.9112, 0.8382, 0.8895]
+   0.5   1.0  0.3   | 0.8825    [0.9149, 0.8412, 0.8912]
+   0.5   1.0  0.6   | 0.8859    [0.9165, 0.846, 0.8954]
+   1.0   0.25 0.15  | 0.8895    [0.9317, 0.8416, 0.8951]
+   1.0   0.25 0.3   | 0.8926    [0.9345, 0.8432, 0.9002]
+   1.0   0.25 0.6   | 0.8957    [0.936, 0.8469, 0.9041]
+   1.0   0.5  0.15  | 0.8891    [0.9304, 0.8412, 0.8956]
+   1.0   0.5  0.3   | 0.8933    [0.9339, 0.8462, 0.8999]
+   1.0   0.5  0.6   | 0.8965    [0.936, 0.849, 0.9043]
+   1.0   1.0  0.15  | 0.8856    [0.9243, 0.8386, 0.8938]
+   1.0   1.0  0.3   | 0.8886    [0.9271, 0.8421, 0.8967]
+   1.0   1.0  0.6   | 0.8922    [0.9304, 0.8458, 0.9006]
+   2.0   0.25 0.15  | 0.8870    [0.9295, 0.8379, 0.8934]
+   2.0   0.25 0.3   | 0.8891    [0.9317, 0.8403, 0.8954]
+   2.0   0.25 0.6   | 0.8913    [0.9347, 0.8403, 0.8988]
+   2.0   0.5  0.15  | 0.8869    [0.9282, 0.8397, 0.8928]
+   2.0   0.5  0.3   | 0.8895    [0.9317, 0.8416, 0.8951]
+   2.0   0.5  0.6   | 0.8926    [0.9345, 0.8432, 0.9002]
+   2.0   1.0  0.15  | 0.8860    [0.928, 0.8375, 0.8925]
+   2.0   1.0  0.3   | 0.8891    [0.9304, 0.8412, 0.8956]
+   2.0   1.0  0.6   | 0.8933    [0.9339, 0.8462, 0.8999]
+   4.0   0.25 0.15  | 0.8834    [0.9284, 0.8316, 0.8901]
+   4.0   0.25 0.3   | 0.8848    [0.9278, 0.8342, 0.8923]
+   4.0   0.25 0.6   | 0.8864    [0.9289, 0.8375, 0.893]
+   4.0   0.5  0.15  | 0.8803    [0.9234, 0.8292, 0.8882]
+   4.0   0.5  0.3   | 0.8870    [0.9295, 0.8379, 0.8934]
+   4.0   0.5  0.6   | 0.8891    [0.9317, 0.8403, 0.8954]
+   4.0   1.0  0.15  | 0.8832    [0.9243, 0.8342, 0.891]
+   4.0   1.0  0.3   | 0.8869    [0.9282, 0.8397, 0.8928]
+   4.0   1.0  0.6   | 0.8895    [0.9317, 0.8416, 0.8951]
+chosen (alpha,beta,gamma) = (0.5, 0.25, 0.3), objective 0.8965, per-draw [0.936, 0.849, 0.9043]
+```
+Spread over the grid: best 0.8965, worst 0.8692. Exact ties at the best value: (0.5,0.25,0.3), (1.0,0.5,0.6) (first in grid order is taken).
+For reference only (F20, same seed, draws, objective): A 0.8670, C 0.8999, D 0.8938, B_oracle 0.9009.
+Interpretation: recorded before use; the chosen weights are written to configs/weights_h.yaml and applied unchanged in the evaluation. One seed, three draws, per-draw values differ by up to 0.09, so differences of ~0.005 between grid points are inside the draw-to-draw spread (as F20).
+
+### F33 — S13 Experiment 1 raw results: heuristic H vs learned C, the four fraction-sweep points, seeds 1-5 x draws 100-149 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Session: S13 | Commit: 9b5c139 (code), 776beff (F32, weights_h.yaml); D65 = 245705b
+Config: `configs/h.yaml` over `configs/sweep.yaml`, `configs/demo.yaml`; H weights `configs/weights_h.yaml` (F32: 0.5, 0.25, 0.3); C weights D52 (1, 0.25, 0.6); frozen seed 1-5 C checkpoints (not used by H); closed loop, dwell filter and handoff on.
+Command: `python scripts/s13_h.py run` then `python scripts/s13_h.py report` (results/s13/h/report-raw.txt). 1000 tasks, 0 failed, 112 min on 12 workers (the machine was shared; the F29 run of the same size took 7.5 min). First evaluation result written 2026-10-15T03:52:23Z (09:22:23 +0530), after F32 (09:21:52 +0530).
+Check: Variant C was recomputed in every task and equals the stored S9 values bit-for-bit (wall time excepted): 0 mismatches at every point. H is paired per draw with stored S9 C and A.
+Reading key: n_win = dispatches to degraded RSUs over [400,1200); (n_H - n_C)/n_A positive = C sends fewer; latency negative = C detects earlier; mean +/- sd across the 5 seed means; intervals Student-t over 5 seeds.
+```
+D42-style accounting (draws attempted / failed / aggregated) and the C-recompute check
+  rho 1.00 frac 0.05: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.10: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.20: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.30: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.05   [K = 1: no correlated failure]
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.9474 +/- 0.0028     0.9685 +/- 0.0029     0.9651 +/- 0.0026
+  n_av: dispatches to degraded, onset->avoidance          71.3 +/- 8.3          22.3 +/- 3.0          21.0 +/- 1.4
+  n_win: dispatches to degraded, [400,1200)              226.9 +/- 6.2          58.7 +/- 4.0          60.3 +/- 2.8
+  never-avoided rate (D56 rule)                        0.056 +/- 0.055       0.000 +/- 0.000       0.000 +/- 0.000
+  detection latency (steps, censored 399)                          n/a        161.3 +/- 26.6        171.1 +/- 31.8
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0034 (sd 0.0006) 95% [+0.0027, +0.0041]
+  (descr.) H - A success: +0.0177 [+0.0169, +0.0185]   C - A success: +0.0211 [+0.0203, +0.0219]
+  (descr.) detection latency C - H: -9.8 steps [-34.4, +14.8]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.007 [-0.008, +0.022]   n_av -0.021 [-0.065, +0.024]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.10
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.9223 +/- 0.0024     0.9601 +/- 0.0027     0.9566 +/- 0.0024
+  n_av: dispatches to degraded, onset->avoidance        235.9 +/- 33.7          48.6 +/- 8.0          48.2 +/- 8.1
+  n_win: dispatches to degraded, [400,1200)              451.7 +/- 9.4        150.7 +/- 17.2        153.4 +/- 17.2
+  never-avoided rate (D56 rule)                        0.264 +/- 0.059       0.000 +/- 0.000       0.000 +/- 0.000
+  detection latency (steps, censored 399)                          n/a        159.2 +/- 26.1        164.3 +/- 30.5
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0035 (sd 0.0006) 95% [+0.0028, +0.0042]
+  (descr.) H - A success: +0.0344 [+0.0319, +0.0368]   C - A success: +0.0379 [+0.0353, +0.0404]
+  (descr.) detection latency C - H: -5.1 steps [-24.9, +14.8]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.006 [-0.009, +0.021]   n_av -0.002 [-0.018, +0.015]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.20   [shared operating point]
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.8713 +/- 0.0026     0.9211 +/- 0.0100     0.9173 +/- 0.0098
+  n_av: dispatches to degraded, onset->avoidance       627.5 +/- 100.4        152.7 +/- 47.9        155.1 +/- 48.7
+  n_win: dispatches to degraded, [400,1200)             912.4 +/- 20.6        506.3 +/- 74.6        510.7 +/- 73.5
+  never-avoided rate (D56 rule)                        0.468 +/- 0.119       0.028 +/- 0.039       0.028 +/- 0.039
+  detection latency (steps, censored 399)                          n/a        150.7 +/- 21.8        157.1 +/- 28.0
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0038 (sd 0.0005) 95% [+0.0032, +0.0045]
+  (descr.) H - A success: +0.0460 [+0.0355, +0.0565]   C - A success: +0.0498 [+0.0392, +0.0605]
+  (descr.) detection latency C - H: -6.5 steps [-23.9, +11.0]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.005 [-0.002, +0.012]   n_av +0.003 [-0.015, +0.021]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.30
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.8212 +/- 0.0023     0.8750 +/- 0.0129     0.8705 +/- 0.0130
+  n_av: dispatches to degraded, onset->avoidance      1065.0 +/- 195.5        250.0 +/- 70.6        272.7 +/- 87.6
+  n_win: dispatches to degraded, [400,1200)            1358.9 +/- 27.9       915.0 +/- 107.4       918.5 +/- 106.6
+  never-avoided rate (D56 rule)                        0.656 +/- 0.167       0.000 +/- 0.000       0.008 +/- 0.018
+  detection latency (steps, censored 399)                          n/a        146.8 +/- 19.3        152.0 +/- 27.4
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0045 (sd 0.0009) 95% [+0.0033, +0.0057]
+  (descr.) H - A success: +0.0493 [+0.0336, +0.0650]   C - A success: +0.0538 [+0.0382, +0.0694]
+  (descr.) detection latency C - H: -5.1 steps [-23.9, +13.7]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.003 [-0.003, +0.008]   n_av +0.018 [-0.020, +0.056]
+```
+
+### F34 — S13 Experiment 1 verdict against D65 and interpretation (written after F33 was committed in 9926c5d)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` | No weight, floor, bound, point, seed, draw or rule of D65 was changed.
+Labels from `python scripts/s13_h.py report --verdict` (results/s13/h/report-verdict.txt), D65 section 1.4 (effect = C minus H post-onset deadline success; floor 0.01; NULL = whole interval inside +-0.025):
+```
+fraction   C - H success [95% interval over seeds]      label
+0.05       +0.0034 [+0.0027, +0.0041]                   NULL
+0.10       +0.0035 [+0.0028, +0.0042]                   NULL
+0.20       +0.0038 [+0.0032, +0.0045]   (shared point)  NULL
+0.30       +0.0045 [+0.0033, +0.0057]                   NULL
+WIN at 0 of 4, NEGATIVE at 0 of 4  ->  D65 overall verdict: NOT SEPARATED (all four labels NULL)
+```
+Rule applied: per point, NEGATIVE needs hi < 0 and mean <= -0.01 (no); WIN needs lo > 0 and mean >= 0.01 (lo > 0 holds at all four, but the mean is 0.003-0.005, below the floor); NULL needs lo > -0.025 and hi < 0.025 (yes). Overall: LEARNING HELPS needs WIN at >= 2 (0), HEURISTIC BETTER needs NEGATIVE at >= 2 (0), so NOT SEPARATED.
+Interpretation:
+1. Under the pre-registered rule learning is not shown to help: the learned head's advantage over the node's own success_ewma is positive and its interval excludes 0 at every point, but it is 0.003-0.005 in absolute success, below the 0.01 floor, and a difference of 0.025 or more is ruled out in either direction. The label is a statement about the floor, not about the sign; the sign is stated here as measured.
+2. Descriptively, H recovers most of C's gain over no trust: H - A is +0.0177 / +0.0344 / +0.0460 / +0.0493 against C - A +0.0211 / +0.0379 / +0.0498 / +0.0538 (5% to 30%).
+3. n_av, n_win and the never-avoided rate (together, D60 Q4): at the shared point C 152.7 / 506.3 / 0.028, H 155.1 / 510.7 / 0.028, A 627.5 / 912.4 / 0.468; the C-vs-H difference in units of A's count is +0.005 [-0.002, +0.012] (n_win) and +0.003 [-0.015, +0.021] (n_av), intervals including 0 at all four points. At 30% H never avoids in 0.8% of runs against C's 0.0%.
+4. Detection latency (descriptive): C 5-10 steps earlier than H at every point, intervals [-34, +15] to [-24, +14] all including 0; all degraded RSUs are detected by both.
+5. D42: every point 250 attempted, 0 failed, 250 aggregated; the C recompute matched S9 bit-for-bit on all 1000 tasks.
+Limits: H's weights were tuned on one seed like every other variant (F32; the surface is flat, spread within draw-to-draw noise); the result is for this scenario and injection model only; it does not revise F17, F27 or any H2 verdict; no mechanism for why the head adds so little is tested.
+
+### F35 — S13 Experiment 2 mechanism check: does neighbour evidence lead own evidence under staggered onset? (RAW; the D65 2.3 gate result is stated beside it)
+Date: 2026-10-15 | Session: S13 | Commit: 84923e3 (code); D65 = 245705b; onset_spread_steps option and F11 regression test in the preceding commit
+Config: `configs/staggered.yaml` (demo.yaml + degradation.onset_spread_steps 300), seeds 1-5, fraction 0.20, rho 0 and 1.0, **injection draws 50-79** (30 per seed per rho; < 100, not evaluation draws, not among the S3 draws 0, 1, 40, 90), observable `success_ewma` of Baseline-A scenarios; no model trained or used.
+Command: `python scripts/s13_stag.py gen mech` then `python scripts/s13_stag.py mech` (results/s13/stag/mech.json). First number of Experiment 2 written 2026-10-15T06:35:28Z (12:05:28 +0530). The staggered traces equal the demo traces bit-for-bit for seeds 1-5 and 100 (checked).
+Definition (D65 2.3): late-onset RSU v = degraded RSU with >= 1 degraded same-segment RSU-RSU-edge neighbour u with onset_u < onset_v. t_w = first t in [onset_w, onset_w+400) with success_ewma_w below its own pre-onset 1st percentile (secondary: 0.10 below its pre-onset mean) for 10 consecutive steps; lead_v = mean over earlier-onset neighbours u of (t_v - t_u), positive = neighbour evidence first. Per-seed mean over all (draw, v); 95% t-interval over the 5 seeds (t = 2.776).
+```
+rule       rho   lead (steps) [95% interval]      sd     mean onset gap   censored (late / earlier)   late-onset RSUs per seed (seeds 1-5)
+primary    0     +103.6 [ +70.9, +136.2]          26.3   103.6            0.000 / 0.000               28 25 34 30 28
+primary    1.0   +92.3  [ +79.2, +105.5]          10.6   98.1             0.000 / 0.000               73 74 66 82 84
+secondary  0     +103.5 [ +84.5, +122.5]          15.3   103.6            0.000 / 0.000               28 25 34 30 28
+secondary  1.0   +89.9  [ +72.6, +107.2]          13.9   98.1             0.000 / 0.000               73 74 66 82 84
+```
+D65 2.3 gate (primary rule, rho 1.0, interval above 0): lo = +79.2 > 0 -> **PASS**; Experiment 2 proceeds to training.
+Interpretation: under staggered onset a late-onset RSU's earlier-onset same-segment neighbours show degraded evidence about 90-100 steps before it does, almost exactly the mean onset gap (98 steps at rho 1.0), so the lead is the injected stagger carried through the same observable; neighbour evidence therefore does precede own evidence in this regime, at both rho. This says nothing yet about whether any model uses it.
+
+### F36 � S13 Experiment 2 training: staggered-regime C and D, seeds 1-5 and tuning seed 100 (RAW diagnostics; no C-vs-D evaluation number exists yet)
+Date: 2026-10-15 | Session: S13 | Commit: 8ebd9a7 (scripts; training ran at the preceding s3_train.py --ckpt-dir/--threads commit); D65 = 245705b
+Config: `configs/staggered.yaml` (onset_spread_steps 300), `TrainSettings` exactly D45 (lr 1e-3, Adam, batch 32, cap 200, patience 8, min_delta 1e-4), D44 architecture (C MLP 1313 params, D 2-layer GINEConv 1614 = 1.23x), S3 data protocol (30 train scenarios, 9 validation draw 40, held-out draw 90 per seed; all draws < 100), Baseline-A dispatch.
+Command: `python scripts/s3_train.py --config configs/staggered.yaml --seed <n> --ckpt-dir checkpoints/s13 --threads 3 --out results/s13` for n in 1 2 3 4 5 100, six processes in parallel, 3 torch threads each (the same for every seed). Checkpoints in checkpoints/s13/ (the S3 checkpoints are untouched). All twelve stopped by patience; each trained once, no re-runs, no selection among runs.
+```
+seed var best_ep stopped untrained_val best_val  heldout_BCE heldout_AUC[450,650) edge probe (same_segment->0 / RSU-RSU->1)
+1    C      43      44        0.6833  0.14863     0.15392      0.8125            
+1    D     115     123        0.9394  0.13660     0.15297      0.8125            0.0583 / 0.0434
+2    C      38      46        0.7564  0.13990     0.14468      0.7344            
+2    D      31      39        3.9948  0.18445     0.17249      0.6094            0.1272 / 0.0247
+3    C      41      42        0.8007  0.16176     0.16518      0.2656            
+3    D     101     109        2.6054  0.15582     0.17827      0.5156            0.1150 / 0.0328
+4    C      16      24        0.6658  0.17145     0.16019      0.8438            
+4    D      65      73        0.2977  0.16462     0.15456      0.9375            0.0792 / 0.0351
+5    C      17      18        0.6396  0.17479     0.16217      0.6250            
+5    D     115     123        0.4111  0.15711     0.15225      0.7812            0.0654 / 0.0578
+100  C      40      40        0.7284  0.17125     0.17472      0.9062            
+100  D      47      55        0.4784  0.17436     0.18048      0.5469            0.0530 / 0.0217
+```
+D44 fallback checks (validation): edge probe >= 0.01 PASS on all six seeds; best validation BCE below untrained validation BCE PASS on all twelve models. The one-time GATv2 swap is not applied (D65 2.4).
+Note: the per-epoch printed sealed diagnostic uses the fixed shared-onset window [450,650) on one validation scenario (draw 40); under staggered onset it printed values of 0.06-0.11 for both C and D on seed 1 (and the held-out value of that window ranges 0.27-0.94 across seeds). It never enters loss, early stopping or selection (L4); it is a window-mismatch diagnostic of a single scenario, not an evaluation number. The pre-registered evaluation uses per-RSU windows (D65 2.5).
+Interpretation: all twelve models converged by patience and pass the pre-committed D44 checks; they are frozen as trained.
+
+### F37 — S13 Experiment 2 raw open-loop results: frozen staggered C and D, draws 200-249, rho 1.0 (test) and rho 0 (control) (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Session: S13 | Commit: befb34f (analysis code in s13_stag.py unchanged since its commit); models F36; D65 = 245705b
+Config: `configs/staggered.yaml`, frozen `checkpoints/s13/` models, seeds 1-5, fraction 0.20, injection draws 200-249 (50 per seed per rho), Baseline-A open-loop scenarios, trust at stride 1 over steps 100-1199.
+Command: `python scripts/s13_stag.py gen eval`, `python scripts/s13_stag.py trust`, `python scripts/s13_stag.py eval` (results/s13/stag/report-eval-raw.txt). First evaluation trust file written 2026-10-15T06:50:12Z (12:20:12 +0530), after F36 (12:19:31 +0530).
+Definitions (D65 2.5): latency = steps from the RSU's own onset to the first run of 10 consecutive steps with trust strictly below tau inside [onset, onset+400), censored at 399; tau = 1st percentile of the model's trust over all RSU-steps in [100,400) pooled over the seed's 50 draws at that rho; per draw the mean over its late-onset RSUs (draws with none are not aggregated); negative D - C = D detects earlier. Secondary AUC: 1 - mean trust over [first onset on the RSU's segment, +250) (RSUs on a segment with no degraded RSU use the draw's earliest onset), degraded vs reliable, per draw. Intervals: Student-t over 5 seeds (2.776).
+```
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / aggregated for the latency primary (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 37  late-onset RSUs 43  tau C 0.8461 D 0.7380
+    seed 2: attempted 50  failed 0  aggregated 38  late-onset RSUs 46  tau C 0.8602 D 0.7423
+    seed 3: attempted 50  failed 0  aggregated 30  late-onset RSUs 36  tau C 0.8137 D 0.5951
+    seed 4: attempted 50  failed 0  aggregated 29  late-onset RSUs 33  tau C 0.8598 D 0.6547
+    seed 5: attempted 50  failed 0  aggregated 30  late-onset RSUs 36  tau C 0.8682 D 0.6161
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 130.1 +/- 15.3   D 226.4 +/- 34.4   detected fraction C 1.000 D 0.946
+  PRIMARY  D - C latency: +96.3 (sd 23.8) 95% [+66.8, +125.9]
+  per-seed D - C latency: [65.4, 89.9, 130.4, 105.2, 90.7]
+  (secondary) window AUC: C 0.9328 D 0.8057   D - C -0.1271 (sd 0.0623) 95% [-0.2044, -0.0498]
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / aggregated for the latency primary (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  late-onset RSUs 127  tau C 0.8461 D 0.7380
+    seed 2: attempted 50  failed 0  aggregated 50  late-onset RSUs 134  tau C 0.8602 D 0.7423
+    seed 3: attempted 50  failed 0  aggregated 50  late-onset RSUs 113  tau C 0.8137 D 0.5951
+    seed 4: attempted 50  failed 0  aggregated 50  late-onset RSUs 135  tau C 0.8598 D 0.6547
+    seed 5: attempted 50  failed 0  aggregated 50  late-onset RSUs 133  tau C 0.8682 D 0.6161
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 126.5 +/- 8.7   D 197.0 +/- 28.8   detected fraction C 1.000 D 0.968
+  PRIMARY  D - C latency: +70.5 (sd 22.3) 95% [+42.8, +98.2]
+  per-seed D - C latency: [44.6, 56.9, 97.3, 63.9, 89.8]
+  (secondary) window AUC: C 0.7942 D 0.7484   D - C -0.0457 (sd 0.0434) 95% [-0.0996, +0.0081]
+
+(description) (D - C latency at rho 1.0) minus (at rho 0), per-seed paired: -25.8 (sd 15.7) 95% [-45.4, -6.3]
+```
+
+### F38 — S13 Experiment 2 verdict against D65 and interpretation (written after F37 was committed in aaba1a3)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` | No S, floor, window, seed, draw or rule of D65 was changed.
+Labels from `python scripts/s13_stag.py eval --verdict` (results/s13/stag/report-eval-verdict.txt), D65 section 2.5 (primary: detection latency of late-onset RSUs, D - C, steps; WIN for D = hi < 0 and mean <= -20; NEGATIVE = lo > 0 and mean >= 20; NULL = interval inside +-20; else NOISY):
+```
+                          D - C latency [95% interval over 5 seeds]    label        C latency   D latency   detected C / D
+rho 1.0 (test)            +70.5 [+42.8, +98.2]                         NEGATIVE     126.5       197.0       1.000 / 0.968
+rho 0   (control)         +96.3 [+66.8, +125.9]                        NEGATIVE     130.1       226.4       1.000 / 0.946
+```
+Rule applied: at rho 1.0, WIN needs hi < 0 (hi = +98.2, no); NEGATIVE needs lo > 0 (+42.8 yes) and mean >= 20 (+70.5 yes) -> NEGATIVE. The label is not NOISY, so the D65 seeds-6-10 extension is not triggered and was not run. D65 reading of the control: the label at rho 1.0 is not WIN, so there is no structural reading to make; D is later than C at rho 0 as well, by more (+96.3 vs +70.5).
+Secondary, descriptive (no label): window AUC D - C = -0.0457 [-0.0996, +0.0081] at rho 1.0 and -0.1271 [-0.2044, -0.0498] at rho 0; (D - C latency at rho 1.0) minus (at rho 0), per-seed paired: -25.8 [-45.4, -6.3].
+Interpretation:
+1. Under staggered onset, where F35 shows neighbour evidence leading own evidence by about 90-100 steps, the GNN head D did not detect late-onset RSUs earlier than the node-local head C: D was 43-98 steps later (95% interval) at rho 1.0 and 67-126 later at rho 0, with all five seeds having D later at both rho (per seed +44.6 to +97.3 at rho 1.0). The pre-registered label is NEGATIVE (C beats D) at rho 1.0.
+2. D's deficit is smaller at rho 1.0 than at rho 0 (-25.8 [-45.4, -6.3] on the difference): the direction of F19's gap-narrowing with correlation, here with an interval excluding 0. It is a narrowing of a deficit, not an advantage, and was not a pre-registered test.
+3. So the F18/F19 boundary condition (shared onset removes the lead-time advantage) is not the whole explanation of why D trails C in this simulation: with a neighbour lead present (F35) and the same training protocol, D still trails C. That is a statement about these two heads trained under D44/D45 in this scenario; mechanisms (dilution by healthy neighbours F19, the D45 training budget, seed fit) are untested hypotheses, not findings. This result does not revise F17 or any H2 verdict; it is a separate regime.
+4. D42: rho 1.0: 250 draws attempted, 0 failed, 250 aggregated; rho 0: 250 attempted, 0 failed, 164 aggregated (draws with no late-onset RSU are not aggregated: 37/38/30/29/30 per seed), late-onset RSUs 194 in total at rho 0 against 642 at rho 1.0.
+Limits: one injection model, S = 300 only, one scenario per seed (topology and traffic), models trained on Baseline-A open-loop dispatch, latency tau is the 1st percentile of pre-onset trust (so C's and D's thresholds differ: C 0.81-0.87, D 0.60-0.74, F37), detection of a gradual ramp with a 10-step run rule; and secondary AUC windows that do not match the training diagnostic windows.
+
+### F39 — S13 Experiment 2 secondary (b): closed-loop tuning grids on the tuning seed under staggered onset (RAW, recorded before the chosen weights are used anywhere)
+Date: 2026-10-15 | Session: S13 | Commit: 1b7bf19; D65 section 2.5 = D52 procedure
+Config: `configs/staggered.yaml`, tuning seed 100 (excluded from evaluation), rho 1.0, fraction 0.20, injection draws 0, 1, 2, closed loop, dwell filter and handoff on, seed-100 staggered C and D checkpoints (F36); A over beta x gamma at alpha 0; C and D over alpha {0.25,0.5,1,2,4} x beta {0.25,0.5,1} x gamma {0.15,0.3,0.6}. Objective: deadline success of dispatched tasks over steps [400, 1200), mean over the 3 draws; ties to the first grid point in ascending order.
+Command: `python scripts/s13_stag.py tune --write` (results/s13/stag/tuning-grid.json; configs/weights_staggered.yaml). 378 runs. Chosen: A (0, 0.25, 0.6) 0.8860; C (2, 0.25, 0.15) 0.9139; D (2, 0.25, 0.6) 0.9060.
+```
+=== A: objective = mean post-onset deadline success over draws (0, 1, 2) (staggered onset, seed 100)
+  alpha  beta  gamma   objective   per-draw
+   0.00  0.25  0.15   0.8762    [0.8875, 0.8562, 0.8849]
+   0.00  0.25  0.30   0.8830    [0.8971, 0.8619, 0.8899]
+   0.00  0.25  0.60   0.8860    [0.9049, 0.8634, 0.8897]  <== chosen
+   0.00  0.50  0.15   0.8712    [0.8834, 0.8516, 0.8786]
+   0.00  0.50  0.30   0.8762    [0.8875, 0.8562, 0.8849]
+   0.00  0.50  0.60   0.8830    [0.8971, 0.8619, 0.8899]
+   0.00  1.00  0.15   0.8663    [0.8764, 0.8462, 0.8762]
+   0.00  1.00  0.30   0.8712    [0.8834, 0.8516, 0.8786]
+   0.00  1.00  0.60   0.8762    [0.8875, 0.8562, 0.8849]
+
+=== C: objective = mean post-onset deadline success over draws (0, 1, 2) (staggered onset, seed 100)
+  alpha  beta  gamma   objective   per-draw
+   0.25  0.25  0.15   0.9092    [0.9415, 0.8751, 0.911]
+   0.25  0.25  0.30   0.9090    [0.9397, 0.8751, 0.9121]
+   0.25  0.25  0.60   0.9062    [0.9347, 0.874, 0.9099]
+   0.25  0.50  0.15   0.9014    [0.9304, 0.8695, 0.9043]
+   0.25  0.50  0.30   0.9031    [0.9308, 0.8721, 0.9065]
+   0.25  0.50  0.60   0.9028    [0.9276, 0.8725, 0.9084]
+   0.25  1.00  0.15   0.8894    [0.9106, 0.8614, 0.8962]
+   0.25  1.00  0.30   0.8922    [0.9136, 0.8643, 0.8988]
+   0.25  1.00  0.60   0.8944    [0.9154, 0.8669, 0.9008]
+   0.50  0.25  0.15   0.9115    [0.9441, 0.8767, 0.9139]
+   0.50  0.25  0.30   0.9126    [0.945, 0.8775, 0.9152]
+   0.50  0.25  0.60   0.9113    [0.943, 0.8764, 0.9145]
+   0.50  0.50  0.15   0.9085    [0.9415, 0.874, 0.9099]
+   0.50  0.50  0.30   0.9092    [0.9415, 0.8751, 0.911]
+   0.50  0.50  0.60   0.9090    [0.9397, 0.8751, 0.9121]
+   0.50  1.00  0.15   0.9000    [0.9295, 0.8671, 0.9034]
+   0.50  1.00  0.30   0.9014    [0.9304, 0.8695, 0.9043]
+   0.50  1.00  0.60   0.9031    [0.9308, 0.8721, 0.9065]
+   1.00  0.25  0.15   0.9130    [0.9469, 0.8773, 0.9147]
+   1.00  0.25  0.30   0.9135    [0.9474, 0.8769, 0.9162]
+   1.00  0.25  0.60   0.9136    [0.9465, 0.8777, 0.9167]
+   1.00  0.50  0.15   0.9107    [0.9439, 0.8758, 0.9126]
+   1.00  0.50  0.30   0.9115    [0.9441, 0.8767, 0.9139]
+   1.00  0.50  0.60   0.9126    [0.945, 0.8775, 0.9152]
+   1.00  1.00  0.15   0.9073    [0.9406, 0.8725, 0.9089]
+   1.00  1.00  0.30   0.9085    [0.9415, 0.874, 0.9099]
+   1.00  1.00  0.60   0.9092    [0.9415, 0.8751, 0.911]
+   2.00  0.25  0.15   0.9139    [0.9476, 0.8771, 0.9169]  <== chosen
+   2.00  0.25  0.30   0.9136    [0.9471, 0.8773, 0.9162]
+   2.00  0.25  0.60   0.9139    [0.9476, 0.8777, 0.9162]
+   2.00  0.50  0.15   0.9120    [0.9458, 0.876, 0.9141]
+   2.00  0.50  0.30   0.9130    [0.9469, 0.8773, 0.9147]
+   2.00  0.50  0.60   0.9135    [0.9474, 0.8769, 0.9162]
+   2.00  1.00  0.15   0.9102    [0.9441, 0.8745, 0.9119]
+   2.00  1.00  0.30   0.9107    [0.9439, 0.8758, 0.9126]
+   2.00  1.00  0.60   0.9115    [0.9441, 0.8767, 0.9139]
+   4.00  0.25  0.15   0.9133    [0.9474, 0.8764, 0.9162]
+   4.00  0.25  0.30   0.9137    [0.9476, 0.8769, 0.9167]
+   4.00  0.25  0.60   0.9137    [0.9471, 0.8777, 0.9162]
+   4.00  0.50  0.15   0.9138    [0.948, 0.8769, 0.9165]
+   4.00  0.50  0.30   0.9139    [0.9476, 0.8771, 0.9169]
+   4.00  0.50  0.60   0.9136    [0.9471, 0.8773, 0.9162]
+   4.00  1.00  0.15   0.9113    [0.9454, 0.8749, 0.9136]
+   4.00  1.00  0.30   0.9120    [0.9458, 0.876, 0.9141]
+   4.00  1.00  0.60   0.9130    [0.9469, 0.8773, 0.9147]
+
+=== D: objective = mean post-onset deadline success over draws (0, 1, 2) (staggered onset, seed 100)
+  alpha  beta  gamma   objective   per-draw
+   0.25  0.25  0.15   0.9015    [0.9291, 0.8693, 0.906]
+   0.25  0.25  0.30   0.9025    [0.9286, 0.871, 0.9078]
+   0.25  0.25  0.60   0.8991    [0.925, 0.8701, 0.9023]
+   0.25  0.50  0.15   0.8921    [0.9158, 0.8627, 0.8978]
+   0.25  0.50  0.30   0.8955    [0.9184, 0.8667, 0.9015]
+   0.25  0.50  0.60   0.8963    [0.9191, 0.8684, 0.9015]
+   0.25  1.00  0.15   0.8806    [0.8973, 0.8551, 0.8895]
+   0.25  1.00  0.30   0.8849    [0.9019, 0.859, 0.8938]
+   0.25  1.00  0.60   0.8883    [0.906, 0.8636, 0.8951]
+   0.50  0.25  0.15   0.9039    [0.9354, 0.869, 0.9071]
+   0.50  0.25  0.30   0.9042    [0.9347, 0.8699, 0.908]
+   0.50  0.25  0.60   0.9036    [0.9332, 0.8701, 0.9073]
+   0.50  0.50  0.15   0.8998    [0.9295, 0.8662, 0.9036]
+   0.50  0.50  0.30   0.9015    [0.9291, 0.8693, 0.906]
+   0.50  0.50  0.60   0.9025    [0.9286, 0.871, 0.9078]
+   0.50  1.00  0.15   0.8896    [0.9145, 0.8595, 0.8949]
+   0.50  1.00  0.30   0.8921    [0.9158, 0.8627, 0.8978]
+   0.50  1.00  0.60   0.8955    [0.9184, 0.8667, 0.9015]
+   1.00  0.25  0.15   0.9039    [0.9367, 0.8669, 0.908]
+   1.00  0.25  0.30   0.9058    [0.9389, 0.8695, 0.9091]
+   1.00  0.25  0.60   0.9056    [0.938, 0.8701, 0.9086]
+   1.00  0.50  0.15   0.9015    [0.9334, 0.8656, 0.9054]
+   1.00  0.50  0.30   0.9039    [0.9354, 0.869, 0.9071]
+   1.00  0.50  0.60   0.9042    [0.9347, 0.8699, 0.908]
+   1.00  1.00  0.15   0.8971    [0.9265, 0.8645, 0.9004]
+   1.00  1.00  0.30   0.8998    [0.9295, 0.8662, 0.9036]
+   1.00  1.00  0.60   0.9015    [0.9291, 0.8693, 0.906]
+   2.00  0.25  0.15   0.9039    [0.9382, 0.8656, 0.908]
+   2.00  0.25  0.30   0.9046    [0.9389, 0.8664, 0.9086]
+   2.00  0.25  0.60   0.9060    [0.9395, 0.8684, 0.9102]  <== chosen
+   2.00  0.50  0.15   0.9023    [0.935, 0.8651, 0.9069]
+   2.00  0.50  0.30   0.9039    [0.9367, 0.8669, 0.908]
+   2.00  0.50  0.60   0.9058    [0.9389, 0.8695, 0.9091]
+   2.00  1.00  0.15   0.8995    [0.9321, 0.864, 0.9023]
+   2.00  1.00  0.30   0.9015    [0.9334, 0.8656, 0.9054]
+   2.00  1.00  0.60   0.9039    [0.9354, 0.869, 0.9071]
+   4.00  0.25  0.15   0.9022    [0.9363, 0.8638, 0.9065]
+   4.00  0.25  0.30   0.9038    [0.938, 0.8653, 0.908]
+   4.00  0.25  0.60   0.9046    [0.9384, 0.8667, 0.9089]
+   4.00  0.50  0.15   0.9023    [0.9369, 0.864, 0.906]
+   4.00  0.50  0.30   0.9039    [0.9382, 0.8656, 0.908]
+   4.00  0.50  0.60   0.9046    [0.9389, 0.8664, 0.9086]
+   4.00  1.00  0.15   0.9007    [0.9334, 0.8634, 0.9054]
+   4.00  1.00  0.30   0.9023    [0.935, 0.8651, 0.9069]
+   4.00  1.00  0.60   0.9039    [0.9367, 0.8669, 0.908]
+
+```
+For reference only (F20, shared onset): A 0.8670, C 0.8999, D 0.8938. One seed, three draws; per-draw values differ by up to 0.09, so differences of ~0.005 between grid points are inside the draw-to-draw spread (as F20).
+Interpretation: recorded before use; the chosen weights are applied unchanged in the evaluation (D65).
+
+### F40 — S13 Experiment 2 secondary (b): closed-loop post-onset success under staggered onset, A / C / D with their own tuned weights (RAW, descriptive: D65 assigns no label to this)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` (weights F39 = 301255e); D65 = 245705b
+Config: `configs/staggered.yaml`, frozen staggered C and D (F36), weights `configs/weights_staggered.yaml` (F39), seeds 1-5, rho 1.0 and 0, fraction 0.20, injection draws 200-249, closed loop, dwell filter and handoff on; 1500 runs (3 variants x 5 seeds x 2 rho x 50 draws), 0 failed, 6 min on 12 workers.
+Command: `python scripts/s13_stag.py closed` then `python scripts/s13_stag.py report` (results/s13/stag/report-closed.txt). Metric: deadline success of dispatched tasks at steps >= 400; mean +/- sd across the 5 seed means; differences paired per draw, per-seed means, Student-t 95% over 5 seeds.
+```
+rho 0  attempted 250 failed 0 aggregated 250
+  A: 0.8978 +/- 0.0020
+  C: 0.9547 +/- 0.0029
+  D: 0.9376 +/- 0.0056
+  D - C: -0.0171 (sd 0.0075) 95% [-0.0265, -0.0078]   (descriptive, no label)
+  C - A: +0.0569 (sd 0.0009) 95% [+0.0558, +0.0581]   (descriptive, no label)
+  D - A: +0.0398 (sd 0.0069) 95% [+0.0313, +0.0483]   (descriptive, no label)
+
+rho 1  attempted 250 failed 0 aggregated 250
+  A: 0.8958 +/- 0.0027
+  C: 0.9336 +/- 0.0066
+  D: 0.9178 +/- 0.0033
+  D - C: -0.0158 (sd 0.0041) 95% [-0.0210, -0.0107]   (descriptive, no label)
+  C - A: +0.0378 (sd 0.0056) 95% [+0.0308, +0.0448]   (descriptive, no label)
+  D - A: +0.0219 (sd 0.0027) 95% [+0.0186, +0.0253]   (descriptive, no label)
+```
+Interpretation: under staggered onset, with each model's own weights, C is above D in post-onset success by 0.016-0.017 at both rho (intervals exclude 0), and both are above no trust (A) by 0.022-0.057. Descriptive only: no pre-registered label applies to this secondary, and it is a closed-loop run of heads trained on open-loop dispatch (F21 item 3).
