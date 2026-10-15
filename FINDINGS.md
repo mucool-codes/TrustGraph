@@ -2261,3 +2261,19 @@ S14 SECONDARY (b): closed-loop post-onset success at the shared point (rho 1.0, 
 ```
 
 Note: A is identical in the two regimes in n_av / n_win / never-avoided (627.1 / 907.1 / 0.488) because A ignores trust and its routing does not depend on when RSUs degrade; its success differs (0.8713 vs 0.8953).
+
+### F45 — S14 verdicts against D68 and interpretation (written after F44 was committed in e74a1a0)
+Date: 2026-10-15 | Rules exactly as in D68; no rule, window, floor or draw changed. Output: `scripts/s14_d2.py eval --verdict`, `report --verdict`.
+
+| item | quantity | mean [95% t, df 4] | D68 label |
+|---|---|---|---|
+| PRIMARY, staggered, rho 1.0 | D2 - C latency of late-onset RSUs (steps) | -1.7 [-7.0, +3.5] (C 128.6, D2 126.9) | **NULL** (interval inside +-20) |
+| control, staggered, rho 0 | D2 - C latency (steps) | -0.8 [-4.0, +2.5] (C 131.0, D2 130.2) | NULL |
+| (a) shared AUC [450,650), rho 1.0 | D2 - C | +0.0012 [-0.0018, +0.0043] | NULL (D43 thresholds, W1 only) |
+| (a) shared AUC, rho 0 | D2 - C | -0.0008 [-0.0043, +0.0026] | NULL |
+| (b) closed loop, shared regime | success D2 - C | +0.0003 [-0.0002, +0.0009] | NULL (D56 H3 thresholds) |
+| (b) closed loop, staggered regime | success D2 - C | +0.0004 [-0.0001, +0.0008] | NULL |
+
+D42 counts: primary rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs per seed 110-138); rho 0 250 / 0 / 183 aggregated (draws with no late-onset RSU are not aggregated); AUC 250 / 0 / 250 per rho; closed loop 250 / 0 / 250 per regime. The NOISY extension (seeds 6-10) was **not triggered** (no NOISY label); none was run. The neighbour-block probe was >= 0.01 in 12 of 12 models (F42), so the "no dependence" report is not triggered. Rho 0 reading (D68 section 4): rho 1.0 label NULL, so there is no structural reading; the rho 1.0 minus rho 0 difference of D2-C latency is -0.9 [-3.8, +1.9], nothing.
+Closed loop, n_av / n_win / never-avoided together (F44): shared regime A 627.1 / 907.1 / 0.488, C 132.9 / 499.3 / 0.004, D2 116.9 / 479.2 / 0.004; staggered regime A 627.1 / 907.1 / 0.488, C 217.0 / 561.5 / 0.004, D2 232.3 / 577.7 / 0.004. Descriptive D57-normalised (n_C - n_D2)/n_A on n_av: +0.027 [+0.008, +0.045] shared, -0.024 [-0.042, -0.006] staggered (opposite signs, intervals exclude 0 but there is no label and no success difference).
+Interpretation (one line): with a head that sees only same-segment RSU neighbours (no vehicles, mean not sum) and starts as C, detection latency, shared-regime AUC and closed-loop success are indistinguishable from C (a latency difference of 20 steps either way is ruled out at rho 1.0), so removing vehicle nodes and the all-neighbour sum did not make the graph help in this simulation, although the models use the neighbour block (probe 0.015-0.115). This is a test of one specific dilution route (D2's construction), not of dilution in general; it does not revise F17, F26, F37 or any H2 verdict.
