@@ -15,6 +15,11 @@ Before doing anything else, read:
   `TECHNICAL_AND_NOVELTY.md` wherever they conflict.
 - `DECISIONS.md` — what was chosen and why.
 - `FINDINGS.md` — what was measured and what it means.
+- `CLAIMS.md` — what the paper may and may not say: allowed claims with their source
+  entries, forbidden claims, reporting conventions. Required before drafting any paper
+  text.
+- `RELATED_WORK.md` — the verified related-work set and what may be said about each
+  work. Required before drafting any related-work text.
 
 Session plan for all 12 sessions: `CLAUDE_CODE_SESSIONS.md`.
 
