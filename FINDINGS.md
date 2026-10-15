@@ -1809,3 +1809,26 @@ secondary  1.0   +89.9  [ +72.6, +107.2]          13.9   98.1             0.000 
 ```
 D65 2.3 gate (primary rule, rho 1.0, interval above 0): lo = +79.2 > 0 -> **PASS**; Experiment 2 proceeds to training.
 Interpretation: under staggered onset a late-onset RSU's earlier-onset same-segment neighbours show degraded evidence about 90-100 steps before it does, almost exactly the mean onset gap (98 steps at rho 1.0), so the lead is the injected stagger carried through the same observable; neighbour evidence therefore does precede own evidence in this regime, at both rho. This says nothing yet about whether any model uses it.
+
+### F36 — S13 Experiment 2 training: staggered-regime C and D, seeds 1-5 and tuning seed 100 (RAW diagnostics; no C-vs-D evaluation number exists yet)
+Date: 2026-10-15 | Session: S13 | Commit: 8ebd9a7 (scripts; training ran at the preceding s3_train.py --ckpt-dir/--threads commit); D65 = 245705b
+Config: `configs/staggered.yaml` (onset_spread_steps 300), `TrainSettings` exactly D45 (lr 1e-3, Adam, batch 32, cap 200, patience 8, min_delta 1e-4), D44 architecture (C MLP 1313 params, D 2-layer GINEConv 1614 = 1.23x), S3 data protocol (30 train scenarios, 9 validation draw 40, held-out draw 90 per seed; all draws < 100), Baseline-A dispatch.
+Command: `python scripts/s3_train.py --config configs/staggered.yaml --seed <n> --ckpt-dir checkpoints/s13 --threads 3 --out results/s13` for n in 1 2 3 4 5 100, six processes in parallel, 3 torch threads each (the same for every seed). Checkpoints in checkpoints/s13/ (the S3 checkpoints are untouched). All twelve stopped by patience; each trained once, no re-runs, no selection among runs.
+```
+seed var best_ep stopped untrained_val best_val  heldout_BCE heldout_AUC[450,650) edge probe (same_segment->0 / RSU-RSU->1)
+1    C      43      44        0.6833  0.14863     0.15392      0.8125            
+1    D     115     123        0.9394  0.13660     0.15297      0.8125            0.0583 / 0.0434
+2    C      38      46        0.7564  0.13990     0.14468      0.7344            
+2    D      31      39        3.9948  0.18445     0.17249      0.6094            0.1272 / 0.0247
+3    C      41      42        0.8007  0.16176     0.16518      0.2656            
+3    D     101     109        2.6054  0.15582     0.17827      0.5156            0.1150 / 0.0328
+4    C      16      24        0.6658  0.17145     0.16019      0.8438            
+4    D      65      73        0.2977  0.16462     0.15456      0.9375            0.0792 / 0.0351
+5    C      17      18        0.6396  0.17479     0.16217      0.6250            
+5    D     115     123        0.4111  0.15711     0.15225      0.7812            0.0654 / 0.0578
+100  C      40      40        0.7284  0.17125     0.17472      0.9062            
+100  D      47      55        0.4784  0.17436     0.18048      0.5469            0.0530 / 0.0217
+```
+D44 fallback checks (validation): edge probe >= 0.01 PASS on all six seeds; best validation BCE below untrained validation BCE PASS on all twelve models. The one-time GATv2 swap is not applied (D65 2.4).
+Note: the per-epoch printed sealed diagnostic uses the fixed shared-onset window [450,650) on one validation scenario (draw 40); under staggered onset it printed values of 0.06-0.11 for both C and D on seed 1 (and the held-out value of that window ranges 0.27-0.94 across seeds). It never enters loss, early stopping or selection (L4); it is a window-mismatch diagnostic of a single scenario, not an evaluation number. The pre-registered evaluation uses per-RSU windows (D65 2.5).
+Interpretation: all twelve models converged by patience and pass the pre-committed D44 checks; they are frozen as trained.
