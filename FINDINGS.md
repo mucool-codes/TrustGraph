@@ -2277,3 +2277,28 @@ Date: 2026-10-15 | Rules exactly as in D68; no rule, window, floor or draw chang
 D42 counts: primary rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs per seed 110-138); rho 0 250 / 0 / 183 aggregated (draws with no late-onset RSU are not aggregated); AUC 250 / 0 / 250 per rho; closed loop 250 / 0 / 250 per regime. The NOISY extension (seeds 6-10) was **not triggered** (no NOISY label); none was run. The neighbour-block probe was >= 0.01 in 12 of 12 models (F42), so the "no dependence" report is not triggered. Rho 0 reading (D68 section 4): rho 1.0 label NULL, so there is no structural reading; the rho 1.0 minus rho 0 difference of D2-C latency is -0.9 [-3.8, +1.9], nothing.
 Closed loop, n_av / n_win / never-avoided together (F44): shared regime A 627.1 / 907.1 / 0.488, C 132.9 / 499.3 / 0.004, D2 116.9 / 479.2 / 0.004; staggered regime A 627.1 / 907.1 / 0.488, C 217.0 / 561.5 / 0.004, D2 232.3 / 577.7 / 0.004. Descriptive D57-normalised (n_C - n_D2)/n_A on n_av: +0.027 [+0.008, +0.045] shared, -0.024 [-0.042, -0.006] staggered (opposite signs, intervals exclude 0 but there is no label and no success difference).
 Interpretation (one line): with a head that sees only same-segment RSU neighbours (no vehicles, mean not sum) and starts as C, detection latency, shared-regime AUC and closed-loop success are indistinguishable from C (a latency difference of 20 steps either way is ruled out at rho 1.0), so removing vehicle nodes and the all-neighbour sum did not make the graph help in this simulation, although the models use the neighbour block (probe 0.015-0.115). This is a test of one specific dilution route (D2's construction), not of dilution in general; it does not revise F17, F26, F37 or any H2 verdict.
+
+### F46 - S15 training: C-h and D2-h on the horizon objective, parameter counts, convergence, D2-h neighbour-block probe, label counts (RAW diagnostics; no D2-h-vs-C-h evaluation number exists yet)
+Date: 2026-10-15 | Commit: see git log (this entry) | Pre-registration D72 = e7c7d54 (2026-10-15 18:51:15 +0530) | Config: configs/staggered.yaml (S = 300), `scripts/s3_train.py --objective horizon`, D45 settings, 3 torch threads, seeds 1-5 and 100; checkpoints/s15/ (untracked). The first training run crashed in the end-of-run summary line (it assumed variants C and D; no S15 result file was written and none was read); the line was guarded (commit "s3_train parameter-ratio line only for the C/D pair") and all twelve trainings were re-run from scratch; the numbers below are from the re-run. Training is deterministic from (config, seed, threads).
+Parameters (from the code): C-h 1313, D2-h 1570. Objective: BCE of trust against z = 1 - y, y = 1 if the fraction of the RSU's tasks in (t, t+150] meeting their deadline is < 0.75, windows with < 5 tasks excluded (D72 section 1).
+Validation BCE is the selection quantity (horizon objective, so it is not comparable with the next-task BCEs of F42). Probe = D68/D72 neighbour-block probe: mean |change in RSU trust| on the seed's validation graphs when D2-h's neighbour block is zeroed (threshold 0.01).
+
+| seed | model | initial val BCE | best val BCE (epoch / stop) | held-out BCE | probe |
+|---|---|---|---|---|---|
+| 1 | C-h | 0.6842 | 0.0541 (46 / 47) | 0.0318 | - |
+| 1 | D2-h | 0.6842 | 0.0558 (31 / 39) | 0.0357 | **0.0014** |
+| 2 | C-h | 0.7537 | 0.0577 (19 / 27) | 0.0423 | - |
+| 2 | D2-h | 0.7537 | 0.0592 (12 / 20) | 0.0446 | 0.0272 |
+| 3 | C-h | 0.7968 | 0.0524 (30 / 34) | 0.0583 | - |
+| 3 | D2-h | 0.7968 | 0.0501 (34 / 35) | 0.0518 | 0.3856 |
+| 4 | C-h | 0.6663 | 0.0412 (40 / 43) | 0.0402 | - |
+| 4 | D2-h | 0.6663 | 0.0397 (41 / 48) | 0.0443 | 0.0872 |
+| 5 | C-h | 0.6403 | 0.0363 (35 / 37) | 0.0501 | - |
+| 5 | D2-h | 0.6403 | 0.0321 (51 / 59) | 0.0431 | 0.0241 |
+| 100 | C-h | 0.7271 | 0.0316 (32 / 33) | 0.0331 | - |
+| 100 | D2-h | 0.7271 | 0.0257 (69 / 74) | 0.0261 | 0.1554 |
+
+All 12 trainings stopped by patience. D44-style checks: best validation BCE below the untrained model's in 12 of 12. **Probe >= 0.01 in 5 of 6 D2-h models; D2-h seed 1 is 0.0014, below the 0.01 threshold, so for that seed the output does not depend on the neighbour block after training (reported as D72 prescribes; the evaluation includes it).** Probe over the five evaluation seeds: 0.0014, 0.0272, 0.3856, 0.0872, 0.0241 (mean 0.1051); seed 100 (tuning only) 0.1554. The probe is larger than for the next-task D2 (F42: 0.015-0.115 in the staggered regime), with one seed far below.
+Label counts (RSU-steps over the 30 staggered training scenarios of the seed, 720000 active RSU-steps each; `scripts/s15_horizon.py counts`): next-task labelled share 0.996-0.997, share of labelled points with a failed next task 0.078-0.087; horizon labelled share 0.980-0.984 (the 5-task rule excludes 1.6-2.0% of active RSU-steps), share of labelled points with y = 1 (f < 0.75) 0.088-0.098 (seeds 1-5; seed 100: 0.997 / 0.081 / 0.980 / 0.098).
+Held-out diagnostic AUC over the fixed shared-onset window [450, 650) printed by the trainer (print-only, a window-and-sample artefact under staggered onset, F41; not a result of this experiment): C-h 0.73, 0.84, 0.61, 0.80, 0.78; D2-h 0.69, 0.86, 0.69, 0.83, 0.88 (seeds 1-5).
+Interpretation (one line): both heads fit the horizon objective (validation BCE far below the untrained 0.64-0.80; the objective is easier in BCE terms because only about 9% of labelled points are y = 1), D2-h uses its neighbour block in 5 of 6 models but not in seed 1; nothing about detection is implied.
