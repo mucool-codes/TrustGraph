@@ -1984,3 +1984,22 @@ State of knowledge at writing: no S16 code exists and no S16 quantity of any kin
 ### D77 - S16 implementation choices D76 left open, and process disclosure
 Date: 2026-10-15 | Session: S16 | Status: active
 D76 is untouched. (1) `scripts/s16_confirm.py` reuses the S15 scenario generator, model loader and closed-loop runner and the S13 latency rule and t-interval unchanged; the false-alarm rule, tau and the labels are small pure functions tested in the new `tests/test_s16.py` (one test was corrected for a float32/float64 comparison before any S16 number existed). The script is allowlisted in `tests/test_sealing.py`. (2) Harness check, before any number: S16's open-loop path reproduced the stored S15 C-h and C trust arrays, and its closed-loop path the stored S15 C-h result, exactly (seed 1, rho 1.0, draw 300). (3) The D76 overall label for the rule's "otherwise" case is NOT CONFIRMED, as written in D76. (4) After F50 was committed, one check was made to read the result, not to change it: pre-onset trust is identical across draws and rho within a seed (F51 (ii)). (5) Times: D76 96246a8 22:24:12 +0530 (commit log; branch pushed at once); first evaluation number 16:59:34Z = 22:29:34 +0530 (script log); first closed-loop result 17:04:03Z; F50 f2eb79d 22:42:31 +0530 (commit log).
+
+### D78 - Resolution of the S16 decision request: CLAIMS.md re-issued with the S16 results (A30 re-issued as NOT CONFIRMED, X24, A16/R6 times, A19 sentence) and the shared-rule caveat on every latency entry
+Date: 2026-10-15 | Session: S16b (after S16 design review) | Status: active
+Records the review answers. D76, D77, F50 and F51 are not edited; nothing is re-run; `paper/` is not edited.
+
+**Decision:**
+- **Q1: adopt as drafted.** A30 is re-issued (confirmatory test, D76: latency EARLIER at both rho, false alarms NOT ACCEPTABLE at both, verdict NOT CONFIRMED; the S15 descriptive numbers kept as recorded); new FORBIDDEN X24; A16 gains the S16 pre-registration, first-number and raw-results times; R6 lists D65, D68, D72, D76 beside the earlier entries; A19 gains the sentence that the rule's false-alarm rate was measured once (C and C-h, 0.32-0.44) and not for D, D2, D2-h or H.
+- **Q2: option (b), applied to every entry that reports a detection latency under this rule or one built the same way.** Inventory (rule = a model's own 1st-percentile threshold over its trust at steps 100-399, detection at the first step from onset with 10 consecutive steps strictly below it inside a 400-step window, censored at 399):
+  - A7 (C 151, D 220 steps; shared point, closed loop): D56 rule, tau per closed-loop run over active RSU-steps. Same construction: caveat added.
+  - A9 (C 77-97 steps earlier than D): D43/D46 rule, tau pooled over the seed's sweep draws, shared onset. Same construction: caveat added.
+  - A23 (C 5-10 steps earlier than H): D65 1.5 = the D56 rule per run, H's series being its `success_ewma`. Same construction: caveat added (inside the parenthesis, as that latency is descriptive).
+  - A25, A28, A29: the D65 2.5 rule with D66 item 1, tau pooled per (model, seed, rho), late-onset RSUs. Caveat added.
+  - A30: the D76 rule (D65 2.5 applied to all degraded RSUs). Caveat added.
+  - **Different rule, left unchanged:** A24 (a lead of the observable `success_ewma`, per-RSU own 1st-percentile threshold, F18 form, no model; it is a statement about the scenario, not a detection latency of any trust head) and A11 (its "does not systematically cost detection" refers to window AUC, F19, not to a latency). No other entry reports a detection latency (A12's and the H5 "latency" are selection-score and timing terms).
+  The caveat is the review's sentence verbatim except that typographic quotes and the en dash are written in the file's ASCII convention ("rule's", "0.32-0.44").
+- **Q3: yes.** The paper-update session adds S15 and S16 together, with A30 shown as NOT CONFIRMED next to the A29 row at the same prominence.
+
+**Alternatives:** caveat in A19 only (rejected by review: a reader meets the latency numbers in the results entries); editing A24/A11 too (rejected: they do not report a latency under this rule).
+**Rationale:** the only measured false-alarm rate of the detection rule is high, so every latency built on it must be read as a comparison under one shared rule, not as a time-to-alarm at a stated false-alarm rate; the S16 negative is carried at its measured strength.
