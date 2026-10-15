@@ -1944,3 +1944,10 @@ Records the review answers. D72, D73 and F46-F49 are not edited; nothing is re-r
 
 **Alternatives:** dropping A30 (rejected by review: it is a measured, scoped, interval-bearing fact, now marked descriptive and unconfirmed).
 **Rationale:** the claims gate must carry the S15 NULL at its measured strength, and must not let the unconfirmed C-h detection gain read as a result.
+
+
+### D75 - S12b: paper fixes (abstract wording, verified citations, author block); the S15 results stay out of the paper until the paper-update session
+Date: 2026-10-15 | Session: S12b | Status: active
+**Decision:** (1) The abstract's three requested edits are made inside CLAIMS.md (A9, A10, A25, A28; A16; A27, A23) and the abstract is trimmed to at most 250 words, keeping the scope and every negative result. (2) Citations are added only after reading the arXiv API record (and, for GNNExplainer, the NeurIPS proceedings page) on 2026-10-15: the authors of refs 1-10, GINEConv (Hu et al., ICLR 2020), GNNExplainer (Ying et al., NeurIPS 2019) and PyTorch Geometric (Fey and Lenssen, 2019). The record, with sources, is in RELATED_WORK.md ("S12b citation verification"). The ICLR page for Hu et al. could not be read (browser check); the venue rests on the arXiv comment "Accepted as a spotlight to ICLR 2020" and is stated as such. (3) The two-author block is set as supplied. (4) Per D74 Q2 the S15 results (A29, A30) and the edits to A19/A20 made in S15b are NOT added now: one paper-update session will add S15 and S16 together. The draft's discussion and limitations therefore still carry the pre-S15 wording of A19/A20.
+**Alternatives:** syncing A19/A20 now (rejected: D74 defers all S15 text to one session, and a partial sync would mix versions).
+**Rationale:** every added citation traces to a page read on a named date; the paper is edited once per CLAIMS version, as D74 decided.

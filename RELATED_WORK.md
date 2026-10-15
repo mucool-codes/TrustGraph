@@ -63,3 +63,26 @@ measured gain over node-local). The table is generated into `results/s10/tables/
 - Ref 11 is the closest explainable vehicular-offloading work found; the contribution difference is the exactly decomposable score and a trust head under injected degradation, not a performance claim.
 - Ref 13's trust floor is the nearest analogue of the gate we tested; in our scenario the gate and the weighted rule performed equivalently (A15).
 - Ref 12 is prior art for behavioural trust of RSUs.
+
+
+## S12b citation verification (2026-10-15, DECISIONS D75)
+
+Authors and venues of the cited works were read on 2026-10-15 from the arXiv API record (`https://export.arxiv.org/api/query?id_list=...`, fields title, authors, comment, journal_ref, doi) and, for GNNExplainer, also from the NeurIPS proceedings page. Nothing was filled from memory.
+
+| Ref | arXiv id | Authors as read | Venue information as read | Source |
+|---|---|---|---|---|
+| 1 | 2605.07658 | Botao Zhu, Xianbin Wang | arXiv comment: "IEEE ICC 2026" | arXiv API |
+| 2 | 2512.05788 | Botao Zhu, Xianbin Wang, Dusit Niyato | journal_ref: IEEE JSAC, 2026, doi 10.1109/JSAC.2025.3642235 | arXiv API |
+| 3 | 2407.02342 | Wenhua Wang, Qiong Wu, Pingyi Fan, Nan Cheng, Wen Chen, Jiangzhou Wang, Khaled B. Letaief | comment: submitted to an IEEE journal | arXiv API |
+| 4 | 2510.26256 | Geng Sun, Siyi Chen, Zemin Sun, Long He, Jiacheng Wang, Dusit Niyato, Zhu Han, Dong In Kim | preprint; arXiv title ends "Vehicular Fog Computing Systems Under Asymmetric Information" | arXiv API |
+| 5 | 2410.03472 | Mohammad Parsa Toopchinezhad, Mahmood Ahmadi | preprint | arXiv API |
+| 6 | 2602.04120 | Samaresh Kumar Singh, Joyjit Roy | journal_ref: 2026 IEEE SoutheastCon, doi 10.1109/SoutheastCon63549.2026.11476268 | arXiv API |
+| 7 | 2501.10292 | Suvidha Mhatre, Ferran Adelantado, Kostas Ramantas, Christos Verikoukis | preprint | arXiv API |
+| 8 | 2509.14925 | Konrad Nowosadko, Franco Ruggeri, Ahmad Terra | preprint | arXiv API |
+| 9 | 2509.21649 | Yeison Stiven Murcia, Oscar Mauricio Caicedo, Daniela Maria Casas, Nelson Luis Saldanha da Fonseca | preprint | arXiv API |
+| 10 | 2509.12262 | Ngoc Hieu Dao | comment: "B. Comp Dissertation" | arXiv API |
+| GINEConv | 1905.12265 | Weihua Hu, Bowen Liu, Joseph Gomes, Marinka Zitnik, Percy Liang, Vijay Pande, Jure Leskovec ("Strategies for Pre-training Graph Neural Networks") | comment: "Accepted as a spotlight to ICLR 2020" | arXiv API (the ICLR/OpenReview page could not be read: browser check) |
+| GNNExplainer | 1903.03894 | Rex (Zhitao) Ying, Dylan Bourgeois, Jiaxuan You, Marinka Zitnik, Jure Leskovec | Advances in Neural Information Processing Systems 32 (2019) | NeurIPS proceedings page (citation meta tags) and arXiv API |
+| PyG | 1903.02428 | Matthias Fey, Jan Eric Lenssen ("Fast Graph Representation Learning with PyTorch Geometric") | comment: "ICLR 2019 (RLGM Workshop)" | arXiv API |
+
+Wording limits: refs 1-10 may still be characterised only as section "What may be said" and the table allow; this record adds authors and venues only. Ref 1's venue is an arXiv comment, ref 3's is "submitted"; they are cited as preprints.
