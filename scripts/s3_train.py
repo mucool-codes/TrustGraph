@@ -32,7 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from trustgraph.config import SeedChain, load_config, with_overrides  # noqa: E402
-from trustgraph.dataset import build_graphset, next_task_labels  # noqa: E402
+from trustgraph.dataset import build_graphset, labels_for  # noqa: E402
 from trustgraph.diagnostic import (  # noqa: E402
     PLATEAU_WINDOW,
     PRIMARY_WINDOW,
@@ -75,6 +75,7 @@ def main() -> int:
     ap.add_argument("--out", default="results")
     ap.add_argument("--ckpt-dir", default="checkpoints", help="S13 (D65) writes to checkpoints/s13; the default is unchanged")
     ap.add_argument("--threads", type=int, default=None, help="torch threads (S13: 3 for every seed); default leaves torch alone")
+    ap.add_argument("--objective", default="next", choices=("next", "horizon"), help="S15 (D72): `horizon` is the forward-looking objective; the default is L3, unchanged")
     args = ap.parse_args()
 
     if args.threads is not None:
@@ -93,29 +94,29 @@ def main() -> int:
     for rho in TRAIN_RHO:
         for frac in TRAIN_FRACTION:
             for draw in TRAIN_DRAWS:
-                gs = build_graphset(scenario_cfg(base, seed, rho, frac, draw), args.config, STRIDE)
+                gs = build_graphset(scenario_cfg(base, seed, rho, frac, draw), args.config, STRIDE, objective=args.objective)
                 train_graphs += gs.graphs
     val_sets = {}
     for rho in VAL_RHO:
         for frac in TRAIN_FRACTION:
             cfg_v = scenario_cfg(base, seed, rho, frac, VAL_DRAW)
-            val_sets[(rho, frac)] = (build_graphset(cfg_v, args.config, STRIDE), cfg_v)
+            val_sets[(rho, frac)] = (build_graphset(cfg_v, args.config, STRIDE, objective=args.objective), cfg_v)
     val_graphs = [g for gs, _ in val_sets.values() for g in gs.graphs]
     diag_set, diag_cfg = val_sets[(DIAG_CELL[0], DIAG_CELL[1])]
     diag_path = default_observed_path(args.config, diag_cfg)
 
     held_cfg = scenario_cfg(base, seed, *HELD_OUT)
-    held_set = build_graphset(held_cfg, args.config, stride=1)
+    held_set = build_graphset(held_cfg, args.config, stride=1, objective=args.objective)
     held_path = default_observed_path(args.config, held_cfg)
     held_obs = load_observed(held_path)
-    y_all, valid_all = next_task_labels(held_obs)
+    y_all, valid_all = labels_for(held_obs, args.objective)
     print(
         f"  train graphs {len(train_graphs)}  val graphs {len(val_graphs)}  "
         f"held-out graphs {len(held_set)}   ({time.time() - t0:.0f}s)",
         flush=True,
     )
 
-    report = {"seed": seed, "settings": settings.__dict__, "variants": {}}
+    report = {"seed": seed, "objective": args.objective, "settings": settings.__dict__, "variants": {}}
     for variant in args.variants:
         print("=" * 78)
         print(f"VARIANT {variant}   seed {seed}   settings {settings}")
@@ -182,7 +183,7 @@ def main() -> int:
         if variant == "D2":
             print(f"    neighbour probe (validation): {entry['neighbour_probe']}")
 
-    if len(report["variants"]) == 2:
+    if set(report["variants"]) == {"C", "D"}:
         pc, pd = (report["variants"][v]["parameters"] for v in ("C", "D"))
         report["parameter_ratio_D_over_C"] = pd / pc
         print(f"\nparameters: C {pc}, D {pd}, D/C = {pd / pc:.2f}x")

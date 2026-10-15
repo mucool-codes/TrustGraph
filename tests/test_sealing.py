@@ -58,6 +58,7 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s13_h.py",  # heuristic-baseline tuning and evaluation (D65)
         "s13_stag.py",  # staggered-onset mechanism check, evaluation and closed loop (D65)
         "s14_d2.py",  # D2 evaluation: open-loop latency and AUC, closed loop (D68)
+        "s15_horizon.py",  # horizon-objective evaluation: open-loop latency, closed loop (D72)
         "s10_data.py",  # figure inputs that need closed-loop runs (timeline, worked example)
         "s9_overhead.py",  # H4/H5 serial stage (D56 section 7)
     }

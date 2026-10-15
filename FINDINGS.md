@@ -2277,3 +2277,218 @@ Date: 2026-10-15 | Rules exactly as in D68; no rule, window, floor or draw chang
 D42 counts: primary rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs per seed 110-138); rho 0 250 / 0 / 183 aggregated (draws with no late-onset RSU are not aggregated); AUC 250 / 0 / 250 per rho; closed loop 250 / 0 / 250 per regime. The NOISY extension (seeds 6-10) was **not triggered** (no NOISY label); none was run. The neighbour-block probe was >= 0.01 in 12 of 12 models (F42), so the "no dependence" report is not triggered. Rho 0 reading (D68 section 4): rho 1.0 label NULL, so there is no structural reading; the rho 1.0 minus rho 0 difference of D2-C latency is -0.9 [-3.8, +1.9], nothing.
 Closed loop, n_av / n_win / never-avoided together (F44): shared regime A 627.1 / 907.1 / 0.488, C 132.9 / 499.3 / 0.004, D2 116.9 / 479.2 / 0.004; staggered regime A 627.1 / 907.1 / 0.488, C 217.0 / 561.5 / 0.004, D2 232.3 / 577.7 / 0.004. Descriptive D57-normalised (n_C - n_D2)/n_A on n_av: +0.027 [+0.008, +0.045] shared, -0.024 [-0.042, -0.006] staggered (opposite signs, intervals exclude 0 but there is no label and no success difference).
 Interpretation (one line): with a head that sees only same-segment RSU neighbours (no vehicles, mean not sum) and starts as C, detection latency, shared-regime AUC and closed-loop success are indistinguishable from C (a latency difference of 20 steps either way is ruled out at rho 1.0), so removing vehicle nodes and the all-neighbour sum did not make the graph help in this simulation, although the models use the neighbour block (probe 0.015-0.115). This is a test of one specific dilution route (D2's construction), not of dilution in general; it does not revise F17, F26, F37 or any H2 verdict.
+
+### F46 - S15 training: C-h and D2-h on the horizon objective, parameter counts, convergence, D2-h neighbour-block probe, label counts (RAW diagnostics; no D2-h-vs-C-h evaluation number exists yet)
+Date: 2026-10-15 | Commit: see git log (this entry) | Pre-registration D72 = e7c7d54 (2026-10-15 18:51:15 +0530) | Config: configs/staggered.yaml (S = 300), `scripts/s3_train.py --objective horizon`, D45 settings, 3 torch threads, seeds 1-5 and 100; checkpoints/s15/ (untracked). The first training run crashed in the end-of-run summary line (it assumed variants C and D; no S15 result file was written and none was read); the line was guarded (commit "s3_train parameter-ratio line only for the C/D pair") and all twelve trainings were re-run from scratch; the numbers below are from the re-run. Training is deterministic from (config, seed, threads).
+Parameters (from the code): C-h 1313, D2-h 1570. Objective: BCE of trust against z = 1 - y, y = 1 if the fraction of the RSU's tasks in (t, t+150] meeting their deadline is < 0.75, windows with < 5 tasks excluded (D72 section 1).
+Validation BCE is the selection quantity (horizon objective, so it is not comparable with the next-task BCEs of F42). Probe = D68/D72 neighbour-block probe: mean |change in RSU trust| on the seed's validation graphs when D2-h's neighbour block is zeroed (threshold 0.01).
+
+| seed | model | initial val BCE | best val BCE (epoch / stop) | held-out BCE | probe |
+|---|---|---|---|---|---|
+| 1 | C-h | 0.6842 | 0.0541 (46 / 47) | 0.0318 | - |
+| 1 | D2-h | 0.6842 | 0.0558 (31 / 39) | 0.0357 | **0.0014** |
+| 2 | C-h | 0.7537 | 0.0577 (19 / 27) | 0.0423 | - |
+| 2 | D2-h | 0.7537 | 0.0592 (12 / 20) | 0.0446 | 0.0272 |
+| 3 | C-h | 0.7968 | 0.0524 (30 / 34) | 0.0583 | - |
+| 3 | D2-h | 0.7968 | 0.0501 (34 / 35) | 0.0518 | 0.3856 |
+| 4 | C-h | 0.6663 | 0.0412 (40 / 43) | 0.0402 | - |
+| 4 | D2-h | 0.6663 | 0.0397 (41 / 48) | 0.0443 | 0.0872 |
+| 5 | C-h | 0.6403 | 0.0363 (35 / 37) | 0.0501 | - |
+| 5 | D2-h | 0.6403 | 0.0321 (51 / 59) | 0.0431 | 0.0241 |
+| 100 | C-h | 0.7271 | 0.0316 (32 / 33) | 0.0331 | - |
+| 100 | D2-h | 0.7271 | 0.0257 (69 / 74) | 0.0261 | 0.1554 |
+
+All 12 trainings stopped by patience. D44-style checks: best validation BCE below the untrained model's in 12 of 12. **Probe >= 0.01 in 5 of 6 D2-h models; D2-h seed 1 is 0.0014, below the 0.01 threshold, so for that seed the output does not depend on the neighbour block after training (reported as D72 prescribes; the evaluation includes it).** Probe over the five evaluation seeds: 0.0014, 0.0272, 0.3856, 0.0872, 0.0241 (mean 0.1051); seed 100 (tuning only) 0.1554. The probe is larger than for the next-task D2 (F42: 0.015-0.115 in the staggered regime), with one seed far below.
+Label counts (RSU-steps over the 30 staggered training scenarios of the seed, 720000 active RSU-steps each; `scripts/s15_horizon.py counts`): next-task labelled share 0.996-0.997, share of labelled points with a failed next task 0.078-0.087; horizon labelled share 0.980-0.984 (the 5-task rule excludes 1.6-2.0% of active RSU-steps), share of labelled points with y = 1 (f < 0.75) 0.088-0.098 (seeds 1-5; seed 100: 0.997 / 0.081 / 0.980 / 0.098).
+Held-out diagnostic AUC over the fixed shared-onset window [450, 650) printed by the trainer (print-only, a window-and-sample artefact under staggered onset, F41; not a result of this experiment): C-h 0.73, 0.84, 0.61, 0.80, 0.78; D2-h 0.69, 0.86, 0.69, 0.83, 0.88 (seeds 1-5).
+Interpretation (one line): both heads fit the horizon objective (validation BCE far below the untrained 0.64-0.80; the objective is easier in BCE terms because only about 9% of labelled points are y = 1), D2-h uses its neighbour block in 5 of 6 models but not in seed 1; nothing about detection is implied.
+
+### F47 - S15 closed-loop tuning grids for C-h and D2-h on the tuning seed (RAW, recorded before the chosen weights are used anywhere)
+Date: 2026-10-15 | Commit: this entry | D72 section 5a = D52 procedure: seed 100, rho 1.0, fraction 0.20, draws {0,1,2}, staggered regime, closed loop (dwell filter, handoff on), objective = mean post-onset (steps >= 400) deadline success; ties to the first grid point in ascending order. Seed-100 C-h and D2-h checkpoints (F46). Run by `scripts/s15_horizon.py tune --write`; first tuning result logged 2026-10-15T13:31:56Z (UTC). Full grid in results/s15/tuning-grid.json (untracked). Harness check before the grid: the original staggered C, run through the S15 closed-loop and open-loop paths on seed 1, draw 200 (an S13 draw, not a result), equals the stored S13 closed-loop result and the stored S13 trust array exactly.
+
+**C-h** chosen (alpha, beta, gamma) = (0.25, 0.25, 0.3), objective 0.9126. For reference: original staggered C (2.0, 0.25, 0.15) and D2 (1.0, 0.25, 0.3) (F43), A (weights_staggered.yaml).
+
+| alpha | beta | gamma | objective | draw 0 | draw 1 | draw 2 |
+|---|---|---|---|---|---|---|
+| 0.25 | 0.25 | 0.15 | 0.9089 | 0.9439 | 0.8725 | 0.9104 |
+| 0.25 | 0.25 | 0.3 | 0.9126 | 0.9469 | 0.8756 | 0.9154 |
+| 0.25 | 0.25 | 0.6 | 0.9124 | 0.9467 | 0.8749 | 0.9156 |
+| 0.25 | 0.5 | 0.15 | 0.9058 | 0.9417 | 0.8684 | 0.9073 |
+| 0.25 | 0.5 | 0.3 | 0.9084 | 0.9437 | 0.8717 | 0.9099 |
+| 0.25 | 0.5 | 0.6 | 0.9099 | 0.9424 | 0.8747 | 0.9126 |
+| 0.25 | 1.0 | 0.15 | 0.8926 | 0.9210 | 0.8593 | 0.8975 |
+| 0.25 | 1.0 | 0.3 | 0.8962 | 0.9241 | 0.8634 | 0.9010 |
+| 0.25 | 1.0 | 0.6 | 0.9005 | 0.9291 | 0.8673 | 0.9052 |
+| 0.5 | 0.25 | 0.15 | 0.9060 | 0.9410 | 0.8693 | 0.9078 |
+| 0.5 | 0.25 | 0.3 | 0.9085 | 0.9419 | 0.8712 | 0.9123 |
+| 0.5 | 0.25 | 0.6 | 0.9126 | 0.9461 | 0.8758 | 0.9158 |
+| 0.5 | 0.5 | 0.15 | 0.9034 | 0.9382 | 0.8669 | 0.9052 |
+| 0.5 | 0.5 | 0.3 | 0.9089 | 0.9439 | 0.8725 | 0.9104 |
+| 0.5 | 0.5 | 0.6 | 0.9126 | 0.9469 | 0.8756 | 0.9154 |
+| 0.5 | 1.0 | 0.15 | 0.9028 | 0.9389 | 0.8653 | 0.9041 |
+| 0.5 | 1.0 | 0.3 | 0.9058 | 0.9417 | 0.8684 | 0.9073 |
+| 0.5 | 1.0 | 0.6 | 0.9084 | 0.9437 | 0.8717 | 0.9099 |
+| 1.0 | 0.25 | 0.15 | 0.9041 | 0.9397 | 0.8667 | 0.9060 |
+| 1.0 | 0.25 | 0.3 | 0.9068 | 0.9417 | 0.8701 | 0.9086 |
+| 1.0 | 0.25 | 0.6 | 0.9094 | 0.9424 | 0.8727 | 0.9132 |
+| 1.0 | 0.5 | 0.15 | 0.9040 | 0.9395 | 0.8680 | 0.9045 |
+| 1.0 | 0.5 | 0.3 | 0.9060 | 0.9410 | 0.8693 | 0.9078 |
+| 1.0 | 0.5 | 0.6 | 0.9085 | 0.9419 | 0.8712 | 0.9123 |
+| 1.0 | 1.0 | 0.15 | 0.9020 | 0.9397 | 0.8643 | 0.9021 |
+| 1.0 | 1.0 | 0.3 | 0.9034 | 0.9382 | 0.8669 | 0.9052 |
+| 1.0 | 1.0 | 0.6 | 0.9089 | 0.9439 | 0.8725 | 0.9104 |
+| 2.0 | 0.25 | 0.15 | 0.9037 | 0.9395 | 0.8662 | 0.9054 |
+| 2.0 | 0.25 | 0.3 | 0.9054 | 0.9382 | 0.8686 | 0.9093 |
+| 2.0 | 0.25 | 0.6 | 0.9086 | 0.9439 | 0.8712 | 0.9106 |
+| 2.0 | 0.5 | 0.15 | 0.9017 | 0.9354 | 0.8662 | 0.9034 |
+| 2.0 | 0.5 | 0.3 | 0.9041 | 0.9397 | 0.8667 | 0.9060 |
+| 2.0 | 0.5 | 0.6 | 0.9068 | 0.9417 | 0.8701 | 0.9086 |
+| 2.0 | 1.0 | 0.15 | 0.9013 | 0.9367 | 0.8638 | 0.9034 |
+| 2.0 | 1.0 | 0.3 | 0.9040 | 0.9395 | 0.8680 | 0.9045 |
+| 2.0 | 1.0 | 0.6 | 0.9060 | 0.9410 | 0.8693 | 0.9078 |
+| 4.0 | 0.25 | 0.15 | 0.9023 | 0.9356 | 0.8660 | 0.9052 |
+| 4.0 | 0.25 | 0.3 | 0.9046 | 0.9389 | 0.8680 | 0.9071 |
+| 4.0 | 0.25 | 0.6 | 0.9072 | 0.9406 | 0.8706 | 0.9104 |
+| 4.0 | 0.5 | 0.15 | 0.8984 | 0.9332 | 0.8608 | 0.9012 |
+| 4.0 | 0.5 | 0.3 | 0.9037 | 0.9395 | 0.8662 | 0.9054 |
+| 4.0 | 0.5 | 0.6 | 0.9054 | 0.9382 | 0.8686 | 0.9093 |
+| 4.0 | 1.0 | 0.15 | 0.8997 | 0.9354 | 0.8627 | 0.9010 |
+| 4.0 | 1.0 | 0.3 | 0.9017 | 0.9354 | 0.8662 | 0.9034 |
+| 4.0 | 1.0 | 0.6 | 0.9041 | 0.9397 | 0.8667 | 0.9060 |
+
+Spread of the 45 objectives: min 0.8926, max 0.9126; points within 0.002 of the best: 4.
+
+**D2-h** chosen (alpha, beta, gamma) = (0.5, 0.25, 0.6), objective 0.9132. For reference: original staggered C (2.0, 0.25, 0.15) and D2 (1.0, 0.25, 0.3) (F43), A (weights_staggered.yaml).
+
+| alpha | beta | gamma | objective | draw 0 | draw 1 | draw 2 |
+|---|---|---|---|---|---|---|
+| 0.25 | 0.25 | 0.15 | 0.9089 | 0.9443 | 0.8708 | 0.9115 |
+| 0.25 | 0.25 | 0.3 | 0.9124 | 0.9467 | 0.8751 | 0.9154 |
+| 0.25 | 0.25 | 0.6 | 0.9109 | 0.9432 | 0.8743 | 0.9152 |
+| 0.25 | 0.5 | 0.15 | 0.9057 | 0.9419 | 0.8680 | 0.9073 |
+| 0.25 | 0.5 | 0.3 | 0.9081 | 0.9434 | 0.8708 | 0.9099 |
+| 0.25 | 0.5 | 0.6 | 0.9093 | 0.9417 | 0.8743 | 0.9119 |
+| 0.25 | 1.0 | 0.15 | 0.8921 | 0.9202 | 0.8588 | 0.8973 |
+| 0.25 | 1.0 | 0.3 | 0.8959 | 0.9236 | 0.8630 | 0.9010 |
+| 0.25 | 1.0 | 0.6 | 0.9002 | 0.9282 | 0.8677 | 0.9045 |
+| 0.5 | 0.25 | 0.15 | 0.9081 | 0.9430 | 0.8701 | 0.9110 |
+| 0.5 | 0.25 | 0.3 | 0.9120 | 0.9465 | 0.8743 | 0.9152 |
+| 0.5 | 0.25 | 0.6 | 0.9132 | 0.9480 | 0.8749 | 0.9167 |
+| 0.5 | 0.5 | 0.15 | 0.9059 | 0.9421 | 0.8682 | 0.9073 |
+| 0.5 | 0.5 | 0.3 | 0.9089 | 0.9443 | 0.8708 | 0.9115 |
+| 0.5 | 0.5 | 0.6 | 0.9124 | 0.9467 | 0.8751 | 0.9154 |
+| 0.5 | 1.0 | 0.15 | 0.9025 | 0.9389 | 0.8643 | 0.9043 |
+| 0.5 | 1.0 | 0.3 | 0.9057 | 0.9419 | 0.8680 | 0.9073 |
+| 0.5 | 1.0 | 0.6 | 0.9081 | 0.9434 | 0.8708 | 0.9099 |
+| 1.0 | 0.25 | 0.15 | 0.9067 | 0.9417 | 0.8688 | 0.9095 |
+| 1.0 | 0.25 | 0.3 | 0.9102 | 0.9447 | 0.8732 | 0.9126 |
+| 1.0 | 0.25 | 0.6 | 0.9128 | 0.9474 | 0.8751 | 0.9160 |
+| 1.0 | 0.5 | 0.15 | 0.9042 | 0.9404 | 0.8658 | 0.9065 |
+| 1.0 | 0.5 | 0.3 | 0.9081 | 0.9430 | 0.8701 | 0.9110 |
+| 1.0 | 0.5 | 0.6 | 0.9120 | 0.9465 | 0.8743 | 0.9152 |
+| 1.0 | 1.0 | 0.15 | 0.9029 | 0.9400 | 0.8643 | 0.9045 |
+| 1.0 | 1.0 | 0.3 | 0.9059 | 0.9421 | 0.8682 | 0.9073 |
+| 1.0 | 1.0 | 0.6 | 0.9089 | 0.9443 | 0.8708 | 0.9115 |
+| 2.0 | 0.25 | 0.15 | 0.9044 | 0.9400 | 0.8660 | 0.9071 |
+| 2.0 | 0.25 | 0.3 | 0.9065 | 0.9402 | 0.8684 | 0.9110 |
+| 2.0 | 0.25 | 0.6 | 0.9119 | 0.9458 | 0.8738 | 0.9160 |
+| 2.0 | 0.5 | 0.15 | 0.9037 | 0.9393 | 0.8658 | 0.9060 |
+| 2.0 | 0.5 | 0.3 | 0.9067 | 0.9417 | 0.8688 | 0.9095 |
+| 2.0 | 0.5 | 0.6 | 0.9102 | 0.9447 | 0.8732 | 0.9126 |
+| 2.0 | 1.0 | 0.15 | 0.9017 | 0.9389 | 0.8623 | 0.9041 |
+| 2.0 | 1.0 | 0.3 | 0.9042 | 0.9404 | 0.8658 | 0.9065 |
+| 2.0 | 1.0 | 0.6 | 0.9081 | 0.9430 | 0.8701 | 0.9110 |
+| 4.0 | 0.25 | 0.15 | 0.9042 | 0.9400 | 0.8669 | 0.9058 |
+| 4.0 | 0.25 | 0.3 | 0.9063 | 0.9402 | 0.8690 | 0.9097 |
+| 4.0 | 0.25 | 0.6 | 0.9089 | 0.9432 | 0.8714 | 0.9121 |
+| 4.0 | 0.5 | 0.15 | 0.9015 | 0.9367 | 0.8647 | 0.9030 |
+| 4.0 | 0.5 | 0.3 | 0.9044 | 0.9400 | 0.8660 | 0.9071 |
+| 4.0 | 0.5 | 0.6 | 0.9065 | 0.9402 | 0.8684 | 0.9110 |
+| 4.0 | 1.0 | 0.15 | 0.8988 | 0.9350 | 0.8603 | 0.9012 |
+| 4.0 | 1.0 | 0.3 | 0.9037 | 0.9393 | 0.8658 | 0.9060 |
+| 4.0 | 1.0 | 0.6 | 0.9067 | 0.9417 | 0.8688 | 0.9095 |
+
+Spread of the 45 objectives: min 0.8921, max 0.9132; points within 0.002 of the best: 7.
+
+Interpretation (one line): the weights are written to the new configs/weights_horizon.yaml and carry no claim (A18); no other weight file was touched.
+
+### F48 - S15 raw results: frozen C-h and D2-h (horizon objective), staggered onset, draws 300-349, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Commit: this entry | Pre-registration D72 = e7c7d54 (2026-10-15 18:51:15 +0530, commit log). Scripts: `scripts/s15_horizon.py trust`, `eval`, `closed`, `report` (code at the S15 commits before this entry). C-h, D2-h = F46 checkpoints; the original staggered C = checkpoints/s13 (S13), re-evaluated on the same draws; weights: A from weights_staggered.yaml, C-h and D2-h from weights_horizon.yaml (F47). Order of the script-logged UTC times (results/s15/first_number.json): tuning grid (seed 100, draws 0-2) first result 2026-10-15T13:31:56Z; **first evaluation number (open-loop trust on draws 300-349) 2026-10-15T13:33:17Z** (= 19:03:17 +0530); first closed-loop evaluation result 2026-10-15T13:34:52Z. The tuning grid therefore preceded both, as D72 section 6 orders it. No weight, window, floor or draw was changed after the first evaluation number. (This run's open-loop and closed-loop numbers were each produced once.)
+
+Open-loop (PRIMARY and SECONDARY (b)); "C(S13)" is the original staggered C trained on the next-task objective:
+
+```
+======================================================================================================================
+S15 PRIMARY: STAGGERED ONSET (S = 300), open-loop frozen C-h and D2-h (horizon objective), draws 300-349, fraction 0.20, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 36  late-onset RSUs 46  tau C-h 0.8832 D2-h 0.8562 C(S13) 0.8461
+    seed 2: attempted 50  failed 0  aggregated 31  late-onset RSUs 42  tau C-h 0.8967 D2-h 0.9445 C(S13) 0.8602
+    seed 3: attempted 50  failed 0  aggregated 33  late-onset RSUs 41  tau C-h 0.9270 D2-h 0.9510 C(S13) 0.8137
+    seed 4: attempted 50  failed 0  aggregated 35  late-onset RSUs 44  tau C-h 0.8530 D2-h 0.9196 C(S13) 0.8598
+    seed 5: attempted 50  failed 0  aggregated 31  late-onset RSUs 38  tau C-h 0.8680 D2-h 0.8969 C(S13) 0.8682
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C-h 95.7 +/- 7.8   D2-h 93.6 +/- 9.3   C(S13, next-task objective) 130.6 +/- 11.3
+  detected fraction: C-h 1.000  D2-h 1.000  C(S13) 1.000
+  PRIMARY  D2-h - C-h latency: -2.0 (sd 4.9) 95% [-8.1, +4.1]
+  per-seed D2-h - C-h latency: [5.0, 1.2, -4.7, -5.8, -5.8]
+  SECONDARY (b) (descriptive, no label)  C-h - C(S13) latency: -34.9 (sd 16.8) 95% [-55.8, -14.1]   per seed [-43.0, -24.4, -60.8, -20.9, -25.6]
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  late-onset RSUs 124  tau C-h 0.8832 D2-h 0.8562 C(S13) 0.8461
+    seed 2: attempted 50  failed 0  aggregated 50  late-onset RSUs 134  tau C-h 0.8967 D2-h 0.9445 C(S13) 0.8602
+    seed 3: attempted 50  failed 0  aggregated 50  late-onset RSUs 106  tau C-h 0.9270 D2-h 0.9510 C(S13) 0.8137
+    seed 4: attempted 50  failed 0  aggregated 50  late-onset RSUs 141  tau C-h 0.8530 D2-h 0.9196 C(S13) 0.8598
+    seed 5: attempted 50  failed 0  aggregated 50  late-onset RSUs 129  tau C-h 0.8680 D2-h 0.8969 C(S13) 0.8682
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C-h 92.3 +/- 4.6   D2-h 88.2 +/- 9.4   C(S13, next-task objective) 129.7 +/- 12.7
+  detected fraction: C-h 1.000  D2-h 1.000  C(S13) 1.000
+  PRIMARY  D2-h - C-h latency: -4.1 (sd 6.3) 95% [-12.0, +3.7]
+  per-seed D2-h - C-h latency: [3.3, 0.6, -5.6, -12.9, -5.9]
+  SECONDARY (b) (descriptive, no label)  C-h - C(S13) latency: -37.4 (sd 13.0) 95% [-53.5, -21.2]   per seed [-38.3, -34.8, -59.0, -28.6, -26.1]
+
+(description) (D2-h - C-h latency at rho 1.0) minus (at rho 0), per-seed paired: -2.1 (sd 2.8) 95% [-5.6, +1.4]
+```
+
+Closed loop (SECONDARY (a)), rho 1.0, fraction 0.20, draws 300-349:
+
+```
+======================================================================================================================
+S15 SECONDARY (a): closed-loop post-onset success, staggered, rho 1.0, fraction 0.20, draws 300-349, seeds [1, 2, 3, 4, 5] (RAW, descriptive: no labels)
+======================================================================================================================
+weights (alpha, beta, gamma): A (0.0, 0.25, 0.6)  C-h (0.25, 0.25, 0.3)  D2-h (0.5, 0.25, 0.6)
+D42: attempted 250  failed 0  aggregated 250
+  A     success 0.8970 +/- 0.0030
+  C_h   success 0.9336 +/- 0.0093
+  D2_h  success 0.9356 +/- 0.0085
+  D2_h - C_h: +0.0020 (sd 0.0011) 95% [+0.0007, +0.0033]
+  C_h - A: +0.0365 (sd 0.0078) 95% [+0.0268, +0.0463]
+  D2_h - A: +0.0385 (sd 0.0071) 95% [+0.0298, +0.0473]
+  n_av / n_win / never-avoided (mean +/- sd over seeds of per-seed means), always together (D60 Q4):
+    A     n_av   589.6 +/-   90.9   n_win   903.7 +/-   19.9   never-avoided 0.468 +/- 0.129
+    C_h   n_av   224.8 +/-   45.3   n_win   559.9 +/-   70.4   never-avoided 0.020 +/- 0.035
+    D2_h  n_av   224.0 +/-   49.3   n_win   556.9 +/-   69.6   never-avoided 0.020 +/- 0.035
+  D57-normalised (n_C-h - n_D2-h)/n_A on n_av: +0.001 [-0.013, +0.015]  (positive = D2-h sends fewer to degraded RSUs; descriptive)
+  D57-normalised (n_C-h - n_D2-h)/n_A on n_win: +0.003 [-0.001, +0.008]  (positive = D2-h sends fewer to degraded RSUs; descriptive)
+  detection latency (closed loop, D56 rule on each run's own trust, descriptive) C_h: 248.2 steps, detected fraction 0.945
+  detection latency (closed loop, D56 rule on each run's own trust, descriptive) D2_h: 246.7 steps, detected fraction 0.947
+```
+
+### F49 - S15 verdicts against D72 and interpretation (written after F48 was committed in da1b039)
+Date: 2026-10-15 | Rules exactly as in D72; no rule, window, floor, H, threshold, minimum or draw changed. Output: `scripts/s15_horizon.py eval --verdict`.
+
+| item | quantity | mean [95% t, df 4] | D72 label |
+|---|---|---|---|
+| **PRIMARY**, staggered, horizon objective, rho 1.0 | D2-h - C-h latency of late-onset RSUs (steps) | -4.1 [-12.0, +3.7] (C-h 92.3, D2-h 88.2) | **NULL** (interval inside +-20; not WIN: hi = +3.7 is not < 0) |
+| control, rho 0 | D2-h - C-h latency (steps) | -2.0 [-8.1, +4.1] (C-h 95.7, D2-h 93.6) | NULL |
+| description | (rho 1.0) minus (rho 0) of D2-h - C-h | -2.1 [-5.6, +1.4] | none |
+| SECONDARY (b), rho 1.0 | C-h - C(S13) latency (steps) | -37.4 [-53.5, -21.2] (C(S13) 129.7) | none (descriptive) |
+| SECONDARY (b), rho 0 | C-h - C(S13) latency (steps) | -34.9 [-55.8, -14.1] (C(S13) 130.6) | none (descriptive) |
+| SECONDARY (a), closed loop | success D2-h - C-h | +0.0020 [+0.0007, +0.0033] (C-h 0.9336, D2-h 0.9356, A 0.8970) | none (descriptive) |
+
+Rho 0 reading (D72 section 4): the rho 1.0 label is NULL, so there is no structural reading. A difference of 20 steps either way between D2-h and C-h is ruled out at both rho (the intervals lie inside +-20). The NOISY extension to seeds 6-10 was **not triggered** (the label is not NOISY); none was run. Per-seed D2-h - C-h latency at rho 1.0: +3.3, +0.6, -5.6, -12.9, -5.9 (two seeds positive, three negative); at rho 0: +5.0, +1.2, -4.7, -5.8, -5.8.
+D42 counts: rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs per seed 106-141); rho 0 250 / 0 / 166 aggregated (36, 31, 33, 35, 31; draws with no late-onset RSU are not aggregated); closed loop 250 / 0 / 250; detected fraction 1.000 for C-h, D2-h and C(S13) at both rho in the open-loop latency.
+Closed loop, n_av / n_win / never-avoided together (F48): A 589.6 / 903.7 / 0.468, C-h 224.8 / 559.9 / 0.020, D2-h 224.0 / 556.9 / 0.020; D57-normalised (n_C-h - n_D2-h)/n_A +0.001 [-0.013, +0.015] on n_av and +0.003 [-0.001, +0.008] on n_win (descriptive, no label). Success differences against A (descriptive): C-h - A +0.0365 [+0.0268, +0.0463], D2-h - A +0.0385 [+0.0298, +0.0473]. The D2-h - C-h success interval lies above 0 and below the 0.01 floor of the D56 H3 rule; no label is applied to it (D72 section 5).
+Neighbour-block probe (F46): D2-h output depended on the neighbour block (>= 0.01) in 4 of the 5 evaluation seeds and in the tuning seed; seed 1 was 0.0014, below the threshold (reported as D72 prescribes).
+Interpretation (one line): trained to predict the coming 150-step window rather than the next task, a head that sees same-segment RSU neighbours (D2-h) did not detect later-onset RSUs earlier than the node-local head trained the same way (NULL at rho 1.0 and rho 0; 20 steps either way ruled out), so the A20 hypothesis that the next-task objective alone left neighbour evidence nothing to improve is not supported in this simulation for this one horizon objective, threshold and D2 construction. Separately and descriptively, the horizon objective itself moved the node-local head's detection earlier by 35-37 steps against the original C (the two latencies use each model's own pre-onset 1st-percentile threshold, so this is a statement about these models under the D65 rule, not about a threshold-free quantity), with no graph involved. This experiment does not revise F17, F26, F37 or F45 or any H2 verdict, and no mechanism is tested here for why the objective change helps C or why D2-h did not exceed C-h.
