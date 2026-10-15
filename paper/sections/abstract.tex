@@ -9,11 +9,11 @@ In this simulation (synthetic road grid, 20 RSUs, 60 vehicles, injected per-segm
 a node-local head (C) and a graph neural network head (D) both raise post-onset deadline success over a tuned no-trust baseline at all four degraded fractions % src: A5
 (C by 0.021--0.054, D by 0.016--0.039), % src: A5; F26
 and C comes within 0.001--0.003 of a perfect-knowledge oracle. % src: A6; F27
-The graph head D was worse than C on the pre-registered diagnostic and under staggered onset, and not better in the closed loop; a contained graph head was not distinguishable from C. % src: A9, A10, A25, A28
+The graph head D was worse than C on the pre-registered diagnostic and under staggered onset, and not better in the closed loop; a contained graph head was not distinguishable from the node-local head under either of two training objectives. % src: A9, A10, A25, A28, A29 (all four graph tests: S4, S13, S14, S15)
+A forward-looking training objective for C failed its pre-registered confirmatory test: more false alarms were not ruled out. % src: A30 (NOT CONFIRMED; false alarms NOT ACCEPTABLE); X24. No latency value is quoted here, so the D78 caveat is carried in Sec. VII, not in the abstract.
 A non-learned behavioural monitor, using each RSU's own success EWMA, recovers most of the trust-aware gain and comes within 0.003--0.005 of C (pre-registered verdict: not separated). % src: A27, A23
 Removing candidates below a trust threshold performed equivalently to the weighted rule on task success. % src: A15
-The attribution layer on the trust head is weakly faithful, unstable across runs, and asynchronous only (about 310~ms per decision). % src: A13, A14
-Null and negative results are reported at the same level of detail as positive ones.
+The attribution layer on the trust head is weakly faithful, unstable across runs, and asynchronous only. % src: A13 (310 ms per decision: A14, in Sec. VII)
 \end{abstract}
 
 \begin{IEEEkeywords}
