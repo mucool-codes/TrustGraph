@@ -1704,3 +1704,73 @@ chosen (alpha,beta,gamma) = (0.5, 0.25, 0.3), objective 0.8965, per-draw [0.936,
 Spread over the grid: best 0.8965, worst 0.8692. Exact ties at the best value: (0.5,0.25,0.3), (1.0,0.5,0.6) (first in grid order is taken).
 For reference only (F20, same seed, draws, objective): A 0.8670, C 0.8999, D 0.8938, B_oracle 0.9009.
 Interpretation: recorded before use; the chosen weights are written to configs/weights_h.yaml and applied unchanged in the evaluation. One seed, three draws, per-draw values differ by up to 0.09, so differences of ~0.005 between grid points are inside the draw-to-draw spread (as F20).
+
+### F33 — S13 Experiment 1 raw results: heuristic H vs learned C, the four fraction-sweep points, seeds 1-5 x draws 100-149 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Session: S13 | Commit: 9b5c139 (code), 776beff (F32, weights_h.yaml); D65 = 245705b
+Config: `configs/h.yaml` over `configs/sweep.yaml`, `configs/demo.yaml`; H weights `configs/weights_h.yaml` (F32: 0.5, 0.25, 0.3); C weights D52 (1, 0.25, 0.6); frozen seed 1-5 C checkpoints (not used by H); closed loop, dwell filter and handoff on.
+Command: `python scripts/s13_h.py run` then `python scripts/s13_h.py report` (results/s13/h/report-raw.txt). 1000 tasks, 0 failed, 112 min on 12 workers (the machine was shared; the F29 run of the same size took 7.5 min). First evaluation result written 2026-10-15T03:52:23Z (09:22:23 +0530), after F32 (09:21:52 +0530).
+Check: Variant C was recomputed in every task and equals the stored S9 values bit-for-bit (wall time excepted): 0 mismatches at every point. H is paired per draw with stored S9 C and A.
+Reading key: n_win = dispatches to degraded RSUs over [400,1200); (n_H - n_C)/n_A positive = C sends fewer; latency negative = C detects earlier; mean +/- sd across the 5 seed means; intervals Student-t over 5 seeds.
+```
+D42-style accounting (draws attempted / failed / aggregated) and the C-recompute check
+  rho 1.00 frac 0.05: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.10: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.20: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+  rho 1.00 frac 0.30: attempted 250  failed 0  aggregated 250   Variant C recompute differs from stored S9 on 0 draws
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.05   [K = 1: no correlated failure]
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.9474 +/- 0.0028     0.9685 +/- 0.0029     0.9651 +/- 0.0026
+  n_av: dispatches to degraded, onset->avoidance          71.3 +/- 8.3          22.3 +/- 3.0          21.0 +/- 1.4
+  n_win: dispatches to degraded, [400,1200)              226.9 +/- 6.2          58.7 +/- 4.0          60.3 +/- 2.8
+  never-avoided rate (D56 rule)                        0.056 +/- 0.055       0.000 +/- 0.000       0.000 +/- 0.000
+  detection latency (steps, censored 399)                          n/a        161.3 +/- 26.6        171.1 +/- 31.8
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0034 (sd 0.0006) 95% [+0.0027, +0.0041]
+  (descr.) H - A success: +0.0177 [+0.0169, +0.0185]   C - A success: +0.0211 [+0.0203, +0.0219]
+  (descr.) detection latency C - H: -9.8 steps [-34.4, +14.8]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.007 [-0.008, +0.022]   n_av -0.021 [-0.065, +0.024]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.10
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.9223 +/- 0.0024     0.9601 +/- 0.0027     0.9566 +/- 0.0024
+  n_av: dispatches to degraded, onset->avoidance        235.9 +/- 33.7          48.6 +/- 8.0          48.2 +/- 8.1
+  n_win: dispatches to degraded, [400,1200)              451.7 +/- 9.4        150.7 +/- 17.2        153.4 +/- 17.2
+  never-avoided rate (D56 rule)                        0.264 +/- 0.059       0.000 +/- 0.000       0.000 +/- 0.000
+  detection latency (steps, censored 399)                          n/a        159.2 +/- 26.1        164.3 +/- 30.5
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0035 (sd 0.0006) 95% [+0.0028, +0.0042]
+  (descr.) H - A success: +0.0344 [+0.0319, +0.0368]   C - A success: +0.0379 [+0.0353, +0.0404]
+  (descr.) detection latency C - H: -5.1 steps [-24.9, +14.8]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.006 [-0.009, +0.021]   n_av -0.002 [-0.018, +0.015]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.20   [shared operating point]
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.8713 +/- 0.0026     0.9211 +/- 0.0100     0.9173 +/- 0.0098
+  n_av: dispatches to degraded, onset->avoidance       627.5 +/- 100.4        152.7 +/- 47.9        155.1 +/- 48.7
+  n_win: dispatches to degraded, [400,1200)             912.4 +/- 20.6        506.3 +/- 74.6        510.7 +/- 73.5
+  never-avoided rate (D56 rule)                        0.468 +/- 0.119       0.028 +/- 0.039       0.028 +/- 0.039
+  detection latency (steps, censored 399)                          n/a        150.7 +/- 21.8        157.1 +/- 28.0
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0038 (sd 0.0005) 95% [+0.0032, +0.0045]
+  (descr.) H - A success: +0.0460 [+0.0355, +0.0565]   C - A success: +0.0498 [+0.0392, +0.0605]
+  (descr.) detection latency C - H: -6.5 steps [-23.9, +11.0]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.005 [-0.002, +0.012]   n_av +0.003 [-0.015, +0.021]
+
+----------------------------------------------------------------------------------------------------------------------
+rho 1.00, fraction 0.30
+  metric                                                             A           C (learned)         H (heuristic)
+  H3 success post-onset                              0.8212 +/- 0.0023     0.8750 +/- 0.0129     0.8705 +/- 0.0130
+  n_av: dispatches to degraded, onset->avoidance      1065.0 +/- 195.5        250.0 +/- 70.6        272.7 +/- 87.6
+  n_win: dispatches to degraded, [400,1200)            1358.9 +/- 27.9       915.0 +/- 107.4       918.5 +/- 106.6
+  never-avoided rate (D56 rule)                        0.656 +/- 0.167       0.000 +/- 0.000       0.008 +/- 0.018
+  detection latency (steps, censored 399)                          n/a        146.8 +/- 19.3        152.0 +/- 27.4
+  detected fraction of degraded RSUs                               n/a       1.000 +/- 0.000       1.000 +/- 0.000
+  PRIMARY  C - H  success: +0.0045 (sd 0.0009) 95% [+0.0033, +0.0057]
+  (descr.) H - A success: +0.0493 [+0.0336, +0.0650]   C - A success: +0.0538 [+0.0382, +0.0694]
+  (descr.) detection latency C - H: -5.1 steps [-23.9, +13.7]   (negative = C detects earlier)
+  (descr.) (n_H - n_C)/n_A, positive = C sends fewer: n_win +0.003 [-0.003, +0.008]   n_av +0.018 [-0.020, +0.056]
+```
