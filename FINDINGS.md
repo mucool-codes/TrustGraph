@@ -2027,3 +2027,25 @@ Interpretation: under staggered onset, with each model's own weights, C is above
 Date: 2026-10-15 | Session: S13b | Commit: see `git log` | Resolves the S13 review's Q4 (D67)
 What F36 observed: the per-epoch sealed diagnostic that `s3_train.py` prints (AUC of trust against the true class over the fixed shared-onset window [450, 650), one validation scenario, draw 40, rho 1.0, fraction 0.2) printed 0.06-0.11 for both C and D on seed 1 during training, and the held-out value of the same window ranged 0.27-0.94 across the twelve models. Under staggered onset an RSU's degradation can begin anywhere in [400, 700], so a fixed window of 200 steps from 450 is not matched to when the evidence appears; a value well below 0.5 on one scenario with 4 degraded and 16 reliable RSUs is a window-and-sample artefact of that diagnostic, not an evaluation number.
 Status: the diagnostic is print-only by construction (L4): it never enters the loss, early stopping or the held-out-BCE model selection, and the S3 protocol and D45 settings were applied unchanged, so the twelve models are what the protocol produced. No evaluation number uses this window; the pre-registered staggered evaluation uses per-RSU onsets and windows (D65 2.5; F37). No model was re-trained or re-selected. This is recorded as it is.
+
+### F42 — S14 D2 training: parameter counts, convergence, neighbour-block probe (RAW diagnostics; no D2-vs-C evaluation number exists yet)
+Date: 2026-10-15 | Commit: see git log (this entry) | Config: configs/demo.yaml (D2-shared), configs/staggered.yaml (D2-stagger); D68 section 2; D45 settings; 3 torch threads; seeds 1-5 and 100.
+Parameters (from the code, asserted by tests/test_d2.py for C and D2): C 1313, **D2 1570** (C + 224 neighbour encoder + 33 neighbour head weights), D 1614 (S3 checkpoint). D2 / C = 1.196, D / C = 1.229.
+Per seed, validation BCE (selection quantity) and the D68 neighbour-block probe (mean |change in RSU trust| when the neighbour block is zeroed, on the seed's validation graphs; threshold 0.01). C values from the existing S3 / S13 result files, same protocol.
+
+| regime | seed | D2 initial val BCE | D2 best val BCE (epoch / stop) | C best val BCE (epoch) | D2 held-out BCE | C held-out BCE | probe |
+|---|---|---|---|---|---|---|---|
+| shared | 1 | 0.6838 | 0.1656 (30 / 37) | 0.1661 (16) | 0.1669 | 0.1680 | 0.0475 |
+| shared | 2 | 0.7527 | 0.1487 (41 / 49) | 0.1483 (47) | 0.1669 | 0.1677 | 0.0511 |
+| shared | 3 | 0.7988 | 0.1668 (34 / 34) | 0.1679 (24) | 0.1813 | 0.1831 | 0.0804 |
+| shared | 4 | 0.6671 | 0.1851 (14 / 21) | 0.1867 (16) | 0.1698 | 0.1712 | 0.0625 |
+| shared | 5 | 0.6422 | 0.1846 (33 / 35) | 0.1859 (21) | 0.1710 | 0.1722 | 0.0148 |
+| shared | 100 | 0.7277 | 0.1773 (22 / 28) | 0.1762 (46) | 0.1800 | 0.1788 | 0.0526 |
+| stag | 1 | 0.6833 | 0.1484 (43 / 51) | 0.1486 (43) | 0.1537 | 0.1539 | 0.0738 |
+| stag | 2 | 0.7564 | 0.1409 (38 / 46) | 0.1399 (38) | 0.1432 | 0.1447 | 0.0717 |
+| stag | 3 | 0.8007 | 0.1608 (34 / 40) | 0.1618 (41) | 0.1646 | 0.1652 | 0.1151 |
+| stag | 4 | 0.6658 | 0.1714 (12 / 20) | 0.1715 (16) | 0.1590 | 0.1602 | 0.1067 |
+| stag | 5 | 0.6396 | 0.1746 (16 / 18) | 0.1748 (17) | 0.1622 | 0.1622 | 0.0177 |
+| stag | 100 | 0.7284 | 0.1700 (37 / 40) | 0.1713 (40) | 0.1742 | 0.1747 | 0.0657 |
+
+All 12 D2 trainings stopped by patience. D44-style checks: best validation BCE is below the untrained model's in 12 of 12; the neighbour probe is >= 0.01 in 12 of 12 (smallest 0.0148), so the output depends on the neighbour block in every model and the "does not depend" report of D68 is not triggered. Interpretation (one line): D2 fits the self-supervised objective about as well as C (validation BCE within 0.002 in either direction) and uses its neighbour block; nothing about detection is implied. Held-out diagnostic AUC (S3 draw 90, printed by the trainer, not a result of this experiment): D2 equals C to 4 decimals in the shared regime (1.0000, all seeds) and is within +0.03 of C in the staggered regime. The per-epoch printed AUC window under staggered onset is print-only (F41). Seed 1 of the shared C was trained at the default thread count (D47); all D2 at 3.
