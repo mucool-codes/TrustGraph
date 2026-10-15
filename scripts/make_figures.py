@@ -502,10 +502,14 @@ def tables(T, P, GT) -> None:
            ("5", "DRL for Delay-Optimized VFC Offloading", "✗", "✗", "✓", "✗"), ("6", "Explainability-as-a-Service for Edge AI", "✗", "✗", "✗", "✓"),
            ("7", "XRL for RAN Slicing (6G ORAN)", "✗", "✗", "✗", "✓"), ("8", "Self-Explaining RL for Mobile Resource Allocation", "✗", "✗", "✗", "✓"),
            ("9", "XAI for RL-based Networking", "✗", "✗", "✗", "✓"), ("10", "Explainable Fraud Detection (GNNExplainer + Shapley)", "✗", "✓", "✗", "✓"),
+           ("11", "SGA-SAC: Bayesian Stackelberg + graph-attention DRL, explainable VEC offloading (Cheng et al., Inf. Fusion 2026)", "✗", "✓ (graph attention)", "✓", "✓ (Grad-CAM)"),
+           ("12", "Trust-Based Malicious RSU Detection in Edge-Enabled VANETs (Siddiqua and Jahan, arXiv 2208.05680)", "✗", "~ (RSU-RSU interaction)", "✗", "✗"),
+           ("13", "G-TRAC: Trust-Aware Routing for Distributed GenAI Inference at the Edge (Nguyen and Elmroth, DCOSS-IoT 2026)", "✗", "~ (path search over peers)", "✗", "✗"),
            ("this", "This work", "✓", "✓ (built; no measured gain over node-local, F17/F27)", "✓", "✓")]
     write_table("related_work", ["Ref", "Work", "Learned trust", "Structure-aware", "Vehicular offloading", "Explainable"], [list(r) for r in rel],
-                "Prior art, mapped (rows from TECHNICAL_AND_NOVELTY.md section 6; S11 updates them)",
-                "TO BE UPDATED IN S11. The structure-aware mark for this work records that message passing is implemented, not that it helped: H2 was tested and not supported (S4).")
+                "Prior art, mapped (rows 1-10 from TECHNICAL_AND_NOVELTY.md section 6; rows 11-13 added in S11a, see RELATED_WORK.md)",
+                "Rows 11-13 are filled from the abstracts only (verified 2026-10-15): a cross means the abstract does not describe the property, not that the paper lacks it; ~ means partly or in a different sense. "
+                "The structure-aware mark for this work records that message passing is implemented, not that it helped: H2 was tested and not supported (S4).")
 
 
 def main() -> int:
