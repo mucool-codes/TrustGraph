@@ -1739,3 +1739,21 @@ S11a is the prerequisite session for S12 (answers to the S12 decision request: Q
 **Alternatives:** drafting the claims inside S12 (the paper would then be checked against its own author's list, D-review answer Q1); citing the new works from memory (rejected: only confirmed references are cited); describing the new works beyond their abstracts (not verified).
 
 **Rationale:** a claims list approved before the paper is written is what makes "every sentence matches an allowed claim" a real check, and it keeps the negative and null results at their measured strength.
+
+### D64 — S11b: CLAIMS.md re-issued with eight edits (supersedes the corresponding wording of D63 item 1; nothing else in D63 changes)
+Date: 2026-10-15 | Session: S11b | Status: active
+Re-issue of CLAIMS.md under the D63 rule that a change needs a new numbered entry. Only the eight edits below were made; no number was re-derived and nothing was re-run.
+
+**Decision:**
+1. **A9:** "D is significantly worse at rho 0" replaced by "the 95% interval over seeds excludes 0" (X11: no p-values or significance tests were computed).
+2. **A7:** A's n_av is **627.5 +/- 100.4** as printed in F26 (and F29). The S9 report's 628 and the ledger's 627 (D60) are the two roundings of 627.5. CLAIMS.md used 627; it now uses F26's value. D60 is not edited.
+3. **X16 added:** no performance, fidelity or "result" claim from seed 100 or draw 7 (tuning seed, demo draw). Allowed: the A12 exactness identity check, A8 as a labelled illustration, A22 as descriptive.
+4. **A19:** training and evaluation share a seed's traffic and differ only in injection draws (D44).
+5. **A15:** the n_win/n_av observation about Gate-C is marked descriptive, with no pre-registered test (D59 judged success only).
+6. **A16:** commit hashes added: D59 3710795, first Gate-C code 86b3a20, F28 eead7f1.
+7. **A22 added (from F23):** trust decisive in 15% (C) and 31% (D) of decisions, winner has lower trust than the runner-up in 12.5% (C) and 18.9% (D); demo scenario only, descriptive. Numbered A22 because A21 is fixed by item 8.
+8. **A21 added, the contribution statement:** (i) behavioural trust layer driving a fixed weighted rule, validated in closed loop against a tuned no-trust baseline and a perfect-knowledge oracle upper bound, node-local head strongest; (ii) exactly decomposable explanation; (iii) pre-registered negative and null results on graph structure with the measured boundary condition (F18). It must not imply the graph helped.
+
+**Alternatives:** leaving "significantly worse" (contradicts X11); rounding 627.5 to 628 (a third spelling of one number).
+
+**Rationale:** each edit makes the claim gate stricter or its numbers exactly traceable to FINDINGS; none widens what the paper may say.
