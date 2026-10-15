@@ -72,8 +72,14 @@ def main() -> int:
     ap.add_argument("--variants", nargs="+", default=["C", "D"])
     ap.add_argument("--max-epochs", type=int, default=None)
     ap.add_argument("--out", default="results")
+    ap.add_argument("--ckpt-dir", default="checkpoints", help="S13 (D65) writes to checkpoints/s13; the default is unchanged")
+    ap.add_argument("--threads", type=int, default=None, help="torch threads (S13: 3 for every seed); default leaves torch alone")
     args = ap.parse_args()
 
+    if args.threads is not None:
+        import torch
+
+        torch.set_num_threads(args.threads)
     base = load_config(args.config)
     seed = args.seed
     settings = TrainSettings() if args.max_epochs is None else TrainSettings(max_epochs=args.max_epochs)
@@ -126,7 +132,7 @@ def main() -> int:
             model, train_graphs, val_graphs, settings, seeds, epoch_callback=diagnostic
         )
         ckpt = save_checkpoint(
-            REPO_ROOT / "checkpoints" / f"s3-seed{seed}-{variant}.pt",
+            REPO_ROOT / args.ckpt_dir / f"s3-seed{seed}-{variant}.pt",
             model, variant, seed, settings, result,
         )
         print(
