@@ -1,0 +1,62 @@
+\section{Related Work}
+\label{sec:related}
+
+% Sources: RELATED_WORK.md (verification record and allowed sentences). Depth is metadata and abstract only; claims about a work are "per its abstract" (X8: no performance comparison was run).
+Table~\ref{tab:related} maps the verified set.
+Rows 1--10 are the works of the project's reference list; rows 11--13 were filled from their abstracts only (verified 2026-10-15).
+A cross means that the abstract does not describe the property, not that the paper lacks it.
+No performance comparison with any of these works was run.
+
+\begin{table*}[t]
+\centering
+% src: results/s10/tables/related_work.csv (rows copied; row 'this' wording as in the file)
+\caption{Prior art, mapped. Check: described; $\sim$: partly or in a different sense; --: not described in the abstract. The structure-aware mark for this work records that message passing is implemented, not that it helped.}
+\label{tab:related}
+\small
+\begin{tabular}{@{}rp{5.4cm}cp{3.0cm}cc@{}}
+\toprule
+Ref & Work & Learned trust & Structure-aware & Vehicular offloading & Explainable \\
+\midrule
+1 & GNN-Mamba spatiotemporal trust evaluation & \checkmark & \checkmark & -- & -- \\
+2 & Multi-hop trust via GNN-aided agentic AI & \checkmark & \checkmark & -- & -- \\
+3 & Federated GNN multi-agent RL for AoI in VEC & -- & \checkmark & \checkmark & -- \\
+4 & Joint allocation under asymmetric information & $\sim$ (economic) & -- & \checkmark & -- \\
+5 & DRL for delay-optimized VFC offloading & -- & -- & \checkmark & -- \\
+6 & Explainability-as-a-Service for edge AI & -- & -- & -- & \checkmark \\
+7 & XRL for RAN slicing (6G ORAN) & -- & -- & -- & \checkmark \\
+8 & Self-explaining RL for mobile resource allocation & -- & -- & -- & \checkmark \\
+9 & XAI for RL-based networking & -- & -- & -- & \checkmark \\
+10 & Explainable fraud detection (GNNExplainer + Shapley) & -- & \checkmark & -- & \checkmark \\
+11 & SGA-SAC: Bayesian Stackelberg + graph-attention DRL, explainable VEC offloading (Cheng et al., 2026) & -- & \checkmark (graph attention) & \checkmark & \checkmark (Grad-CAM) \\
+12 & Trust-based malicious RSU detection in edge-enabled VANETs (Siddiqua and Jahan) & -- & $\sim$ (RSU-RSU interaction) & -- & -- \\
+13 & G-TRAC: trust-aware routing for distributed GenAI inference at the edge (Nguyen and Elmroth, 2026) & -- & $\sim$ (path search over peers) & -- & -- \\
+\midrule
+this & This work & \checkmark & \checkmark (built; no measured gain over node-local) & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\paragraph*{Learned, structure-aware trust}
+% src: RELATED_WORK.md, positioning sentence 1
+References~\cite{r1,r2} already do learned, structure-aware trust with GNNs; they share authorship and are one continuing line of work.
+We adopt the formulation and integrate it into the offloading objective, and our own result is that the graph did not help in our scenario (Sec.~\ref{sec:graph}).
+
+\paragraph*{Offloading in vehicular edge and fog computing}
+References~\cite{r3,r4,r5} address offloading or resource allocation in vehicular edge and fog computing: a federated GNN multi-agent reinforcement-learning method for age of information~\cite{r3}, joint allocation under asymmetric information~\cite{r4}, and deep reinforcement learning for delay-optimised offloading~\cite{r5}.
+By the table, only~\cite{r3} is structure-aware, and none of the three is marked explainable.
+
+\paragraph*{Explainability}
+References~\cite{r6,r7,r8,r9} concern explainability for edge AI, RAN slicing, mobile-network resource allocation and RL-based networking; reference~\cite{r10} combines GNNExplainer with Shapley values for fraud detection.
+% src: RELATED_WORK.md table (titles of rows 6-10); no statement beyond the table
+Reference~\cite{r11}, SGA-SAC, is the closest explainable vehicular-offloading work we found.
+Per its abstract, it models vehicles and RSUs as a hierarchical Bayesian Stackelberg game, uses soft actor-critic with a graph attention mechanism in the policy network, and uses Grad-CAM to visualise the multi-agent decision, evaluated on latency and energy consumption; the abstract does not describe a node-trust model.
+% src: RELATED_WORK.md item 11 (allowed differentiation)
+Its explanation is a gradient visualisation of a learned policy, whereas ours is an exact decomposition of a fixed linear score plus a separate attribution on the trust head, and its objective is latency and energy whereas ours is deadline success under injected node degradation.
+The contribution difference is the exactly decomposable score and a trust head under injected degradation, not a performance claim.
+
+\paragraph*{Behavioural trust of RSUs, and trust floors}
+Reference~\cite{r12} is prior art for behavioural trust of RSUs: per its abstract, a trust-based scheme that uses stable, frequent RSU-to-RSU interaction and a check for altered sensor-detected data in beacons to detect malicious RSUs in edge-enabled VANETs, with a self-reported detection of about 92\% of malicious RSUs; the abstract does not describe offloading, a learned model or an explanation.
+% src: RELATED_WORK.md item 12
+Reference~\cite{r13} formulates routing of distributed generative-AI inference over edge devices as a risk-bounded shortest-path problem solved by trust-floor pruning combined with Dijkstra's search; it is not vehicular and concerns routing of inference, not task offloading from vehicles.
+Its trust floor, which removes candidates below a threshold before selection, is the nearest analogue of the gate we test as a baseline (Gate-C, Sec.~\ref{sec:method}); in our scenario the gate and the weighted rule performed equivalently (Sec.~\ref{sec:gate}).
+Gate-C is our own construction on our own trust head; we did not implement~\cite{r13}.

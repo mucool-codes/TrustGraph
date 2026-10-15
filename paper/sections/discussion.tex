@@ -1,0 +1,39 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph*{What the results mean}
+In this simulation, a behavioural signal that enters the offloading decision as a weighted term raises deadline success over the same rule without trust at every degraded fraction tested, and the node-local head comes within $0.001$--$0.003$ of an oracle that reads the sealed fault state (Sec.~\ref{sec:behav}).
+% src: A5, A6
+Most of that gain is already available from the node's own evidence: a non-learned monitor, H, which uses only the RSU's own \texttt{success\_ewma}, recovers most of the trust-aware gain, and the pre-registered rule did not separate it from the learned head (Sec.~\ref{sec:learning}).
+% src: A27, A23 (X18: we do not say that learning adds nothing; the label is NULL under a 0.01 floor with signed differences 0.003-0.005)
+We read this as a statement about the floor we fixed in advance and about this scenario, not as a statement that the learned head is unnecessary.
+% src: X18
+
+On graph structure, the load-bearing hypothesis was tested and is not supported.
+The graph head did not beat the node-local head on the pre-registered diagnostic (NEGATIVE), in the closed loop, under staggered onset where a neighbour lead exists, or as a contained head that starts as C (NULL); and we measured why the first test could not have succeeded in the shared-onset scenario, as a boundary condition of that scenario (Sec.~\ref{sec:graph}).
+% src: A9, A10, A11, A25, A28; X1, X2, X17, X21 (no generalisation: one injection model, S = 300, one scenario per seed, open-loop-trained heads, one D2 construction)
+These results are for one injection model, one stagger size, one scenario per seed and heads trained on open-loop dispatch; we make no claim about other regimes or architectures.
+% src: X17, X21
+
+The weighted rule and a gate on the same head performed equivalently on task success (Sec.~\ref{sec:gate}).
+The case for a weighted term is therefore a design argument: an exactly decomposable score and no empty-candidate-set failure mode, and not a measured gain.
+% src: A15, X3
+Layer 1 explains the score and is exact; it does not explain why a node's trust has its value.
+Layer 2 attributes the trust head's output weakly, unstably and only asynchronously, and each Layer 2 explanation is one draw (Secs.~\ref{sec:layer1}, \ref{sec:layer2} and~\ref{sec:overhead}).
+% src: A12, A13, A14; X15, X5
+
+\paragraph*{Untested hypotheses}
+The following were not run, and none of them is a finding.
+They are the open questions that the record leaves, stated as hypotheses.
+% src: A20 (verbatim list; "None of these, other than the single D2 construction of A28, was run and none may be reported as a finding")
+\begin{itemize}
+\item An observation-count feature.
+\item Other architectures.
+\item Training the trust heads on closed-loop dispatch, and the shift between the open-loop training dispatch and the closed-loop evaluation dispatch as a possible cause of D trailing C.
+\item The self-supervised objective (next-task success of the node itself) rewards current behaviour only, so neighbour evidence that predicts a later failure may have no way to improve the objective (not tested).
+\item Dilution of D's own-node signal by its aggregation over many neighbours: this was tested for one contained construction (D2, Sec.~\ref{sec:graph}), while dilution in general is untested.
+\item Cold-start and collusion conditions where a graph model might help.
+\item Gating a different head.
+\end{itemize}
+Staggered onset, which an earlier version of this list included, was tested (Sec.~\ref{sec:graph}).
+% src: A20 (staggered onset tested in S13: A24, A25)

@@ -1,0 +1,37 @@
+\section{Introduction}
+\label{sec:intro}
+
+Vehicles generate compute tasks that they cannot process onboard and can offload to roadside fog nodes (RSUs); which RSU receives a task is the decision studied here.
+A certificate is evidence about identity: it says who a node is.
+Whether the node is \emph{currently working correctly} is a different question, and one that observed task outcomes can speak to.
+This paper calls the difference between the two the certificate-versus-behaviour gap.
+
+As a published illustration that V2X software can stop working, three CVE records describe denial of service in the open-source Vanetza V2X implementation:
+% src: A26; CVE_VERIFICATION.md (read 2026-10-15). Wording of A26 only (X13, X20): nothing about ITS-G5, radio range, deployed RSUs, field use, certificate holders or SCMS.
+CVE-2026-37554, CVE-2026-43988 and CVE-2026-44905 are published CVE records of denial-of-service vulnerabilities (CVSS 3.1 base 7.5) in the open-source Vanetza V2X implementation ($\le$ 26.02), in each of which a remote unauthenticated network attacker can terminate the process through an uncaught exception (CWE-248): the first in ECC point validation in GeoNetworking packet processing (published 2026-05-01), the second in ASN.1/OER parsing and the third in the cryptographic verification path (both published 2026-05-26)~\cite{cve1,cve2,cve3}.
+The records were read from the CVE Program record service on 2026-10-15.
+We draw no further conclusion from these records.
+
+We add a behavioural trust layer to the offloading decision.
+A trust head scores each RSU from observed task outcomes, and a fixed analytic rule, $\text{score}=\alpha\,\text{trust}-\beta\,\text{latency}-\gamma\,\text{load}$, selects the target among in-range, dwell-feasible RSUs.
+% src: A1
+Selection is not learned, and the baseline without trust is the same rule with $\alpha=0$.
+The trust head is trained self-supervised to predict whether an RSU meets its next task deadline; the injected behaviour class is never a label or a feature.
+% src: A2
+We compare a node-local head (C) with a graph neural network head (D) that aggregates evidence over the network graph, under the same rule, the same features and the same training objective.
+The question the comparison is built to answer is whether message passing over the graph adds anything beyond the node's own evidence.
+
+The evaluation was designed so that a null or negative answer could be reported at full strength.
+Each comparison has a rule (metric, floor, window, verdict labels) that was written to the repository, and committed, before the numbers it judges (Sec.~\ref{sec:protocol}).
+All results are for one simulated scenario with injected degradation, and the text says so throughout.
+
+\paragraph*{Contributions}
+In this simulation, the paper contributes:
+% src: A21. The list is A21 and nothing more; it must not be read as implying that the graph helped (X1, X2).
+\begin{enumerate}
+\item a behavioural trust layer that drives a fixed weighted selection rule, validated in the closed loop against a tuned no-trust baseline (A) and a perfect-knowledge oracle upper bound (B-oracle), in which the node-local head (C) is the strongest;
+\item an exactly decomposable explanation of each selection (Layer 1);
+\item pre-registered negative and null results on graph structure, with the measured boundary condition of this scenario.
+\end{enumerate}
+
+The rest of the paper follows the order in which the questions were asked: related work (Sec.~\ref{sec:related}), the scenario (Sec.~\ref{sec:system}), the method and its baselines (Sec.~\ref{sec:method}), the explanation layers (Sec.~\ref{sec:explanation}), the protocol (Sec.~\ref{sec:protocol}), results (Sec.~\ref{sec:results}), discussion, limitations and conclusion.
