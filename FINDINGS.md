@@ -2411,3 +2411,66 @@ Spread of the 45 objectives: min 0.8926, max 0.9126; points within 0.002 of the 
 Spread of the 45 objectives: min 0.8921, max 0.9132; points within 0.002 of the best: 7.
 
 Interpretation (one line): the weights are written to the new configs/weights_horizon.yaml and carry no claim (A18); no other weight file was touched.
+
+### F48 - S15 raw results: frozen C-h and D2-h (horizon objective), staggered onset, draws 300-349, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Commit: this entry | Pre-registration D72 = e7c7d54 (2026-10-15 18:51:15 +0530, commit log). Scripts: `scripts/s15_horizon.py trust`, `eval`, `closed`, `report` (code at the S15 commits before this entry). C-h, D2-h = F46 checkpoints; the original staggered C = checkpoints/s13 (S13), re-evaluated on the same draws; weights: A from weights_staggered.yaml, C-h and D2-h from weights_horizon.yaml (F47). Order of the script-logged UTC times (results/s15/first_number.json): tuning grid (seed 100, draws 0-2) first result 2026-10-15T13:31:56Z; **first evaluation number (open-loop trust on draws 300-349) 2026-10-15T13:33:17Z** (= 19:03:17 +0530); first closed-loop evaluation result 2026-10-15T13:34:52Z. The tuning grid therefore preceded both, as D72 section 6 orders it. No weight, window, floor or draw was changed after the first evaluation number. (This run's open-loop and closed-loop numbers were each produced once.)
+
+Open-loop (PRIMARY and SECONDARY (b)); "C(S13)" is the original staggered C trained on the next-task objective:
+
+```
+======================================================================================================================
+S15 PRIMARY: STAGGERED ONSET (S = 300), open-loop frozen C-h and D2-h (horizon objective), draws 300-349, fraction 0.20, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 36  late-onset RSUs 46  tau C-h 0.8832 D2-h 0.8562 C(S13) 0.8461
+    seed 2: attempted 50  failed 0  aggregated 31  late-onset RSUs 42  tau C-h 0.8967 D2-h 0.9445 C(S13) 0.8602
+    seed 3: attempted 50  failed 0  aggregated 33  late-onset RSUs 41  tau C-h 0.9270 D2-h 0.9510 C(S13) 0.8137
+    seed 4: attempted 50  failed 0  aggregated 35  late-onset RSUs 44  tau C-h 0.8530 D2-h 0.9196 C(S13) 0.8598
+    seed 5: attempted 50  failed 0  aggregated 31  late-onset RSUs 38  tau C-h 0.8680 D2-h 0.8969 C(S13) 0.8682
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C-h 95.7 +/- 7.8   D2-h 93.6 +/- 9.3   C(S13, next-task objective) 130.6 +/- 11.3
+  detected fraction: C-h 1.000  D2-h 1.000  C(S13) 1.000
+  PRIMARY  D2-h - C-h latency: -2.0 (sd 4.9) 95% [-8.1, +4.1]
+  per-seed D2-h - C-h latency: [5.0, 1.2, -4.7, -5.8, -5.8]
+  SECONDARY (b) (descriptive, no label)  C-h - C(S13) latency: -34.9 (sd 16.8) 95% [-55.8, -14.1]   per seed [-43.0, -24.4, -60.8, -20.9, -25.6]
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  late-onset RSUs 124  tau C-h 0.8832 D2-h 0.8562 C(S13) 0.8461
+    seed 2: attempted 50  failed 0  aggregated 50  late-onset RSUs 134  tau C-h 0.8967 D2-h 0.9445 C(S13) 0.8602
+    seed 3: attempted 50  failed 0  aggregated 50  late-onset RSUs 106  tau C-h 0.9270 D2-h 0.9510 C(S13) 0.8137
+    seed 4: attempted 50  failed 0  aggregated 50  late-onset RSUs 141  tau C-h 0.8530 D2-h 0.9196 C(S13) 0.8598
+    seed 5: attempted 50  failed 0  aggregated 50  late-onset RSUs 129  tau C-h 0.8680 D2-h 0.8969 C(S13) 0.8682
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C-h 92.3 +/- 4.6   D2-h 88.2 +/- 9.4   C(S13, next-task objective) 129.7 +/- 12.7
+  detected fraction: C-h 1.000  D2-h 1.000  C(S13) 1.000
+  PRIMARY  D2-h - C-h latency: -4.1 (sd 6.3) 95% [-12.0, +3.7]
+  per-seed D2-h - C-h latency: [3.3, 0.6, -5.6, -12.9, -5.9]
+  SECONDARY (b) (descriptive, no label)  C-h - C(S13) latency: -37.4 (sd 13.0) 95% [-53.5, -21.2]   per seed [-38.3, -34.8, -59.0, -28.6, -26.1]
+
+(description) (D2-h - C-h latency at rho 1.0) minus (at rho 0), per-seed paired: -2.1 (sd 2.8) 95% [-5.6, +1.4]
+```
+
+Closed loop (SECONDARY (a)), rho 1.0, fraction 0.20, draws 300-349:
+
+```
+======================================================================================================================
+S15 SECONDARY (a): closed-loop post-onset success, staggered, rho 1.0, fraction 0.20, draws 300-349, seeds [1, 2, 3, 4, 5] (RAW, descriptive: no labels)
+======================================================================================================================
+weights (alpha, beta, gamma): A (0.0, 0.25, 0.6)  C-h (0.25, 0.25, 0.3)  D2-h (0.5, 0.25, 0.6)
+D42: attempted 250  failed 0  aggregated 250
+  A     success 0.8970 +/- 0.0030
+  C_h   success 0.9336 +/- 0.0093
+  D2_h  success 0.9356 +/- 0.0085
+  D2_h - C_h: +0.0020 (sd 0.0011) 95% [+0.0007, +0.0033]
+  C_h - A: +0.0365 (sd 0.0078) 95% [+0.0268, +0.0463]
+  D2_h - A: +0.0385 (sd 0.0071) 95% [+0.0298, +0.0473]
+  n_av / n_win / never-avoided (mean +/- sd over seeds of per-seed means), always together (D60 Q4):
+    A     n_av   589.6 +/-   90.9   n_win   903.7 +/-   19.9   never-avoided 0.468 +/- 0.129
+    C_h   n_av   224.8 +/-   45.3   n_win   559.9 +/-   70.4   never-avoided 0.020 +/- 0.035
+    D2_h  n_av   224.0 +/-   49.3   n_win   556.9 +/-   69.6   never-avoided 0.020 +/- 0.035
+  D57-normalised (n_C-h - n_D2-h)/n_A on n_av: +0.001 [-0.013, +0.015]  (positive = D2-h sends fewer to degraded RSUs; descriptive)
+  D57-normalised (n_C-h - n_D2-h)/n_A on n_win: +0.003 [-0.001, +0.008]  (positive = D2-h sends fewer to degraded RSUs; descriptive)
+  detection latency (closed loop, D56 rule on each run's own trust, descriptive) C_h: 248.2 steps, detected fraction 0.945
+  detection latency (closed loop, D56 rule on each run's own trust, descriptive) D2_h: 246.7 steps, detected fraction 0.947
+```
