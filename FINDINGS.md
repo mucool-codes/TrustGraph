@@ -1794,3 +1794,18 @@ Interpretation:
 4. Detection latency (descriptive): C 5-10 steps earlier than H at every point, intervals [-34, +15] to [-24, +14] all including 0; all degraded RSUs are detected by both.
 5. D42: every point 250 attempted, 0 failed, 250 aggregated; the C recompute matched S9 bit-for-bit on all 1000 tasks.
 Limits: H's weights were tuned on one seed like every other variant (F32; the surface is flat, spread within draw-to-draw noise); the result is for this scenario and injection model only; it does not revise F17, F27 or any H2 verdict; no mechanism for why the head adds so little is tested.
+
+### F35 — S13 Experiment 2 mechanism check: does neighbour evidence lead own evidence under staggered onset? (RAW; the D65 2.3 gate result is stated beside it)
+Date: 2026-10-15 | Session: S13 | Commit: 84923e3 (code); D65 = 245705b; onset_spread_steps option and F11 regression test in the preceding commit
+Config: `configs/staggered.yaml` (demo.yaml + degradation.onset_spread_steps 300), seeds 1-5, fraction 0.20, rho 0 and 1.0, **injection draws 50-79** (30 per seed per rho; < 100, not evaluation draws, not among the S3 draws 0, 1, 40, 90), observable `success_ewma` of Baseline-A scenarios; no model trained or used.
+Command: `python scripts/s13_stag.py gen mech` then `python scripts/s13_stag.py mech` (results/s13/stag/mech.json). First number of Experiment 2 written 2026-10-15T06:35:28Z (12:05:28 +0530). The staggered traces equal the demo traces bit-for-bit for seeds 1-5 and 100 (checked).
+Definition (D65 2.3): late-onset RSU v = degraded RSU with >= 1 degraded same-segment RSU-RSU-edge neighbour u with onset_u < onset_v. t_w = first t in [onset_w, onset_w+400) with success_ewma_w below its own pre-onset 1st percentile (secondary: 0.10 below its pre-onset mean) for 10 consecutive steps; lead_v = mean over earlier-onset neighbours u of (t_v - t_u), positive = neighbour evidence first. Per-seed mean over all (draw, v); 95% t-interval over the 5 seeds (t = 2.776).
+```
+rule       rho   lead (steps) [95% interval]      sd     mean onset gap   censored (late / earlier)   late-onset RSUs per seed (seeds 1-5)
+primary    0     +103.6 [ +70.9, +136.2]          26.3   103.6            0.000 / 0.000               28 25 34 30 28
+primary    1.0   +92.3  [ +79.2, +105.5]          10.6   98.1             0.000 / 0.000               73 74 66 82 84
+secondary  0     +103.5 [ +84.5, +122.5]          15.3   103.6            0.000 / 0.000               28 25 34 30 28
+secondary  1.0   +89.9  [ +72.6, +107.2]          13.9   98.1             0.000 / 0.000               73 74 66 82 84
+```
+D65 2.3 gate (primary rule, rho 1.0, interval above 0): lo = +79.2 > 0 -> **PASS**; Experiment 2 proceeds to training.
+Interpretation: under staggered onset a late-onset RSU's earlier-onset same-segment neighbours show degraded evidence about 90-100 steps before it does, almost exactly the mean onset gap (98 steps at rho 1.0), so the lead is the injected stagger carried through the same observable; neighbour evidence therefore does precede own evidence in this regime, at both rho. This says nothing yet about whether any model uses it.
