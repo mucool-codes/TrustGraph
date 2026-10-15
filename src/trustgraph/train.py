@@ -221,6 +221,21 @@ def edge_probe(model: nn.Module, graphs: list[Data], num_rsus: int) -> dict:
     }
 
 
+@torch.no_grad()
+def neighbour_probe(model: nn.Module, graphs: list[Data], num_rsus: int) -> dict:
+    """D68 section 2: does D2's output depend on its neighbour block? Mean |change in RSU trust| when it is zeroed."""
+    model.eval()
+    diffs = []
+    for batch in _batches(graphs, 64):
+        base = model(batch.x, batch.edge_index, batch.edge_attr)
+        off = model(batch.x, batch.edge_index, batch.edge_attr, drop_neighbours=True)
+        rsu_rows = torch.zeros(batch.num_nodes, dtype=torch.bool)
+        for a in batch.ptr.tolist()[:-1]:
+            rsu_rows[a : a + num_rsus] = True
+        diffs.append((off - base).abs()[rsu_rows])
+    return {"mean_abs_change_neighbour_block_zeroed": float(torch.cat(diffs).mean())}
+
+
 # ---------------------------------------------------------------------- checkpoints
 
 

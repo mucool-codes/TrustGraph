@@ -23,9 +23,9 @@ import torch
 from torch import nn
 from torch_geometric.nn import GINEConv
 
-from .features import EDGE_FEATURE_DIM, NODE_FEATURE_DIM, RSU_BLOCK, RSU_FEATURES
+from .features import EDGE_COL, EDGE_FEATURE_DIM, NODE_FEATURE_DIM, RSU_BLOCK, RSU_FEATURES
 
-VARIANTS = ("C", "D")
+VARIANTS = ("C", "D", "D2")
 
 
 class TrustHead(nn.Module):
@@ -112,6 +112,57 @@ class NodeLocalTrustHead(nn.Module):
         return torch.sigmoid(self.logits(x, edge_index, edge_attr))
 
 
+class ContainedGraphHead(nn.Module):
+    """Variant D2 ("C plus neighbours", DECISIONS.md D68): C's own branch plus a contained neighbour branch.
+
+    Own branch: identical to `NodeLocalTrustHead` (two Linear layers over the node's own RSU row).
+    Neighbour branch: the mean, over the node's RSU neighbours joined by an edge with `same_segment` = 1,
+    of a 1-layer encoder (Linear + ReLU) of those neighbours' RSU feature rows; zero when there is no such
+    neighbour, with a 0/1 "has neighbours" flag appended. Vehicle nodes and other-segment RSUs never enter.
+    Head: logit = head_own(own) + head_nbr(neighbour block), i.e. one linear head over the concatenation,
+    with the neighbour weights initialised to ZERO, so D2 starts as exactly C's function.
+
+    The own branch is built first, so under the same torch seed its initial weights equal C's.
+    """
+
+    def __init__(self, hidden_dim: int = 32, num_layers: int = 2) -> None:
+        super().__init__()
+        if num_layers != 2:
+            raise ValueError("D2 matches C's depth of 2 (D68)")
+        self.fc1 = nn.Linear(len(RSU_FEATURES), hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.head = nn.Linear(hidden_dim, 1)
+        self.nbr_enc = nn.Linear(len(RSU_FEATURES), hidden_dim)
+        self.head_nbr = nn.Linear(hidden_dim + 1, 1, bias=False)  # encoded neighbours + the has-neighbours flag
+        nn.init.zeros_(self.head_nbr.weight)
+
+    def neighbour_block(self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor) -> torch.Tensor:
+        """(num_nodes, hidden + 1): mean encoded same-segment neighbour vector and the has-neighbours flag."""
+        n = x.shape[0]
+        sel = edge_attr[:, EDGE_COL["same_segment"]] > 0.5
+        src, dst = edge_index[0][sel], edge_index[1][sel]
+        enc = torch.relu(self.nbr_enc(x[:, RSU_BLOCK]))
+        total = torch.zeros(n, enc.shape[1], dtype=enc.dtype).index_add(0, dst, enc[src])
+        count = torch.zeros(n, dtype=enc.dtype).index_add(0, dst, torch.ones(src.shape[0], dtype=enc.dtype))
+        mean = total / count.clamp(min=1.0).unsqueeze(-1)
+        return torch.cat([mean, (count > 0).to(enc.dtype).unsqueeze(-1)], dim=-1)
+
+    def logits(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor, drop_neighbours: bool = False
+    ) -> torch.Tensor:
+        h = torch.relu(self.fc1(x[:, RSU_BLOCK]))
+        h = torch.relu(self.fc2(h))
+        out = self.head(h).squeeze(-1)
+        if drop_neighbours:  # probe only (D68 section 2): the neighbour block set to zero
+            return out
+        return out + self.head_nbr(self.neighbour_block(x, edge_index, edge_attr)).squeeze(-1)
+
+    def forward(
+        self, x: torch.Tensor, edge_index: torch.Tensor, edge_attr: torch.Tensor, drop_neighbours: bool = False
+    ) -> torch.Tensor:
+        return torch.sigmoid(self.logits(x, edge_index, edge_attr, drop_neighbours))
+
+
 def build_trust_head(
     cfg_model: dict, torch_seed: int, device: str, variant: str = "D"
 ) -> nn.Module:
@@ -130,6 +181,8 @@ def build_trust_head(
         model: nn.Module = TrustHead(
             in_dim=NODE_FEATURE_DIM, hidden_dim=hidden_dim, num_layers=num_layers
         )
+    elif variant == "D2":
+        model = ContainedGraphHead(hidden_dim=hidden_dim, num_layers=num_layers)
     else:
         model = NodeLocalTrustHead(hidden_dim=hidden_dim, num_layers=num_layers)
     return model.to(device)
