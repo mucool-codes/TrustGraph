@@ -46,6 +46,7 @@ from trustgraph.train import (  # noqa: E402
     calibration_table,
     edge_probe,
     mean_bce,
+    neighbour_probe,
     predict_trust,
     save_checkpoint,
     train,
@@ -163,6 +164,8 @@ def main() -> int:
         }
         if variant == "D":
             entry["edge_probe"] = edge_probe(model, val_graphs, base.topology["num_rsus"])
+        if variant == "D2":
+            entry["neighbour_probe"] = neighbour_probe(model, val_graphs, base.topology["num_rsus"])
         report["variants"][variant] = entry
 
         print(f"\n  HELD-OUT scenario (rho={HELD_OUT[0]}, fraction={HELD_OUT[1]}, draw {HELD_OUT[2]})")
@@ -176,6 +179,8 @@ def main() -> int:
                 print(f"      {r['lo']:.1f}-{r['hi']:.1f}  {r['n']:7d}   {r['mean_pred']:.4f}    {r['observed']:.4f}")
         if variant == "D":
             print(f"    edge probe (validation)  : {entry['edge_probe']}")
+        if variant == "D2":
+            print(f"    neighbour probe (validation): {entry['neighbour_probe']}")
 
     if len(report["variants"]) == 2:
         pc, pd = (report["variants"][v]["parameters"] for v in ("C", "D"))

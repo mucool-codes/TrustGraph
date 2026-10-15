@@ -37,7 +37,7 @@ from .selection import Decision, select
 from .topology import pairwise_distances
 from .train import load_checkpoint
 
-VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E", "Gate_C", "H")
+VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E", "Gate_C", "H", "D2")
 HANDOFF_MODES: tuple[str, ...] = ("relay", "off")
 LOG_SCHEMA_VERSION = 2  # 2: candidates carry `load`, the exact value the score used (D53)
 
@@ -51,6 +51,7 @@ TRUST_SOURCE = {
     "E": "model_D",  # E = D + explanation; selection is identical to D (D50)
     "Gate_C": "model_C",  # C's head, plus a trust threshold before selection (D59)
     "H": "success_ewma_feature",  # heuristic baseline: the RSU's own success_ewma, no learning (D65)
+    "D2": "model_D2",  # S14 (D68): C plus a contained same-segment neighbour branch
 }
 
 
@@ -382,7 +383,7 @@ class OffloadEngine:
 
 def load_frozen_head(cfg: Config, settings: OffloadSettings) -> torch.nn.Module:
     """The seed's frozen checkpoint for the variant's trust head (C, or D for D/E)."""
-    head = "C" if settings.variant in ("C", "Gate_C") else "D"
+    head = "C" if settings.variant in ("C", "Gate_C") else ("D2" if settings.variant == "D2" else "D")
     path = Path(settings.checkpoint_dir) / f"s3-seed{cfg.seed}-{head}.pt"
     if not path.exists():
         raise FileNotFoundError(
