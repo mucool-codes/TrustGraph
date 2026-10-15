@@ -1725,3 +1725,17 @@ Records the review answers to the S9b decision request. D59, F28-F31 and D61's o
 **Alternatives:** presenting the weighted form as a measured improvement (contradicted by F30); a further gate study (D59 section 5); Gate-C in every figure (it was not evaluated in the timeline or the S4/S8 scenarios).
 
 **Rationale:** the paper may claim only what F30 supports; the exact decomposition and the absence of a fallback case are properties of the design that do not depend on a success gap.
+
+### D63 — S11a: CLAIMS.md is the paper's claim gate (draft pending design review), and the related-work set is verified at abstract level
+Date: 2026-10-15 | Session: S11a | Status: active
+S11a is the prerequisite session for S12 (answers to the S12 decision request: Q1 separate session S11a, Q2 identifiers supplied and verified, Q3 claims list and related-work fix first; the rest of S11 - demo script, slides, DECISIONS cleanup, index - follows separately and is not done here).
+
+**Decision:**
+1. **`CLAIMS.md`** lists the ALLOWED claims (A1-A20, each with the wording, the exact numbers and the FINDINGS/DECISIONS entries they come from), the FORBIDDEN claims (X1-X15), and the reporting conventions (R1-R8, from D58, D60, D62). It is written only from F16-F31 and D43-D62 and the locked decisions. **Status: draft; S12 does not start until design review approves it.** After approval a change needs a new numbered DECISIONS entry; the file is re-issued, never silently edited.
+2. **`RELATED_WORK.md`** records the verification of the three works added to the ten of TECHNICAL_AND_NOVELTY.md section 6 and what the paper may say about each. SGA-SAC (Cheng et al., Information Fusion 136:104506, 2026) and Siddiqua and Jahan (arXiv 2208.05680) matched the supplied identifiers; G-TRAC was found by search and confirmed as Nguyen and Elmroth, arXiv 2603.28622, DCOSS-IoT 2026, so it may be cited. Verification depth is metadata and abstract only (SGA-SAC full text is paywalled); content statements are limited to what the abstracts say. The table in `make_figures.py` now has 13 rows plus "this work", with rows 11-13 marked as abstract-based.
+3. **Not verified, not citable yet:** the CVE records of TECHNICAL_AND_NOVELTY.md, and any background statement (SCMS revocation delay, regulatory pressure) without a verified source (CLAIMS X13).
+4. Two choices in the claims text that review should confirm: the H4 decision-change result is written as FAITHFUL-by-the-literal-rule at exactly the floor and called borderline (D60 Q2), never pooled (X5); and every H1 sentence carries n_win and the never-avoided rate with n_av (R2, X9).
+
+**Alternatives:** drafting the claims inside S12 (the paper would then be checked against its own author's list, D-review answer Q1); citing the new works from memory (rejected: only confirmed references are cited); describing the new works beyond their abstracts (not verified).
+
+**Rationale:** a claims list approved before the paper is written is what makes "every sentence matches an allowed claim" a real check, and it keeps the negative and null results at their measured strength.
