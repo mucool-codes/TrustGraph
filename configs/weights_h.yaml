@@ -1,0 +1,8 @@
+comment: Variant H (D65). Tuned on seed 100, rho 1.0, fraction 0.2, draws 0-2 by the
+  D52 procedure.
+tuning_seed: 100
+weights:
+  H:
+    alpha: 0.5
+    beta: 0.25
+    gamma: 0.3

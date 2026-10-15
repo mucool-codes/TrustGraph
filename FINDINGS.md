@@ -1644,3 +1644,63 @@ fraction   fraction of runs never avoiding:    A                C               
 ```
 Consistency: the A and C columns equal F26's (0.056 / 0.264 / 0.468 / 0.656 and 0.000 / 0.000 / 0.028 / 0.000), as they must since they are read from the same S9 files.
 Interpretation: Gate-C's censoring is identical to C's at every point, so the n_av comparison between them is not distorted by different censoring; the large censoring is A's (up to 66% at 30% degraded), as F27 item 3 says.
+
+### F32 — S13 Experiment 1: tuning grid of the heuristic baseline H on the tuning seed (RAW, recorded before the chosen weights are used anywhere)
+Date: 2026-10-15 | Session: S13 | Commit: 9b5c139 (code); pre-registration D65 = 245705b (2026-10-15 09:16:12 +0530)
+Config: `configs/demo.yaml`, `configs/h.yaml`, tuning seed 100 (excluded from all evaluation), rho 1.0, fraction 0.20, injection draws 0, 1, 2, closed loop, dwell filter and handoff on | Protocol: D65 section 1.2 = D52 procedure, unchanged
+Variant H: trust_v = the RSU's own `success_ewma` (no model, no gate); weights alpha/beta/gamma tuned over alpha {0.25,0.5,1,2,4} x beta {0.25,0.5,1} x gamma {0.15,0.3,0.6}
+Command: `python scripts/s13_h.py tune --write` (results/s13/h/tuning.json; configs/weights_h.yaml). 135 runs, 1m32s on 12 workers. First result of Experiment 1 written 2026-10-15T03:50:31Z (09:20:31 +0530).
+Objective: deadline success of dispatched tasks over steps [400, 1200), mean over the 3 draws. Ties go to the first grid point in ascending (alpha, beta, gamma) order.
+```
+H  (rows: alpha, beta, gamma; value: mean post-onset deadline success over draws 0,1,2; per-draw in brackets)
+   alpha beta gamma | objective  per-draw
+   0.25  0.25 0.15  | 0.8922    [0.9304, 0.8458, 0.9006]
+   0.25  0.25 0.3   | 0.8929    [0.9282, 0.8495, 0.901]
+   0.25  0.25 0.6   | 0.8907    [0.9219, 0.8495, 0.9006]
+   0.25  0.5  0.15  | 0.8825    [0.9149, 0.8412, 0.8912]
+   0.25  0.5  0.3   | 0.8859    [0.9165, 0.846, 0.8954]
+   0.25  0.5  0.6   | 0.8862    [0.9145, 0.8479, 0.896]
+   0.25  1.0  0.15  | 0.8692    [0.8919, 0.8355, 0.8801]
+   0.25  1.0  0.3   | 0.8725    [0.8949, 0.8388, 0.8838]
+   0.25  1.0  0.6   | 0.8754    [0.8978, 0.8419, 0.8864]
+   0.5   0.25 0.15  | 0.8933    [0.9339, 0.8462, 0.8999]
+   0.5   0.25 0.3   | 0.8965    [0.936, 0.849, 0.9043]  <== chosen
+   0.5   0.25 0.6   | 0.8957    [0.9321, 0.8499, 0.9052]
+   0.5   0.5  0.15  | 0.8886    [0.9271, 0.8421, 0.8967]
+   0.5   0.5  0.3   | 0.8922    [0.9304, 0.8458, 0.9006]
+   0.5   0.5  0.6   | 0.8929    [0.9282, 0.8495, 0.901]
+   0.5   1.0  0.15  | 0.8796    [0.9112, 0.8382, 0.8895]
+   0.5   1.0  0.3   | 0.8825    [0.9149, 0.8412, 0.8912]
+   0.5   1.0  0.6   | 0.8859    [0.9165, 0.846, 0.8954]
+   1.0   0.25 0.15  | 0.8895    [0.9317, 0.8416, 0.8951]
+   1.0   0.25 0.3   | 0.8926    [0.9345, 0.8432, 0.9002]
+   1.0   0.25 0.6   | 0.8957    [0.936, 0.8469, 0.9041]
+   1.0   0.5  0.15  | 0.8891    [0.9304, 0.8412, 0.8956]
+   1.0   0.5  0.3   | 0.8933    [0.9339, 0.8462, 0.8999]
+   1.0   0.5  0.6   | 0.8965    [0.936, 0.849, 0.9043]
+   1.0   1.0  0.15  | 0.8856    [0.9243, 0.8386, 0.8938]
+   1.0   1.0  0.3   | 0.8886    [0.9271, 0.8421, 0.8967]
+   1.0   1.0  0.6   | 0.8922    [0.9304, 0.8458, 0.9006]
+   2.0   0.25 0.15  | 0.8870    [0.9295, 0.8379, 0.8934]
+   2.0   0.25 0.3   | 0.8891    [0.9317, 0.8403, 0.8954]
+   2.0   0.25 0.6   | 0.8913    [0.9347, 0.8403, 0.8988]
+   2.0   0.5  0.15  | 0.8869    [0.9282, 0.8397, 0.8928]
+   2.0   0.5  0.3   | 0.8895    [0.9317, 0.8416, 0.8951]
+   2.0   0.5  0.6   | 0.8926    [0.9345, 0.8432, 0.9002]
+   2.0   1.0  0.15  | 0.8860    [0.928, 0.8375, 0.8925]
+   2.0   1.0  0.3   | 0.8891    [0.9304, 0.8412, 0.8956]
+   2.0   1.0  0.6   | 0.8933    [0.9339, 0.8462, 0.8999]
+   4.0   0.25 0.15  | 0.8834    [0.9284, 0.8316, 0.8901]
+   4.0   0.25 0.3   | 0.8848    [0.9278, 0.8342, 0.8923]
+   4.0   0.25 0.6   | 0.8864    [0.9289, 0.8375, 0.893]
+   4.0   0.5  0.15  | 0.8803    [0.9234, 0.8292, 0.8882]
+   4.0   0.5  0.3   | 0.8870    [0.9295, 0.8379, 0.8934]
+   4.0   0.5  0.6   | 0.8891    [0.9317, 0.8403, 0.8954]
+   4.0   1.0  0.15  | 0.8832    [0.9243, 0.8342, 0.891]
+   4.0   1.0  0.3   | 0.8869    [0.9282, 0.8397, 0.8928]
+   4.0   1.0  0.6   | 0.8895    [0.9317, 0.8416, 0.8951]
+chosen (alpha,beta,gamma) = (0.5, 0.25, 0.3), objective 0.8965, per-draw [0.936, 0.849, 0.9043]
+```
+Spread over the grid: best 0.8965, worst 0.8692. Exact ties at the best value: (0.5,0.25,0.3), (1.0,0.5,0.6) (first in grid order is taken).
+For reference only (F20, same seed, draws, objective): A 0.8670, C 0.8999, D 0.8938, B_oracle 0.9009.
+Interpretation: recorded before use; the chosen weights are written to configs/weights_h.yaml and applied unchanged in the evaluation. One seed, three draws, per-draw values differ by up to 0.09, so differences of ~0.005 between grid points are inside the draw-to-draw spread (as F20).
