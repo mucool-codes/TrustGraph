@@ -2558,3 +2558,23 @@ D42: attempted 250 per model  failed 0  aggregated 250
   D57-normalised (n_C - n_C-h)/n_A on n_av: +0.018 [-0.023, +0.058]  (positive = C-h sends fewer to degraded RSUs; descriptive)
   D57-normalised (n_C - n_C-h)/n_A on n_win: +0.013 [+0.001, +0.025]  (positive = C-h sends fewer to degraded RSUs; descriptive)
 ```
+
+### F51 - S16 verdict against D76 and interpretation (written after F50 was committed in f2eb79d)
+Date: 2026-10-15 | Rules exactly as in D76; no rule, threshold, hold, floor, bound, window, draw, model or weight changed. Output: `scripts/s16_confirm.py eval --verdict` (results/s16/report-eval-verdict-5seeds.txt).
+
+| item | quantity (C-h minus C, paired per draw) | mean [95% t, df 4] | D76 label |
+|---|---|---|---|
+| **CO-PRIMARY 1, rho 1.0** | detection latency, all degraded RSUs (steps) | -38.2 [-53.4, -23.1] (C-h 90.9, C 129.1) | **EARLIER** (hi < 0 and mean <= -20) |
+| **CO-PRIMARY 2, rho 1.0** | false-alarm rate, healthy RSUs | -0.1265 [-0.4602, +0.2072] (C-h 0.316, C 0.443) | **NOT ACCEPTABLE** (hi = +0.207 > 0.05) |
+| **OVERALL, rho 1.0** | | | **NOT CONFIRMED** |
+| control, rho 0, co-primary 1 | latency (steps) | -35.7 [-53.4, -18.1] (C-h 93.1, C 128.9) | EARLIER |
+| control, rho 0, co-primary 2 | false-alarm rate | -0.1173 [-0.4667, +0.2322] (C-h 0.326, C 0.443) | NOT ACCEPTABLE |
+| control, rho 0, overall | | | NOT CONFIRMED |
+| SECONDARY, closed loop, rho 1.0 | post-onset success | -0.0008 [-0.0023, +0.0007] (C-h 0.9338, C 0.9346, A 0.8972) | none (descriptive) |
+
+**Verdict (D76 section 6): NOT CONFIRMED.** Co-primary 1 is EARLIER at rho 1.0, but co-primary 2 is NOT ACCEPTABLE, so OBJECTIVE HELPS is not reached; the rho 0 control has the same two labels. No extension was run (D76 section 6 allows none).
+Why co-primary 2 fails: its point estimate is negative (C-h raised fewer false alarms on average), but the interval is wide and its upper end, +0.207, is above the 0.05 bound, so up to about 21 percentage points more false alarms for C-h are not ruled out at 5 seeds. Per-seed C-h - C false-alarm rate at rho 1.0: -0.011, +0.048, +0.029, -0.101, -0.596 (seed 5 carries most of the mean; two seeds positive); at rho 0: +0.004, +0.058, +0.059, -0.099, -0.608. Per-seed C-h - C latency at rho 1.0: -39.7, -42.2, -55.5, -30.3, -23.5 (all five negative); at rho 0: -36.7, -37.7, -57.6, -26.4, -20.3.
+D42 counts: every open-loop point 250 attempted / 0 failed / 250 aggregated, 1000 degraded and 4000 healthy RSUs per rho (4 degraded and 16 healthy per draw); detected fraction 1.000 for both models at both rho; closed loop 250 / 0 / 250 per model.
+Closed loop, n_av / n_win / never-avoided together (F50): A 589.5 / 907.1 / 0.440, C 245.4 / 576.5 / 0.024, C-h 237.2 / 565.0 / 0.024; D57-normalised (n_C - n_C-h)/n_A +0.018 [-0.023, +0.058] on n_av and +0.013 [+0.001, +0.025] on n_win (descriptive, no label). C - A +0.0374 [+0.0324, +0.0424], C-h - A +0.0366 [+0.0305, +0.0427] (descriptive).
+Descriptive facts that bear on reading the rule (no label): (i) under the D65/D76 rule (per-model pre-onset 1st percentile, 10-step hold) a large share of healthy RSUs cross at some step in [100, 1200): C 0.443 and C-h 0.316 at rho 1.0, of which about 0.11 for both models first cross before step 400. This is the first time the rule's false-alarm rate has been measured; it was not measured for D, D2, D2-h or H. (ii) Within a seed, both models' trust over steps 100-399 is identical across the 50 draws and both rho (checked after F50 on seeds 1 and 5, three draws per rho), so tau is a per-seed constant (equal to the F48 values) and the same healthy RSUs account for pre-onset crossings in every draw where they are healthy; the per-draw false-alarm rates within a seed are therefore strongly dependent, and the seed, as pre-registered, is the unit of analysis.
+Interpretation (one line): on fresh draws and over all degraded RSUs, the horizon-trained node-local head again detected degradation earlier than the next-task head by a margin like A30's (38 steps at rho 1.0, 36 at rho 0, EARLIER at both), but the pre-registered condition that this comes without more false alarms is not met at 5 seeds (the false-alarm difference is between -0.46 and +0.21), so the confirmatory verdict is NOT CONFIRMED; the closed-loop success of the two heads did not differ. No mechanism is tested, and this does not revise F17, F26, F37, F45, F49 or any earlier verdict.
