@@ -1832,3 +1832,36 @@ seed var best_ep stopped untrained_val best_val  heldout_BCE heldout_AUC[450,650
 D44 fallback checks (validation): edge probe >= 0.01 PASS on all six seeds; best validation BCE below untrained validation BCE PASS on all twelve models. The one-time GATv2 swap is not applied (D65 2.4).
 Note: the per-epoch printed sealed diagnostic uses the fixed shared-onset window [450,650) on one validation scenario (draw 40); under staggered onset it printed values of 0.06-0.11 for both C and D on seed 1 (and the held-out value of that window ranges 0.27-0.94 across seeds). It never enters loss, early stopping or selection (L4); it is a window-mismatch diagnostic of a single scenario, not an evaluation number. The pre-registered evaluation uses per-RSU windows (D65 2.5).
 Interpretation: all twelve models converged by patience and pass the pre-committed D44 checks; they are frozen as trained.
+
+### F37 — S13 Experiment 2 raw open-loop results: frozen staggered C and D, draws 200-249, rho 1.0 (test) and rho 0 (control) (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Session: S13 | Commit: befb34f (analysis code in s13_stag.py unchanged since its commit); models F36; D65 = 245705b
+Config: `configs/staggered.yaml`, frozen `checkpoints/s13/` models, seeds 1-5, fraction 0.20, injection draws 200-249 (50 per seed per rho), Baseline-A open-loop scenarios, trust at stride 1 over steps 100-1199.
+Command: `python scripts/s13_stag.py gen eval`, `python scripts/s13_stag.py trust`, `python scripts/s13_stag.py eval` (results/s13/stag/report-eval-raw.txt). First evaluation trust file written 2026-10-15T06:50:12Z (12:20:12 +0530), after F36 (12:19:31 +0530).
+Definitions (D65 2.5): latency = steps from the RSU's own onset to the first run of 10 consecutive steps with trust strictly below tau inside [onset, onset+400), censored at 399; tau = 1st percentile of the model's trust over all RSU-steps in [100,400) pooled over the seed's 50 draws at that rho; per draw the mean over its late-onset RSUs (draws with none are not aggregated); negative D - C = D detects earlier. Secondary AUC: 1 - mean trust over [first onset on the RSU's segment, +250) (RSUs on a segment with no degraded RSU use the draw's earliest onset), degraded vs reliable, per draw. Intervals: Student-t over 5 seeds (2.776).
+```
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / aggregated for the latency primary (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 37  late-onset RSUs 43  tau C 0.8461 D 0.7380
+    seed 2: attempted 50  failed 0  aggregated 38  late-onset RSUs 46  tau C 0.8602 D 0.7423
+    seed 3: attempted 50  failed 0  aggregated 30  late-onset RSUs 36  tau C 0.8137 D 0.5951
+    seed 4: attempted 50  failed 0  aggregated 29  late-onset RSUs 33  tau C 0.8598 D 0.6547
+    seed 5: attempted 50  failed 0  aggregated 30  late-onset RSUs 36  tau C 0.8682 D 0.6161
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 130.1 +/- 15.3   D 226.4 +/- 34.4   detected fraction C 1.000 D 0.946
+  PRIMARY  D - C latency: +96.3 (sd 23.8) 95% [+66.8, +125.9]
+  per-seed D - C latency: [65.4, 89.9, 130.4, 105.2, 90.7]
+  (secondary) window AUC: C 0.9328 D 0.8057   D - C -0.1271 (sd 0.0623) 95% [-0.2044, -0.0498]
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / aggregated for the latency primary (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  late-onset RSUs 127  tau C 0.8461 D 0.7380
+    seed 2: attempted 50  failed 0  aggregated 50  late-onset RSUs 134  tau C 0.8602 D 0.7423
+    seed 3: attempted 50  failed 0  aggregated 50  late-onset RSUs 113  tau C 0.8137 D 0.5951
+    seed 4: attempted 50  failed 0  aggregated 50  late-onset RSUs 135  tau C 0.8598 D 0.6547
+    seed 5: attempted 50  failed 0  aggregated 50  late-onset RSUs 133  tau C 0.8682 D 0.6161
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 126.5 +/- 8.7   D 197.0 +/- 28.8   detected fraction C 1.000 D 0.968
+  PRIMARY  D - C latency: +70.5 (sd 22.3) 95% [+42.8, +98.2]
+  per-seed D - C latency: [44.6, 56.9, 97.3, 63.9, 89.8]
+  (secondary) window AUC: C 0.7942 D 0.7484   D - C -0.0457 (sd 0.0434) 95% [-0.0996, +0.0081]
+
+(description) (D - C latency at rho 1.0) minus (at rho 0), per-seed paired: -25.8 (sd 15.7) 95% [-45.4, -6.3]
+```
