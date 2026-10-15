@@ -1,7 +1,7 @@
 # CLAIMS.md
 
 **What this paper may and may not say.** Written in S11a from F16-F31 and D43-D62 (and the locked decisions
-L1-L12 of PROJECT_SPEC.md). Status: **DRAFT for design review. S12 must not start until this file is approved.**
+L1-L12 of PROJECT_SPEC.md); extended in S13b with the S13 results (F32-F40) under D67. Status: **DRAFT for design review. S12 must not start until this file is approved.**
 Once approved, a change needs a new numbered DECISIONS entry (the next free number) saying what changed and why;
 this file is then re-issued, never silently edited.
 
@@ -51,7 +51,9 @@ the same decisions as A** (asserted on all 2000 paired draws of S9, F26). B-orac
 zero delay; an **upper bound, not a method**. C: node-local MLP trust. D: 2-layer GINEConv trust over the graph. E: D plus
 explanation (its decisions equal D's by construction, asserted). Gate-C: an **extra baseline**, C's frozen head with candidates
 below tau = 0.9 removed first (D59). Weights are the D52 weights, tuned once on seed 100 and applied unchanged.
-*Sources:* PROJECT_SPEC 3; D44, D50, D52, D59; F26 (checks), F28.
+H: an **extra baseline** (S13): trust is the RSU's own `success_ewma`, no model, no neighbour information, the same rule with no gate; its weights were tuned once on
+seed 100 by the D52 procedure (D65, F32) and applied unchanged.
+*Sources:* PROJECT_SPEC 3; D44, D50, D52, D59, D65; F26 (checks), F28, F32.
 
 ### Closed-loop dispatch results (H1, H3)
 
@@ -95,11 +97,11 @@ at rho 1.0; -0.0517 [-0.0902, -0.0131] at rho 0), the slope of the gap on realis
 colluders in training). Cold start is NULL at rho 1.0 (-0.0273 [-0.0935, +0.0389]; an advantage of 0.05 is ruled out), and
 at rho 0 D is worse and the 95% interval over seeds excludes 0 (-0.1431 [-0.2226, -0.0635], reported as information). C detects degradation about
 77-97 steps earlier than D at every rho. "H2 holds in full" is false.
-*Sources:* F16, F17; D43, D47, D49. Figure 5.
+*Sources:* F16, F17; D43, D47, D49. Figure 5. A25 reports the separate staggered-onset regime.
 
 **A10. The closed loop agrees.** D is not better than C on any closed-loop point: the paired success difference D minus C is
 -0.016 [-0.027, -0.006] at the shared point (NEGATIVE at 20% and 30%, NULL at 5% and 10%), about the same at rho 0 and rho 1.0
-(-0.016), and it does not widen with rho. This is the secondary closed-loop check of H2 and does not revise A9.
+(-0.016), and it does not widen with rho. This is the secondary closed-loop check of H2 and does not revise A9. F40 (descriptive) shows the same direction under staggered onset (A25).
 *Sources:* F26, F27 (item 4); D56 section 3.
 
 **A11. Why, as far as it was measured.** `same_segment` is correct on every sampled RSU-RSU edge (0 mismatches over 92,000 instances,
@@ -108,7 +110,8 @@ but removing it does not systematically cost detection. A degraded RSU's own evi
 same-segment neighbours' (own-lead -0.3 to +0.5 s, all intervals include 0; about 110 s after onset), because onset is shared (D31).
 At rho 0, 59% of degraded RSUs have only healthy same-segment neighbours; at rho 1, 95% have degraded neighbours but those move
 simultaneously. So in this scenario own-node evidence is never later than neighbour evidence, and a lead-time advantage for message
-passing is not available by construction. This is stated as a **boundary condition of this scenario**, not as a general result.
+passing is not available by construction. This is stated as a **boundary condition of this scenario**, not as a general result. The staggered-onset regime, in which a lead does exist (A24), is
+reported in A25: D still did not detect earlier than C.
 *Sources:* F18, F19; D48, D49.
 
 ### Explanation (Layer 1, Layer 2) and overhead (H4, H5)
@@ -156,6 +159,41 @@ steps >= 400 was 4.8%, 6.2%, 12.1%, 19.1% (5% to 30% degraded). tau was chosen o
 decomposable score (Layer 1) and no empty-candidate-set failure mode.
 *Sources:* F28-F31; D59, D61, D62.
 
+### S13: heuristic baseline and staggered onset (pre-registered in D65)
+
+**A23. H against C: not separated (Experiment 1).** In this simulation, a heuristic that uses each RSU's own `success_ewma` as its trust (H, the same fixed rule, no gate,
+no learning) came within 0.003-0.005 of the learned node-local head C on post-onset task success at all four degraded fractions: C minus H is +0.0034 [+0.0027, +0.0041]
+(5%), +0.0035 [+0.0028, +0.0042] (10%), +0.0038 [+0.0032, +0.0045] (20%, shared point), +0.0045 [+0.0033, +0.0057] (30%) (95% t-interval over 5 seeds). Every interval lies above 0
+but below the 0.01 floor, so the pre-registered label is NULL at all four points and the verdict is NOT SEPARATED (D65; WIN at 0 of 4, NEGATIVE at 0 of 4). A difference of 0.025 or more in either
+direction is ruled out. H weights (0.5, 0.25, 0.3) were tuned once on seed 100 (F32). At the shared point n_av / n_win / never-avoided: C 152.7 / 506.3 / 0.028, H 155.1 / 510.7 / 0.028,
+A 627.5 / 912.4 / 0.468 (always stated together, R2); detection latency C is 5-10 steps earlier than H with every interval including 0 (descriptive). D42: 250 attempted, 0 failed, 250 aggregated at
+each point; C recomputed bit-for-bit equal to S9.
+*Sources:* F33, F34, F32; D65. Tables `ablation_shared_point`, `ablation_all_points`, `paired_effects_shared_point`; Figures 3 and 4.
+
+**A24. Mechanism check under staggered onset.** In this simulation, with onsets drawn independently and uniformly over [400, 700] (S = 300), a late-onset degraded RSU (one with an earlier-onset
+degraded same-segment RSU-RSU neighbour) showed degraded evidence in `success_ewma` after its earlier-onset neighbours by +92.3 [+79.2, +105.5] steps at rho 1.0 and +103.6 [+70.9, +136.2] at rho 0
+(draws 50-79, seeds 1-5; mean onset gap 98.1 and 103.6). The lead is the injected stagger carried through the observable. It is a statement about the scenario, not about any model.
+*Sources:* F35; D65 2.3.
+
+**A25. D against C under staggered onset: C detects earlier (Experiment 2).** In this simulation, under staggered onset (S = 300; heads trained fresh on the staggered regime with the D44/D45
+settings; draws 200-249, 5 seeds), D detected late-onset RSUs later than C: D minus C is +70.5 [+42.8, +98.2] steps at rho 1.0 (C 126.5, D 197.0) and +96.3 [+66.8, +125.9] at rho 0 (C 130.1, D 226.4).
+The pre-registered label is NEGATIVE at rho 1.0 (C beats D) and the rho 0 control is NEGATIVE too, so there is no structural reading; the extension to seeds 6-10 was not triggered (not NOISY). D42: rho 1.0 250 attempted,
+0 failed, 250 aggregated; rho 0 250 / 0 / 164 (draws with no late-onset RSU are not aggregated). Descriptive, no pre-registered label: the window AUC difference D minus C is -0.046 [-0.100, +0.008] (rho 1.0) and
+-0.127 [-0.204, -0.050] (rho 0); closed-loop post-onset success D minus C is -0.016 [-0.021, -0.011] (rho 1.0) and -0.017 [-0.027, -0.008] (rho 0) with each model's own weights tuned on seed 100 (F39, F40).
+It may be said that the graph did not help in this regime either, where a neighbour lead exists. This does not revise A9; it is a separate, labelled regime.
+*Sources:* F36, F37, F38, F39, F40; D65, D66. Mechanisms for D trailing C stay hypotheses (A20, X10).
+
+**A26. The three CVE records (verified).** CVE-2026-37554, CVE-2026-43988 and CVE-2026-44905 are published CVE records of denial-of-service vulnerabilities (CVSS 3.1 base 7.5) in the open-source
+Vanetza V2X implementation (<= 26.02), in each of which a remote unauthenticated network attacker can terminate the process through an uncaught exception (CWE-248): the first in ECC point validation in GeoNetworking
+packet processing (published 2026-05-01), the second in ASN.1/OER parsing and the third in the cryptographic verification path (both published 2026-05-26). Read from the CVE Program record service on 2026-10-15.
+Nothing beyond this wording (X20).
+*Sources:* `CVE_VERIFICATION.md`.
+
+**A27. A non-learned monitor recovers most of the gain over no trust.** In this simulation, H minus A is +0.018 to +0.049 against C minus A at +0.021 to +0.054, so a non-learned behavioural monitor recovers most of
+the trust-aware gain (F33). Per fraction (5%, 10%, 20%, 30%): H minus A +0.0177, +0.0344, +0.0460, +0.0493; C minus A +0.0211, +0.0379, +0.0498, +0.0538 (paired, 95% t-intervals over 5 seeds in F33).
+Descriptive: the pre-registered comparison is A23.
+*Sources:* F33; D65, D67.
+
 ### Protocol
 
 **A16. Pre-registration and statistics.** The H2 rule (D43), the explanation protocol (D54), the sweep, metrics and verdict rule
@@ -164,8 +202,10 @@ numbers they judge (verified from commit order for D59: D59 = 3710795 at 19:26, 
 Seeds 1-5 with frozen checkpoints; evaluation draws 100-149; tuning seed 100 and the demo draw excluded from every evaluation. The unit
 of analysis is the seed: per-seed means of per-draw paired differences, 95% Student-t intervals over 5 seeds (df 4). Mean +/- sd is across
 seeds. No multiplicity correction. D42: the sweeps contain no cold-start RSU; every sweep point reports 250 draws attempted, 0 failed, 250 aggregated
-(S4's cold-start conditions report attempted / infeasible / aggregated per D42).
-*Sources:* D43, D54, D56, D57, D59, D42; F16, F26, F29; commit log.
+(S4's cold-start conditions report attempted / infeasible / aggregated per D42). The S13 experiments were pre-registered in D65 (commit 245705b, 2026-10-15 09:16:12 +0530)
+before any of their numbers: the first Experiment 1 number (the H tuning grid) was produced at 09:20:31 and recorded in F32 (776beff, 09:21:52); the first Experiment 2
+number (the mechanism check) at 12:05:28, recorded in F35 (b2c09c7, 12:06:23). D66 records the implementation choices D65 left open.
+*Sources:* D43, D54, D56, D57, D59, D65, D66, D42; F16, F26, F29, F32, F35; commit log.
 
 **A17. Reproducibility.** Every run is reproducible from (config file, seed); figures and tables regenerate from one command and are
 byte-identical on re-run.
@@ -183,13 +223,14 @@ Hand-tuned weights, tuned on one seed. Scale capped at 15-30 RSUs and 50-100 veh
 degraded RSUs (D31). The trust heads were trained on Baseline-A (open-loop) dispatch and are evaluated in the closed loop, a distribution
 shift (D50 item 5, F21 item 3). Collusion models never saw colluders in training. B-oracle reads sealed truth. The avoidance bar of 0.75 is a stated
 assumption. Seed 1 was trained at the default thread count and seeds 2-5 at 3 threads (D47; inference is not thread-sensitive, F18 check 3).
-Layer 2 uses one explainer run per explanation and a 200-decision sample. Training and evaluation share a seed's traffic and differ only in injection draws (D44).
+Layer 2 uses one explainer run per explanation and a 200-decision sample. Training and evaluation share a seed's traffic and differ only in injection draws (D44). Staggered onset was tested at S = 300 only, with independent uniform
+onsets, one scenario per seed and heads trained on open-loop dispatch (A25). H's weights were tuned on one seed (A23).
 *Sources:* PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18.
 
-**A20. Untested future work (stated as such, as hypotheses).** Staggered onset (D31(c)); an observation-count feature (D38(d)); other architectures;
+**A20. Untested future work (stated as such, as hypotheses).** An observation-count feature (D38(d)); other architectures;
 training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a possible cause of D trailing C; D's aggregation over many healthy
 neighbours diluting its own-node signal (F19); cold-start and collusion conditions where a graph model might help; gating a different head.
-None of these was run and none may be reported as a finding.
+None of these was run and none may be reported as a finding. (Staggered onset, D31(c), was tested in S13: A24, A25.)
 *Sources:* D47, D49, D60 (Q3), F19, F21.
 
 ### Contribution statement
@@ -238,7 +279,8 @@ Single-run numbers; draw-level standard errors (draws within a seed share a mode
 
 **X13.** Background statements that are not in the repo and not cited from a verified reference, for example the time SCMS CRL revocation takes to propagate,
 regulatory pressure for post-incident reconstruction, or CVE details. They may be used only with a verified citation (otherwise leave a TODO). The CVE
-records listed in TECHNICAL_AND_NOVELTY.md were not re-verified in S11a and may not be cited until they are.
+records listed in TECHNICAL_AND_NOVELTY.md were not re-verified in S11a; the three Vanetza records were verified in S13 (`CVE_VERIFICATION.md`) and may be cited only
+with the wording of A26. Every other detail of them, and any other CVE, stays barred until verified.
 
 **X14.** Re-describing any pre-registered result with a different rule after the fact (changed floor, window or label); describing D57 as anything other than a
 pre-evaluation correction; describing the tuning-seed grids (F20, F28) as findings about the weights or tau.
@@ -247,6 +289,15 @@ pre-evaluation correction; describing the tuning-seed grids (F20, F28) as findin
 
 **X16.** Any performance, fidelity or "result" claim based on seed 100 or draw 7 (the tuning seed and the demo draw). Allowed only: the A12 exactness
 identity check, A8 as a labelled illustration, and A22 as descriptive.
+
+**X17.** That staggered onset rescues, or fails to rescue, H2 in general. A24 and A25 state what was measured: one injection model, S = 300, one scenario per seed, open-loop-trained heads. No "regimes
+where the graph helps / does not help" generalisation.
+
+**X18.** "Learning adds nothing", "H equals C", "the learned head is unnecessary", or "H is better". Allowed: the NULL label under the 0.01 floor with the signed differences and intervals (A23), and A27 as a description.
+
+**X19.** Describing D's smaller deficit at rho 1.0 than at rho 0 (-25.8 [-45.4, -6.3] steps on the difference) as an advantage, a structural effect, or a pre-registered result. It is a descriptive narrowing of a deficit (F38).
+
+**X20.** Any CVE wording beyond A26: "ETSI ITS-G5", radio range, deployed RSU or vehicle products, field exploitation, attacks specific to certificate-holding nodes, or any statement from the CVE records about SCMS.
 
 ---
 
@@ -259,7 +310,7 @@ head. (D60 Q1, D58.)
 **R4. Effect and interval.** Every difference carries its 95% interval over seeds and, where a pre-registered rule applies, its D43/D54/D56/D59 label.
 **R5. Scope.** "In this simulation" at least once per results paragraph; limitations in their own section but results never moved into it.
 **R6. Dated protocol.** The pre-registrations are described with their entries (D43, D54, D56 + D57, D59) and the fact that the rule preceded the numbers.
-**R7. Gate-C and B-oracle labelled.** Gate-C as an extra baseline, B-oracle as an upper bound, B as equal to A in this scenario, E as D plus explanation.
+**R7. Gate-C, H and B-oracle labelled.** Gate-C and H as extra baselines (H: the RSU's own `success_ewma`, no learning), B-oracle as an upper bound, B as equal to A in this scenario, E as D plus explanation.
 **R8. Figures from the script.** Figures come from `figures/s10/` via `scripts/make_figures.py`; none is redrawn. Every number in the text matches a source entry cited in a LaTeX comment.
 
 ---
@@ -270,3 +321,4 @@ head. (D60 Q1, D58.)
 - Venue, page limit, and class: undecided.
 - Any numbers for the rho-sweep H1/H3 points not in `results/s10/tables/ablation_all_points` or F26.
 - Gate-C at rho-sweep points: not run (D59: fraction-sweep points only); the paper must say so.
+- H at rho-sweep points: not run (D65: fraction-sweep points only); the paper must say so. The staggered regime was run at 20% degraded with rho 1.0 and rho 0 only.

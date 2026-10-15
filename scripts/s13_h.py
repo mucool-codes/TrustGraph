@@ -210,7 +210,7 @@ def cmd_run() -> int:
 
 # ------------------------------------------------------------------ report
 
-KEYS = ("succ", "nav", "nwin", "never", "lat", "det")
+KEYS = ("succ", "sall", "nav", "nwin", "never", "lat", "det")
 
 
 def load_arrays(g):
@@ -235,6 +235,7 @@ def load_arrays(g):
                 c_mismatch += int(not r["c_recompute_equals_s9"])
                 for v, m in (("a", st["A"]), ("c", st["C"]), ("h", r["h"])):
                     a[f"{v}_succ"][i, j] = m["success_post_onset"]
+                    a[f"{v}_sall"][i, j] = m["success_all"]
                     a[f"{v}_nav"][i, j] = m["n_av"]
                     a[f"{v}_nwin"][i, j] = m["n_win"]
                     a[f"{v}_never"][i, j] = float(m["never_avoided"])

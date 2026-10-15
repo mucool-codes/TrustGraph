@@ -43,7 +43,7 @@ TAB = S10 / "tables"
 
 # ------------------------------------------------------------------ one style for everything
 INK, MUTED, FAINT = "#1f2328", "#5b6470", "#d5d9de"
-COL = {"A": "#6b7280", "B": "#9ca3af", "B_oracle": "#2f855a", "C": "#2a6fb0", "D": "#c2571a", "E": "#c2571a", "Gate_C": "#7c5cbf"}
+COL = {"A": "#6b7280", "B": "#9ca3af", "B_oracle": "#2f855a", "C": "#2a6fb0", "D": "#c2571a", "E": "#c2571a", "Gate_C": "#7c5cbf", "H": "#a67c00"}
 NAME = {"A": "A  no trust", "B": "B  certificate", "B_oracle": "B-oracle  (upper bound)", "C": "C  node-local MLP",
         "D": "D  GNN", "E": "E  GNN + explanation"}
 ONSET, RAMP_END, WIN = 400, 700, 25
@@ -111,6 +111,32 @@ def load_gate() -> dict:
         paired[key] = M.h3_effect(a["c_succ"], a["g_succ"])
         vs_a[key] = M.h3_effect(a["g_succ"], a["a_succ"])
     return {"T": T, "paired": paired, "vs_a": vs_a, "tau": g["tau"]}
+
+
+def load_h() -> dict:
+    """Heuristic baseline H (S13, D65) at the four fraction-sweep points, from results/s13/h/raw (no sealed access).
+
+    Returns {"T": {(rho, frac): {metric: (mean, sd)}}, "paired": {(rho, frac): (mean, lo, hi, D65 label) of C minus H success},
+    "vs_a": {(rho, frac): Effect of H minus A success}, "weights": (alpha, beta, gamma)}.
+    """
+    if not (REPO_ROOT / "results" / "s13" / "h" / "raw").exists():
+        raise SystemExit("results/s13/h/raw missing: run `python scripts/s13_h.py run` first (S13)")
+    import s13_h as Hm
+    from trustgraph import sweep_metrics as M
+
+    g = Hm.load_h()
+    T, paired, vs_a = {}, {}, {}
+    for pt, d in Hm.load_arrays(g).items():
+        a = d["a"]
+        sm = lambda x: (float(np.mean(M.seed_means(x))), float(np.std(M.seed_means(x), ddof=1)))  # noqa: E731
+        key = (round(pt[0], 2), round(pt[1], 2))
+        T[key] = {"success_post_onset": sm(a["h_succ"]), "success_all": sm(a["h_sall"]), "n_av": sm(a["h_nav"]), "n_win": sm(a["h_nwin"]),
+                  "never_avoided": sm(a["h_never"]), "latency": sm(a["h_lat"]), "detected_fraction": sm(a["h_det"])}
+        m, _, lo, hi = Hm.diff(a["c_succ"], a["h_succ"])
+        paired[key] = (m, lo, hi, Hm.label_d65(m, lo, hi))
+        vs_a[key] = M.h3_effect(a["h_succ"], a["a_succ"])
+    w = Hm.yaml.safe_load(Hm.weights_path(g).read_text())["weights"]["H"]
+    return {"T": T, "paired": paired, "vs_a": vs_a, "weights": (w["alpha"], w["beta"], w["gamma"])}
 
 
 def ensure_inputs(recompute: bool) -> None:
@@ -255,15 +281,16 @@ def fig_timeline() -> None:
 
 
 # ------------------------------------------------------------------ Figure 3: success vs fraction
-def fig_success_vs_fraction(T, P, GT) -> None:
+def fig_success_vs_fraction(T, P, GT, HH) -> None:
     fr = [0.05, 0.10, 0.20, 0.30]
     fig, ax = plt.subplots(1, 2, figsize=(14, 5.4), gridspec_kw={"wspace": 0.22})
     a = ax[0]
     order = [("A", "A = B  (identical decisions)", "o"), ("B_oracle", NAME["B_oracle"], "s"), ("C", NAME["C"], "^"),
-             ("Gate_C", "Gate-C  (extra baseline)", "v"), ("D", "D = E  (same dispatch)", "D")]
-    off = {"A": -1.2, "B_oracle": -0.6, "C": 0.0, "Gate_C": 0.6, "D": 1.2}
+             ("Gate_C", "Gate-C  (extra baseline)", "v"), ("H", "H  heuristic: own success_ewma (extra baseline)", "P"),
+             ("D", "D = E  (same dispatch)", "D")]
+    off = {"A": -1.5, "B_oracle": -0.9, "C": -0.3, "Gate_C": 0.3, "H": 0.9, "D": 1.5}
     for v, lab, mk in order:
-        src_ = {f: (GT["T"][(1.0, f)] if v == "Gate_C" else T[(1.0, f)][v]) for f in fr}
+        src_ = {f: (GT["T"][(1.0, f)] if v == "Gate_C" else HH["T"][(1.0, f)] if v == "H" else T[(1.0, f)][v]) for f in fr}
         m = [src_[f]["success_post_onset"][0] for f in fr]; s = [src_[f]["success_post_onset"][1] for f in fr]
         a.errorbar(np.array(fr) * 100 + off[v], m, yerr=s, color=COL[v], marker=mk, ms=8, capsize=4, lw=2.2,
                    ls="--" if v == "B_oracle" else "-", label=lab)
@@ -271,15 +298,15 @@ def fig_success_vs_fraction(T, P, GT) -> None:
     a.set_title("(a) Success, mean +/- sd over 5 seeds"); a.legend(frameon=False, fontsize=11, loc="lower left")
     a.text(30.5, 0.9755, "at 5% only one RSU is degraded:\nno correlated failure", fontsize=10.5, color=MUTED, ha="right", va="top")
     b = ax[1]
-    for v, off_ in (("C", -0.6), ("Gate_C", 0.0), ("D", 0.6)):
-        if v == "Gate_C":
-            e = [GT["vs_a"][(1.0, f)] for f in fr]
+    for v, off_ in (("C", -0.9), ("Gate_C", -0.3), ("H", 0.3), ("D", 0.9)):
+        if v in ("Gate_C", "H"):
+            e = [(GT if v == "Gate_C" else HH)["vs_a"][(1.0, f)] for f in fr]
             m = np.array([x.mean for x in e]); lo = np.array([x.lo for x in e]); hi = np.array([x.hi for x in e])
         else:
             m = np.array([P[(1.0, f, v, "A")]["h3_mean"] for f in fr]); lo = np.array([P[(1.0, f, v, "A")]["h3_lo"] for f in fr])
             hi = np.array([P[(1.0, f, v, "A")]["h3_hi"] for f in fr])
-        b.errorbar(np.array(fr) * 100 + off_, m, yerr=[m - lo, hi - m], color=COL[v], marker="v" if v == "Gate_C" else "o", ms=8, capsize=4,
-                   label=("Gate-C minus A  (extra baseline)" if v == "Gate_C" else f"{v} minus A"))
+        b.errorbar(np.array(fr) * 100 + off_, m, yerr=[m - lo, hi - m], color=COL[v], marker={"Gate_C": "v", "H": "P"}.get(v, "o"), ms=8, capsize=4,
+                   label=("Gate-C minus A  (extra baseline)" if v == "Gate_C" else "H minus A  (extra baseline)" if v == "H" else f"{v} minus A"))
     b.axhline(0, color=MUTED, lw=1.2); b.axhline(0.01, color=MUTED, lw=1.2, ls=":")
     b.text(30.8, 0.0115, "pre-registered floor 0.01", ha="right", fontsize=10.5, color=MUTED)
     b.set_xticks([5, 10, 20, 30]); b.set_xlabel("degraded fraction of RSUs (%)  at rho = 1.0"); b.set_ylabel("paired gain in success rate")
@@ -288,26 +315,26 @@ def fig_success_vs_fraction(T, P, GT) -> None:
 
 
 # ------------------------------------------------------------------ Figure 4: ablation
-def fig_ablation(T, P, GT) -> None:
+def fig_ablation(T, P, GT, HH) -> None:
     S = T[SHARED]
-    variants = ["A", "B", "C", "D", "E", "Gate_C"]
+    variants = ["A", "B", "C", "D", "E", "Gate_C", "H"]
     src = {"E": "D"}
-    label = {"Gate_C": "Gate-C"}
+    label = {"Gate_C": "Gate-C", "H": "H"}
     panels = [("success_post_onset", "task success rate after onset\n(axis starts at 0.80)", (0.80, 0.96), "{:.3f}", "h3", "{:+.3f}"),
               ("n_av", "tasks sent to degraded RSUs,\nonset to avoidance", (0, 760), "{:.0f}", "h1", "{:+.3f}"),
               ("n_win", "tasks sent to degraded RSUs,\nfixed window [400, 1200)", (0, 1050), "{:.0f}", None, None)]
     fig, ax = plt.subplots(1, 3, figsize=(16.5, 6.0), gridspec_kw={"wspace": 0.42})
     for a, (m, ylab, ylim, f, pk, pf) in zip(ax, panels):
         for i, v in enumerate(variants):
-            mean, sd = (GT["T"][SHARED] if v == "Gate_C" else S[src.get(v, v)])[m]
+            mean, sd = (GT["T"][SHARED] if v == "Gate_C" else HH["T"][SHARED] if v == "H" else S[src.get(v, v)])[m]
             a.bar(i, mean, 0.7, color=COL[v], hatch="//" if v == "E" else None, edgecolor="white" if v == "E" else COL[v], lw=0,
                   alpha=0.45 if v == "B" else 1.0, zorder=2)
             a.errorbar(i, mean, yerr=sd, color=INK, capsize=5, lw=1.8, zorder=3)
             a.text(i, mean + sd + (ylim[1] - ylim[0]) * 0.015, f.format(mean), ha="center", fontsize=11)
         om = S["B_oracle"][m][0]
         a.axhline(om, color=COL["B_oracle"], ls="--", lw=2.0, zorder=1)
-        a.text(5.5, om, "  oracle", color=COL["B_oracle"], ha="left", va="center", fontsize=11, clip_on=False)
-        a.set_xticks(range(6)); a.set_xticklabels([label.get(v, v) for v in variants]); a.set_ylim(*ylim); a.set_xlim(-0.6, 5.6); a.set_ylabel(ylab)
+        a.text(6.5, om, "  oracle", color=COL["B_oracle"], ha="left", va="center", fontsize=11, clip_on=False)
+        a.set_xticks(range(len(variants))); a.set_xticklabels([label.get(v, v) for v in variants]); a.set_ylim(*ylim); a.set_xlim(-0.6, 6.6); a.set_ylabel(ylab)
         a.spines["bottom"].set_visible(True)
         a.add_patch(plt.Rectangle((1.55, ylim[0]), 1.9, ylim[1] - ylim[0], fc="#fff4c2", ec="none", alpha=0.75, zorder=0))
         a.text(2.5, 1.02, "C vs D: the structural test", transform=a.get_xaxis_transform(), ha="center", va="bottom", fontsize=11.5, fontweight="bold")
@@ -317,13 +344,16 @@ def fig_ablation(T, P, GT) -> None:
             if pk == "h3":
                 e = GT["paired"][SHARED]
                 lab += f"\nC minus Gate-C: {e.mean:+.4f}  [{e.lo:+.4f}, {e.hi:+.4f}]"
+                hm, hlo, hhi, _ = HH["paired"][SHARED]
+                lab += f"\nC minus H: {hm:+.4f}  [{hlo:+.4f}, {hhi:+.4f}]"
             a.set_xlabel(lab, fontsize=11.5)
         else:
             a.set_xlabel("(rule-free count, a guard on the middle panel)", fontsize=11, color=MUTED)
     fig.suptitle("Ablation at the shared operating point (rho 1.0, 20% degraded). Bars: mean over 5 seeds, whiskers: sd.\n"
                  "B equals A and E equals D (identical decisions, asserted). Dashed green: B-oracle, an upper bound.\n"
-                 f"Gate-C: an extra baseline (frozen C head, candidates with trust below {GT['tau']:g} removed first, D59), run at the fraction-sweep points only.",
-                 x=0.125, ha="left", fontsize=13.5, fontweight="bold", y=1.08)
+                 f"Gate-C: an extra baseline (frozen C head, candidates with trust below {GT['tau']:g} removed first, D59), run at the fraction-sweep points only.\n"
+                 "H: an extra baseline, trust = the RSU's own success_ewma (no learning, same rule, no gate; S13), run at the fraction-sweep points only.",
+                 x=0.125, ha="left", fontsize=13.5, fontweight="bold", y=1.12)
     save(fig, "fig4_ablation")
 
 
@@ -441,7 +471,7 @@ def pm(ms, nd=3):
     return f"{ms[0]:.{nd}f} ± {ms[1]:.{nd}f}"
 
 
-def tables(T, P, GT) -> None:
+def tables(T, P, GT, HH) -> None:
     S = T[SHARED]
     rows = []
     for v, src in (("A", "A"), ("B", "B"), ("B_oracle", "B_oracle"), ("C", "C"), ("D", "D"), ("E", "D")):
@@ -452,13 +482,17 @@ def tables(T, P, GT) -> None:
     g = GT["T"][SHARED]
     rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["success_all"]), pm(g["n_av"], 0), pm(g["n_win"], 0),
                  pm(g["never_avoided"], 2), "not reported (D59)", "not reported (D59)"])
+    h = HH["T"][SHARED]
+    rows.append(["H (heuristic baseline)", pm(h["success_post_onset"]), pm(h["success_all"]), pm(h["n_av"], 0), pm(h["n_win"], 0),
+                 pm(h["never_avoided"], 2), pm(h["latency"], 0), pm(h["detected_fraction"], 2)])
     write_table("ablation_shared_point",
                 ["Variant", "Success after onset", "Success, all steps", "To degraded, onset to avoidance", "To degraded, [400,1200)",
                  "Runs never avoiding", "Detection latency (steps)", "Degraded RSUs detected"], rows,
                 "Ablation at the shared operating point (rho 1.0, 20% degraded): mean ± sd across 5 seeds (50 draws each)",
                 "B decides identically to A in this scenario and E identically to D (both asserted); B-oracle reads the sealed fault state and is an upper bound, "
                 "not a method. Detection latency is censored at 399 steps; A and B cannot detect by construction. Gate-C is an extra baseline: the frozen C head with candidates "
-                f"below trust {GT['tau']:g} removed before the same rule (D59); it was run at the four fraction-sweep points only and its detection figures are not reported.")
+                f"below trust {GT['tau']:g} removed before the same rule (D59); it was run at the four fraction-sweep points only and its detection figures are not reported. "
+                "H is an extra baseline (S13, D65): trust is the RSU's own success_ewma, no learning, the same rule with no gate, weights tuned on the tuning seed; run at the four fraction-sweep points only.")
     pts = [(1.0, 0.05), (1.0, 0.10), (1.0, 0.20), (1.0, 0.30), (0.0, 0.20), (0.25, 0.20), (0.5, 0.20), (0.75, 0.20)]
     rows = []
     for rho, fr in pts:
@@ -468,8 +502,11 @@ def tables(T, P, GT) -> None:
         if (round(rho, 2), round(fr, 2)) in GT["T"]:
             gg = GT["T"][(round(rho, 2), round(fr, 2))]
             rows.append([f"{rho:g}", f"{fr:.2f}", "Gate-C (extra baseline)", pm(gg["success_post_onset"]), pm(gg["n_av"], 0), pm(gg["n_win"], 0)])
+        if (round(rho, 2), round(fr, 2)) in HH["T"]:
+            hh = HH["T"][(round(rho, 2), round(fr, 2))]
+            rows.append([f"{rho:g}", f"{fr:.2f}", "H (heuristic baseline)", pm(hh["success_post_onset"]), pm(hh["n_av"], 0), pm(hh["n_win"], 0)])
     write_table("ablation_all_points", ["rho", "fraction", "Variant", "Success after onset", "To degraded, onset to avoidance", "To degraded, [400,1200)"],
-                rows, "All sweep points: mean ± sd across 5 seeds", "Rho sweep at fraction 0.20, fraction sweep at rho 1.0; the (1.0, 0.20) rows are shared. B = A and E = D throughout. Gate-C was run at the four fraction-sweep points only.")
+                rows, "All sweep points: mean ± sd across 5 seeds", "Rho sweep at fraction 0.20, fraction sweep at rho 1.0; the (1.0, 0.20) rows are shared. B = A and E = D throughout. Gate-C and H were run at the four fraction-sweep points only.")
 
     verdict = json.loads((S9 / "summary-verdict.json").read_text(encoding="utf-8"))["verdicts"]
     rows = []
@@ -479,10 +516,13 @@ def tables(T, P, GT) -> None:
                      f"{e['H1']['mean']:+.3f} [{e['H1']['lo']:+.3f}, {e['H1']['hi']:+.3f}]", e["H1"]["label"]])
     e = GT["paired"][SHARED]
     rows.append(["C vs Gate-C (extra baseline)", f"{e.mean:+.4f} [{e.lo:+.4f}, {e.hi:+.4f}]", e.label, "not gating (see F29)", "-"])
+    hm, hlo, hhi, hlab = HH["paired"][SHARED]
+    rows.append(["C vs H (heuristic baseline)", f"{hm:+.4f} [{hlo:+.4f}, {hhi:+.4f}]", hlab, "not gating (see F33)", "-"])
     write_table("paired_effects_shared_point", ["Comparison", "H3 success difference [95% CI]", "H3 label", "H1 reduction [95% CI]", "H1 label"], rows,
                 "Paired effects at the shared point (per draw, seed means, Student-t over 5 seeds); labels from the rule fixed in D56/D57",
                 "H1 reduction = (n_ref - n_X) / n_A. D vs C is the closed-loop secondary check of H2 and never gates. C vs Gate-C is the D59 comparison (WIN would mean the weighted rule beats the gate; "
-                "floor 0.01); its label is the shared-point label, the D59 verdict uses all four fraction points (NOT SEPARATED, F30).")
+                "floor 0.01); its label is the shared-point label, the D59 verdict uses all four fraction points (NOT SEPARATED, F30). "
+                "C vs H is the D65 comparison (WIN would mean the learned head beats the heuristic; floor 0.01, NULL = interval inside +-0.025); its label is the shared-point label, the D65 verdict uses all four fraction points (NOT SEPARATED, F34).")
 
     o = json.loads((S9 / "overhead.json").read_text(encoding="utf-8"))
     rows = []
@@ -517,11 +557,11 @@ def main() -> int:
     ap.add_argument("--recompute", action="store_true", help="rebuild the cached closed-loop inputs of Figures 2 and 6")
     a = ap.parse_args()
     ensure_inputs(a.recompute)
-    T, P, GT = load_table(), load_paired(), load_gate()
+    T, P, GT, HH = load_table(), load_paired(), load_gate(), load_h()
     print("figures:")
-    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P, GT); fig_ablation(T, P, GT); fig_s4_gap(); fig_explanation()
+    fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P, GT, HH); fig_ablation(T, P, GT, HH); fig_s4_gap(); fig_explanation()
     print("tables:")
-    tables(T, P, GT)
+    tables(T, P, GT, HH)
     return 0
 
 
