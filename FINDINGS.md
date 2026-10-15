@@ -2158,3 +2158,106 @@ Spread: best 0.9002, worst 0.8725; within 0.002 of the best: 15 of 45 points.
 Spread: best 0.9140, worst 0.8891; within 0.002 of the best: 20 of 45 points.
 
 Interpretation (one line): the surface is flat at the top for D2 in both regimes (many points within 0.002), as for C and D (F20); the weights are written to the new configs/weights_d2.yaml and carry no claim (A18).
+
+### F44 — S14 raw results: frozen C and D2, draws 250-299, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-15 | Commit: this entry | Pre-registration D68 = ac72b82 (2026-10-15 13:34:48 +0530). Scripts: `scripts/s14_d2.py eval`, `report` (code at c6bb684/fd167d5). C = existing frozen checkpoints (shared: checkpoints/s3-seed*-C.pt; staggered: checkpoints/s13/), D2 = F42 checkpoints, weights: C and A from weights.yaml / weights_staggered.yaml, D2 from weights_d2.yaml (F43). First evaluation number on draws 250-299 (open-loop trust): **2026-10-15T08:58:01Z (14:28:01 +0530)**; first closed-loop evaluation result 09:07:54Z; the tuning grid (seed 100, draws 0-2) 08:51:57Z preceded both. Harness check before the runs: C closed loop recomputed on draw 100 (shared, vs S9 stored) and draw 200 (staggered, vs S13 stored), seed 1, equal bit-for-bit (those draws are not results).
+
+Open-loop (PRIMARY and SECONDARY (a)):
+
+```
+======================================================================================================================
+S14 PRIMARY: STAGGERED ONSET (S = 300), open-loop frozen C and D2-stagger, draws 250-299, fraction 0.20, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+rho 0  (CONTROL)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 41  late-onset RSUs 54  tau C 0.8461 D2 0.8387
+    seed 2: attempted 50  failed 0  aggregated 33  late-onset RSUs 38  tau C 0.8602 D2 0.8791
+    seed 3: attempted 50  failed 0  aggregated 40  late-onset RSUs 49  tau C 0.8137 D2 0.8137
+    seed 4: attempted 50  failed 0  aggregated 32  late-onset RSUs 35  tau C 0.8598 D2 0.8483
+    seed 5: attempted 50  failed 0  aggregated 37  late-onset RSUs 50  tau C 0.8682 D2 0.8651
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 131.0 +/- 15.7   D2 130.2 +/- 13.2   detected fraction C 1.000 D2 1.000
+  PRIMARY  D2 - C latency: -0.8 (sd 2.6) 95% [-4.0, +2.5]
+  per-seed D2 - C latency: [0.5, -0.7, -5.3, 1.1, 0.6]
+
+rho 1  (TEST)
+  D42 accounting per seed: draws attempted / failed / aggregated (draws with a late-onset RSU) / late-onset RSUs
+    seed 1: attempted 50  failed 0  aggregated 50  late-onset RSUs 126  tau C 0.8461 D2 0.8387
+    seed 2: attempted 50  failed 0  aggregated 50  late-onset RSUs 125  tau C 0.8602 D2 0.8791
+    seed 3: attempted 50  failed 0  aggregated 50  late-onset RSUs 110  tau C 0.8137 D2 0.8137
+    seed 4: attempted 50  failed 0  aggregated 50  late-onset RSUs 138  tau C 0.8598 D2 0.8483
+    seed 5: attempted 50  failed 0  aggregated 50  late-onset RSUs 124  tau C 0.8682 D2 0.8651
+  detection latency (steps after own onset, late-onset RSUs, censored 399): C 128.6 +/- 9.5   D2 126.9 +/- 7.8   detected fraction C 1.000 D2 1.000
+  PRIMARY  D2 - C latency: -1.7 (sd 4.2) 95% [-7.0, +3.5]
+  per-seed D2 - C latency: [2.8, -0.3, -8.6, -0.4, -2.0]
+
+(description) (D2 - C latency at rho 1.0) minus (at rho 0), per-seed paired: -0.9 (sd 2.3) 95% [-3.8, +1.9]
+
+======================================================================================================================
+S14 SECONDARY (a): SHARED ONSET, diagnostic AUC of 1 - trust over [450, 650), degraded vs reliable (D43), draws 250-299, fraction 0.20, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+rho 0   D42: per seed attempted 50 failed 0 aggregated (draws with both classes present) shown
+    seed 1: attempted 50  failed 0  aggregated 50
+    seed 2: attempted 50  failed 0  aggregated 50
+    seed 3: attempted 50  failed 0  aggregated 50
+    seed 4: attempted 50  failed 0  aggregated 50
+    seed 5: attempted 50  failed 0  aggregated 50
+  AUC  C 0.9838 +/- 0.0276   D2 0.9829 +/- 0.0302
+  D2 - C: -0.0008 (sd 0.0028) 95% [-0.0043, +0.0026]
+  per-seed D2 - C: [-0.0056, 0.0, 0.0, 0.0, 0.0016]
+
+rho 1   D42: per seed attempted 50 failed 0 aggregated (draws with both classes present) shown
+    seed 1: attempted 50  failed 0  aggregated 50
+    seed 2: attempted 50  failed 0  aggregated 50
+    seed 3: attempted 50  failed 0  aggregated 50
+    seed 4: attempted 50  failed 0  aggregated 50
+    seed 5: attempted 50  failed 0  aggregated 50
+  AUC  C 0.9773 +/- 0.0385   D2 0.9785 +/- 0.0384
+  D2 - C: +0.0012 (sd 0.0025) 95% [-0.0018, +0.0043]
+  per-seed D2 - C: [0.0006, 0.0, 0.0, 0.0, 0.0056]
+```
+
+Closed loop (SECONDARY (b)):
+
+```
+======================================================================================================================
+S14 SECONDARY (b): closed-loop post-onset success at the shared point (rho 1.0, fraction 0.20), draws 250-299, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+======================================================================================================================
+
+--- regime shared: weights (alpha, beta, gamma) A (0.0, 0.25, 0.6)  C (1.0, 0.25, 0.6)  D2 (2.0, 0.25, 0.6)
+    D42: attempted 250  failed 0  aggregated 250
+  A   success 0.8713 +/- 0.0032
+  C   success 0.9216 +/- 0.0097
+  D2  success 0.9219 +/- 0.0096
+  D2 - C: +0.0003 (sd 0.0004) 95% [-0.0002, +0.0009]
+  C - A: +0.0503 (sd 0.0076) 95% [+0.0408, +0.0598]
+  D2 - A: +0.0506 (sd 0.0076) 95% [+0.0412, +0.0600]
+  n_av / n_win / never-avoided (mean +/- sd over seeds of per-seed means), always together (D60 Q4):
+    A   n_av   627.1 +/-  112.0   n_win   907.1 +/-   17.6   never-avoided 0.488 +/- 0.126
+    C   n_av   132.9 +/-   24.1   n_win   499.3 +/-   64.5   never-avoided 0.004 +/- 0.009
+    D2  n_av   116.9 +/-   18.7   n_win   479.2 +/-   65.6   never-avoided 0.004 +/- 0.009
+  D57-normalised (n_C - n_D2)/n_A on n_av: +0.027 [+0.008, +0.045]  (positive = D2 sends fewer to degraded RSUs; descriptive)
+  D57-normalised (n_C - n_D2)/n_A on n_win: +0.022 [+0.011, +0.033]  (positive = D2 sends fewer to degraded RSUs; descriptive)
+  detection latency (descriptive) C: 149.9 steps, detected fraction 1.000
+  detection latency (descriptive) D2: 150.2 steps, detected fraction 1.000
+
+--- regime stag: weights (alpha, beta, gamma) A (0.0, 0.25, 0.6)  C (2.0, 0.25, 0.15)  D2 (1.0, 0.25, 0.3)
+    D42: attempted 250  failed 0  aggregated 250
+  A   success 0.8953 +/- 0.0036
+  C   success 0.9346 +/- 0.0078
+  D2  success 0.9349 +/- 0.0077
+  D2 - C: +0.0004 (sd 0.0004) 95% [-0.0001, +0.0008]
+  C - A: +0.0393 (sd 0.0051) 95% [+0.0330, +0.0456]
+  D2 - A: +0.0396 (sd 0.0051) 95% [+0.0334, +0.0459]
+  n_av / n_win / never-avoided (mean +/- sd over seeds of per-seed means), always together (D60 Q4):
+    A   n_av   627.1 +/-  112.0   n_win   907.1 +/-   17.6   never-avoided 0.488 +/- 0.126
+    C   n_av   217.0 +/-   22.2   n_win   561.5 +/-   48.7   never-avoided 0.004 +/- 0.009
+    D2  n_av   232.3 +/-   20.4   n_win   577.7 +/-   49.8   never-avoided 0.004 +/- 0.009
+  D57-normalised (n_C - n_D2)/n_A on n_av: -0.024 [-0.042, -0.006]  (positive = D2 sends fewer to degraded RSUs; descriptive)
+  D57-normalised (n_C - n_D2)/n_A on n_win: -0.018 [-0.022, -0.013]  (positive = D2 sends fewer to degraded RSUs; descriptive)
+  detection latency (descriptive) C: 288.8 steps, detected fraction 0.826
+  detection latency (descriptive) D2: 278.4 steps, detected fraction 0.850
+```
+
+Note: A is identical in the two regimes in n_av / n_win / never-avoided (627.1 / 907.1 / 0.488) because A ignores trust and its routing does not depend on when RSUs degrade; its success differs (0.8713 vs 0.8953).
