@@ -2474,3 +2474,21 @@ D42: attempted 250  failed 0  aggregated 250
   detection latency (closed loop, D56 rule on each run's own trust, descriptive) C_h: 248.2 steps, detected fraction 0.945
   detection latency (closed loop, D56 rule on each run's own trust, descriptive) D2_h: 246.7 steps, detected fraction 0.947
 ```
+
+### F49 - S15 verdicts against D72 and interpretation (written after F48 was committed in da1b039)
+Date: 2026-10-15 | Rules exactly as in D72; no rule, window, floor, H, threshold, minimum or draw changed. Output: `scripts/s15_horizon.py eval --verdict`.
+
+| item | quantity | mean [95% t, df 4] | D72 label |
+|---|---|---|---|
+| **PRIMARY**, staggered, horizon objective, rho 1.0 | D2-h - C-h latency of late-onset RSUs (steps) | -4.1 [-12.0, +3.7] (C-h 92.3, D2-h 88.2) | **NULL** (interval inside +-20; not WIN: hi = +3.7 is not < 0) |
+| control, rho 0 | D2-h - C-h latency (steps) | -2.0 [-8.1, +4.1] (C-h 95.7, D2-h 93.6) | NULL |
+| description | (rho 1.0) minus (rho 0) of D2-h - C-h | -2.1 [-5.6, +1.4] | none |
+| SECONDARY (b), rho 1.0 | C-h - C(S13) latency (steps) | -37.4 [-53.5, -21.2] (C(S13) 129.7) | none (descriptive) |
+| SECONDARY (b), rho 0 | C-h - C(S13) latency (steps) | -34.9 [-55.8, -14.1] (C(S13) 130.6) | none (descriptive) |
+| SECONDARY (a), closed loop | success D2-h - C-h | +0.0020 [+0.0007, +0.0033] (C-h 0.9336, D2-h 0.9356, A 0.8970) | none (descriptive) |
+
+Rho 0 reading (D72 section 4): the rho 1.0 label is NULL, so there is no structural reading. A difference of 20 steps either way between D2-h and C-h is ruled out at both rho (the intervals lie inside +-20). The NOISY extension to seeds 6-10 was **not triggered** (the label is not NOISY); none was run. Per-seed D2-h - C-h latency at rho 1.0: +3.3, +0.6, -5.6, -12.9, -5.9 (two seeds positive, three negative); at rho 0: +5.0, +1.2, -4.7, -5.8, -5.8.
+D42 counts: rho 1.0 250 attempted / 0 failed / 250 aggregated (late-onset RSUs per seed 106-141); rho 0 250 / 0 / 166 aggregated (36, 31, 33, 35, 31; draws with no late-onset RSU are not aggregated); closed loop 250 / 0 / 250; detected fraction 1.000 for C-h, D2-h and C(S13) at both rho in the open-loop latency.
+Closed loop, n_av / n_win / never-avoided together (F48): A 589.6 / 903.7 / 0.468, C-h 224.8 / 559.9 / 0.020, D2-h 224.0 / 556.9 / 0.020; D57-normalised (n_C-h - n_D2-h)/n_A +0.001 [-0.013, +0.015] on n_av and +0.003 [-0.001, +0.008] on n_win (descriptive, no label). Success differences against A (descriptive): C-h - A +0.0365 [+0.0268, +0.0463], D2-h - A +0.0385 [+0.0298, +0.0473]. The D2-h - C-h success interval lies above 0 and below the 0.01 floor of the D56 H3 rule; no label is applied to it (D72 section 5).
+Neighbour-block probe (F46): D2-h output depended on the neighbour block (>= 0.01) in 4 of the 5 evaluation seeds and in the tuning seed; seed 1 was 0.0014, below the threshold (reported as D72 prescribes).
+Interpretation (one line): trained to predict the coming 150-step window rather than the next task, a head that sees same-segment RSU neighbours (D2-h) did not detect later-onset RSUs earlier than the node-local head trained the same way (NULL at rho 1.0 and rho 0; 20 steps either way ruled out), so the A20 hypothesis that the next-task objective alone left neighbour evidence nothing to improve is not supported in this simulation for this one horizon objective, threshold and D2 construction. Separately and descriptively, the horizon objective itself moved the node-local head's detection earlier by 35-37 steps against the original C (the two latencies use each model's own pre-onset 1st-percentile threshold, so this is a statement about these models under the D65 rule, not about a threshold-free quantity), with no graph involved. This experiment does not revise F17, F26, F37 or F45 or any H2 verdict, and no mechanism is tested here for why the objective change helps C or why D2-h did not exceed C-h.
