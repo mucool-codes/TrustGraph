@@ -70,7 +70,7 @@ B-oracle is described as an upper bound that reads sealed ground truth.
 **A7. Dispatches to degraded RSUs (H1).** Dispatch counts are always stated **together**: n_av (dispatches to degraded RSUs
 from onset to the run's own effective-avoidance step), n_win (the fixed window, steps 400-1200, which does not depend on
 the avoidance rule) and the never-avoided rate (fraction of runs that never reach the avoidance rule). At the shared point:
-A n_av 627 +/- 100, n_win 912 +/- 21, never-avoided 0.47 +/- 0.12; C 153 +/- 48, 506 +/- 75, 0.03 +/- 0.04;
+A n_av 627.5 +/- 100.4, n_win 912 +/- 21, never-avoided 0.47 +/- 0.12; C 153 +/- 48, 506 +/- 75, 0.03 +/- 0.04;
 D 211 +/- 84, 610 +/- 84, 0.03 +/- 0.04; B-oracle 24 +/- 26, 395 +/- 90, 0.01 +/- 0.03. Relative to A (in units of A's count)
 the n_av reduction is +0.756 [+0.676, +0.836] for C and +0.664 [+0.523, +0.806] for D (WIN), and the fixed-window reduction
 is smaller, +0.446 [+0.351, +0.541] and +0.331 [+0.221, +0.442]. Against B-oracle both are NEGATIVE (the oracle is better by
@@ -93,7 +93,7 @@ beat the capacity-matched node-local head C: the paired difference D minus C is 
 at rho 1.0; -0.0517 [-0.0902, -0.0131] at rho 0), the slope of the gap on realised correlation is +0.0300 [-0.0017, +0.0617]
 (not significant), so the verdict is NEGATIVE (C beats D). Collusion is NOISY at both rho (inconclusive: the models never saw
 colluders in training). Cold start is NULL at rho 1.0 (-0.0273 [-0.0935, +0.0389]; an advantage of 0.05 is ruled out), and
-D is significantly worse at rho 0 (-0.1431 [-0.2226, -0.0635], reported as information). C detects degradation about
+at rho 0 D is worse and the 95% interval over seeds excludes 0 (-0.1431 [-0.2226, -0.0635], reported as information). C detects degradation about
 77-97 steps earlier than D at every rho. "H2 holds in full" is false.
 *Sources:* F16, F17; D43, D47, D49. Figure 5.
 
@@ -137,13 +137,20 @@ offered as evidence that C's explanations are better.
 the table caption (13th Gen Intel i5-13450HX, CPU only, one decision at a time).
 *Sources:* F26 (H5 block), F24; table `latency_breakdown`.
 
+**A22. What decides decisions, in the demo scenario (descriptive only).** In the demo scenario (seed 100, draw 7, a tuning seed, labelled as such;
+one run per variant, 6873 decisions each), trust is the decisive term (a term worth at least 0.6 of the winner-versus-runner-up margin, D53) in 15% of
+C's decisions and 31% of D's; the winner has lower trust than the runner-up in 12.5% of C's decisions and 18.9% of D's. Load and latency decide
+most of the rest. This describes how the fixed rule behaved in this one scenario; it carries no interval, is not a performance result and is not
+used to compare C with D. (A22 is numbered out of sequence; it sits here because it belongs with Layer 1.)
+*Sources:* F23 (table of decisive terms; 12.5% and 18.9% are 857 and 1296 of 6873, which F23's prose rounds to 13% and 19%); D53.
+
 ### Weighted rule versus gate
 
 **A15. Gate-C: no difference on success.** On the same trust head (C), removing candidates below tau = 0.9 before the same rule
 performed equivalently on task success: the paired difference C minus Gate-C is +0.0003 [-0.0003, +0.0009] (5%), +0.0001
 [-0.0004, +0.0005] (10%), -0.0002 [-0.0006, +0.0003] (20%), -0.0003 [-0.0006, +0.0001] (30%); NULL at all four points; the pre-registered
 verdict is NOT SEPARATED. Gate-C sends slightly fewer tasks to degraded RSUs than C (n_win 493.5 vs 506.3 at the shared point) without a
-success difference. The gate acted often (removed a candidate on 31-44% of decisions) and its empty-candidate-set fallback rate at
+success difference (descriptive, no pre-registered test; D59 judged success only). The gate acted often (removed a candidate on 31-44% of decisions) and its empty-candidate-set fallback rate at
 steps >= 400 was 4.8%, 6.2%, 12.1%, 19.1% (5% to 30% degraded). tau was chosen on one seed from a flat grid (all values within 0.0007).
 **Framing (D62):** "weighted term, not a gate" is a **design argument**, not a measured gain. The weighted form's benefits are an exactly
 decomposable score (Layer 1) and no empty-candidate-set failure mode.
@@ -153,7 +160,7 @@ decomposable score (Layer 1) and no empty-candidate-set failure mode.
 
 **A16. Pre-registration and statistics.** The H2 rule (D43), the explanation protocol (D54), the sweep, metrics and verdict rule
 (D56, with the single amendment D57 made before any evaluation draw ran) and the Gate-C protocol (D59) were each committed before the
-numbers they judge (verified from commit order for D59: D59 at 19:26, first Gate-C number at 19:29, evaluation results at 19:33).
+numbers they judge (verified from commit order for D59: D59 = 3710795 at 19:26, first Gate-C code = 86b3a20, first Gate-C number (F28) = eead7f1 at 19:29, evaluation results at 19:33).
 Seeds 1-5 with frozen checkpoints; evaluation draws 100-149; tuning seed 100 and the demo draw excluded from every evaluation. The unit
 of analysis is the seed: per-seed means of per-draw paired differences, 95% Student-t intervals over 5 seeds (df 4). Mean +/- sd is across
 seeds. No multiplicity correction. D42: the sweeps contain no cold-start RSU; every sweep point reports 250 draws attempted, 0 failed, 250 aggregated
@@ -176,7 +183,7 @@ Hand-tuned weights, tuned on one seed. Scale capped at 15-30 RSUs and 50-100 veh
 degraded RSUs (D31). The trust heads were trained on Baseline-A (open-loop) dispatch and are evaluated in the closed loop, a distribution
 shift (D50 item 5, F21 item 3). Collusion models never saw colluders in training. B-oracle reads sealed truth. The avoidance bar of 0.75 is a stated
 assumption. Seed 1 was trained at the default thread count and seeds 2-5 at 3 threads (D47; inference is not thread-sensitive, F18 check 3).
-Layer 2 uses one explainer run per explanation and a 200-decision sample.
+Layer 2 uses one explainer run per explanation and a 200-decision sample. Training and evaluation share a seed's traffic and differ only in injection draws (D44).
 *Sources:* PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18.
 
 **A20. Untested future work (stated as such, as hypotheses).** Staggered onset (D31(c)); an observation-count feature (D38(d)); other architectures;
@@ -184,6 +191,14 @@ training the trust heads on closed-loop dispatch and the F21 dispatch-shift as a
 neighbours diluting its own-node signal (F19); cold-start and collusion conditions where a graph model might help; gating a different head.
 None of these was run and none may be reported as a finding.
 *Sources:* D47, D49, D60 (Q3), F19, F21.
+
+### Contribution statement
+
+**A21. The contribution, as it may be stated.** In this simulation, the paper contributes: (i) a behavioural trust layer that drives a fixed weighted
+selection rule, validated in the closed loop against a tuned no-trust baseline (A) and a perfect-knowledge oracle upper bound (B-oracle), in which the
+node-local head (C) is the strongest; (ii) an exactly decomposable explanation of each selection (Layer 1); (iii) pre-registered negative and null
+results on graph structure, with the measured boundary condition of this scenario (F18). It must not be worded so as to imply that the graph helped (X1, X2).
+*Sources:* A5, A6 (i); A12 (ii); A9, A10, A11 (iii); F18, F26, F27; D56, D60.
 
 ---
 
@@ -229,6 +244,9 @@ records listed in TECHNICAL_AND_NOVELTY.md were not re-verified in S11a and may 
 pre-evaluation correction; describing the tuning-seed grids (F20, F28) as findings about the weights or tau.
 
 **X15.** That Layer 1 explains why a node's trust is high or low (it explains the score only), or that the explanation is causal.
+
+**X16.** Any performance, fidelity or "result" claim based on seed 100 or draw 7 (the tuning seed and the demo draw). Allowed only: the A12 exactness
+identity check, A8 as a labelled illustration, and A22 as descriptive.
 
 ---
 
