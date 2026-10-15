@@ -1999,3 +1999,26 @@ Command: `python scripts/s13_stag.py tune --write` (results/s13/stag/tuning-grid
 ```
 For reference only (F20, shared onset): A 0.8670, C 0.8999, D 0.8938. One seed, three draws; per-draw values differ by up to 0.09, so differences of ~0.005 between grid points are inside the draw-to-draw spread (as F20).
 Interpretation: recorded before use; the chosen weights are applied unchanged in the evaluation (D65).
+
+### F40 — S13 Experiment 2 secondary (b): closed-loop post-onset success under staggered onset, A / C / D with their own tuned weights (RAW, descriptive: D65 assigns no label to this)
+Date: 2026-10-15 | Session: S13 | Commit: see `git log` (weights F39 = 301255e); D65 = 245705b
+Config: `configs/staggered.yaml`, frozen staggered C and D (F36), weights `configs/weights_staggered.yaml` (F39), seeds 1-5, rho 1.0 and 0, fraction 0.20, injection draws 200-249, closed loop, dwell filter and handoff on; 1500 runs (3 variants x 5 seeds x 2 rho x 50 draws), 0 failed, 6 min on 12 workers.
+Command: `python scripts/s13_stag.py closed` then `python scripts/s13_stag.py report` (results/s13/stag/report-closed.txt). Metric: deadline success of dispatched tasks at steps >= 400; mean +/- sd across the 5 seed means; differences paired per draw, per-seed means, Student-t 95% over 5 seeds.
+```
+rho 0  attempted 250 failed 0 aggregated 250
+  A: 0.8978 +/- 0.0020
+  C: 0.9547 +/- 0.0029
+  D: 0.9376 +/- 0.0056
+  D - C: -0.0171 (sd 0.0075) 95% [-0.0265, -0.0078]   (descriptive, no label)
+  C - A: +0.0569 (sd 0.0009) 95% [+0.0558, +0.0581]   (descriptive, no label)
+  D - A: +0.0398 (sd 0.0069) 95% [+0.0313, +0.0483]   (descriptive, no label)
+
+rho 1  attempted 250 failed 0 aggregated 250
+  A: 0.8958 +/- 0.0027
+  C: 0.9336 +/- 0.0066
+  D: 0.9178 +/- 0.0033
+  D - C: -0.0158 (sd 0.0041) 95% [-0.0210, -0.0107]   (descriptive, no label)
+  C - A: +0.0378 (sd 0.0056) 95% [+0.0308, +0.0448]   (descriptive, no label)
+  D - A: +0.0219 (sd 0.0027) 95% [+0.0186, +0.0253]   (descriptive, no label)
+```
+Interpretation: under staggered onset, with each model's own weights, C is above D in post-onset success by 0.016-0.017 at both rho (intervals exclude 0), and both are above no trust (A) by 0.022-0.057. Descriptive only: no pre-registered label applies to this secondary, and it is a closed-loop run of heads trained on open-loop dispatch (F21 item 3).
