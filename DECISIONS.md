@@ -1807,3 +1807,19 @@ Check order WIN, NEGATIVE, NULL, NOISY (WIN and NEGATIVE are exclusive). **Respo
 **Alternatives:** (a) H as a thresholded or smoothed variant of success_ewma (rejected: the brief fixes it as the feature itself, and a gate is excluded by L1); (b) tuning H on the evaluation seeds (leaks); (c) staggering per segment instead of per RSU, or evenly spaced onsets (rejected: independent draws are the simplest rule consistent with "spread uniformly over [400, 400+S] by a seeded generator", and the mechanism check measures the realised ordering); (d) a smaller S (rejected: S = 300 equals the ramp length so the spread is comparable to the time evidence takes to appear, ~110 s after onset, F18); (e) judging Experiment 2 on closed-loop success (rejected as primary: the staggered regime's claim is about when evidence arrives, which latency measures directly; success is secondary); (f) running seeds 6-10 for Experiment 1 (would need new C checkpoints; Experiment 1's rule has no extension step).
 
 **Rationale:** F17/F27 say the graph did not beat the node-local head in the shared-onset scenario, and F18/F19 identify why a lead-time advantage was unavailable there. Experiment 1 asks the complementary question about the learned head itself (does learning beat the node's own running average), which a reviewer will ask because C and the feature C reads are so close; Experiment 2 tests the one regime the record names as favourable to message passing. Fixing the rules, floors, windows, S and the stop condition before any number exists is what makes either outcome, including "learning adds nothing" and "the graph still does not help", reportable at full strength.
+
+### D66 — S13 implementation choices D65 left open, and where the CVE verification lives
+Date: 2026-10-15 | Session: S13 | Status: active
+D65 is untouched; these fill gaps in it. Items 1-3 were fixed before the number they affect was computed (each is in the committed `scripts/s13_stag.py` before its F-entry); the tests and the code are the record.
+
+**Decision:**
+1. **"Within [onset, onset+400)" for the latency rule** is read as: the 10-step run lies entirely inside the window (first possible start onset, last onset+390). The mechanism check (D65 2.3) uses the F18 form, a run starting inside the window. Both censor at onset+399 / 399.
+2. **Open-loop evaluation reads stored trust**: the frozen C and D are run once over each evaluation scenario (stride 1, steps 100-1199) and the trust arrays are stored (`results/s13/stag/trust/`); latency and AUC are computed from them, tau pooled per (model, seed, rho) over steps [100, 400) (stored indices 0-299).
+3. **Mechanism-check draws 50-79** were generated with the same code as the evaluation scenarios, before any staggered model existed; no staggered model was used by the check.
+4. **New weight files** `configs/weights_h.yaml` (H) and `configs/weights_staggered.yaml` (A, C, D under staggered onset); `configs/weights.yaml` is untouched. `s3_train.py` gained `--ckpt-dir` and `--threads` (defaults unchanged); the staggered checkpoints are in `checkpoints/s13/` and the S3 ones were not touched.
+5. **CVE verification** is recorded in the new file `CVE_VERIFICATION.md`; CLAIMS.md, RELATED_WORK.md and TECHNICAL_AND_NOVELTY.md are not edited (S13 Task 3). The CLAIMS X13 wording change is proposed in the S13 decision request.
+6. **Process disclosure:** Experiment 1's evaluation took 112 min instead of the ~8 min of the comparable F29 run because the machine was shared; no result depends on it (all 1000 tasks finished, 0 failed).
+
+**Alternatives:** editing RELATED_WORK.md in place (rejected: CLAIMS.md must not be edited this session and RELATED_WORK.md's verification record is cited by it); recomputing trust inside the analysis (rejected: slower and no more reproducible).
+
+**Rationale:** each choice is the smallest implementation consistent with D65's text; stating them keeps the pre-registration auditable.
