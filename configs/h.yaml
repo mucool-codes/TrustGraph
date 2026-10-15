@@ -1,0 +1,21 @@
+# S13 Experiment 1: heuristic trust baseline H (DECISIONS.md D65, frozen).
+# H = trust_v is the RSU's own success_ewma, no learning; the same L1 rule, no gate.
+sweep_config: configs/sweep.yaml     # seeds, draws, base config and C's weights are S9's, unchanged
+out_dir: results/s13/h
+weights_file: configs/weights_h.yaml # written by `s13_h.py tune --write`; configs/weights.yaml is never touched
+
+tuning:                              # D52 procedure, exactly
+  seed: 100
+  rho: 1.0
+  fraction: 0.20
+  draws: [0, 1, 2]
+  alphas: [0.25, 0.5, 1.0, 2.0, 4.0]
+  betas: [0.25, 0.5, 1.0]
+  gammas: [0.15, 0.3, 0.6]
+
+# The four fraction-sweep points at rho 1.0 (the shared operating point, fraction 0.20, is one of them).
+points:
+  - {rho: 1.0, fraction: 0.05}
+  - {rho: 1.0, fraction: 0.10}
+  - {rho: 1.0, fraction: 0.20}
+  - {rho: 1.0, fraction: 0.30}

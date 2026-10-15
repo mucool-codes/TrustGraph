@@ -37,7 +37,7 @@ from .selection import Decision, select
 from .topology import pairwise_distances
 from .train import load_checkpoint
 
-VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E", "Gate_C")
+VARIANTS: tuple[str, ...] = ("A", "B", "B_oracle", "C", "D", "E", "Gate_C", "H")
 HANDOFF_MODES: tuple[str, ...] = ("relay", "off")
 LOG_SCHEMA_VERSION = 2  # 2: candidates carry `load`, the exact value the score used (D53)
 
@@ -50,6 +50,7 @@ TRUST_SOURCE = {
     "D": "model_D",
     "E": "model_D",  # E = D + explanation; selection is identical to D (D50)
     "Gate_C": "model_C",  # C's head, plus a trust threshold before selection (D59)
+    "H": "success_ewma_feature",  # heuristic baseline: the RSU's own success_ewma, no learning (D65)
 }
 
 
@@ -186,6 +187,8 @@ class OffloadEngine:
             self._trust = self._rsu_features[t, :, RSU_COL["cert_valid"]].astype(np.float64)
         elif source == "cert_valid_oracle":
             self._trust = np.asarray(oracle_cert_valid, dtype=np.float64)
+        elif source == "success_ewma_feature":  # H (D65): the observable L8 EWMA itself, no model
+            self._trust = self._rsu_features[t, :, RSU_COL["success_ewma"]].astype(np.float64)
         else:
             with torch.no_grad():
                 out = self.model(data.x, data.edge_index, data.edge_attr)

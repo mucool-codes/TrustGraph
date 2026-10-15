@@ -61,7 +61,7 @@ def test_closed_loop_is_deterministic(cfg, world, trace):
 
 
 def test_variants_and_trust_sources_cover_the_d50_list():
-    assert set(VARIANTS) == {"A", "B", "B_oracle", "C", "D", "E", "Gate_C"}  # Gate_C added in S9b (D59)
+    assert set(VARIANTS) == {"A", "B", "B_oracle", "C", "D", "E", "Gate_C", "H"}  # Gate_C: S9b (D59); H: S13 (D65)
     assert TRUST_SOURCE["E"] == TRUST_SOURCE["D"] == "model_D"
     with pytest.raises(ValueError):
         OffloadSettings(variant="F")
@@ -88,6 +88,30 @@ def test_model_variants_run_with_an_untrained_head_and_trust_is_a_probability(
         for c in rec["candidates"]:
             assert 0.0 <= c["trust"] <= 1.0
             assert rec["trust_source"] == TRUST_SOURCE[variant]
+
+
+def test_H_trust_is_the_rsus_own_success_ewma_and_needs_no_model(cfg, world, trace):
+    """D65: variant H reads the observable L8 EWMA itself - no head, no neighbour information, no gate."""
+    out = run_closed_loop(cfg, world, trace, _settings("H"))
+    log = out.extras["decision_log"]
+    assert log and TRUST_SOURCE["H"] == "success_ewma_feature"
+    for rec in log:
+        assert rec["trust_source"] == "success_ewma_feature"
+        for c in rec["candidates"]:
+            assert c["trust"] == pytest.approx(c["features"]["success_ewma"], abs=1e-6)
+            assert 0.0 <= c["trust"] <= 1.0
+    # the selection is the unchanged L1 rule: the chosen RSU is the argmax of the logged scores
+    for rec in log:
+        live = [c for c in rec["candidates"] if c["dwell_eligible"]]
+        if rec["selected_rsu"] is not None and live:
+            best = max(live, key=lambda c: c["score"])
+            assert rec["selected_rsu"] == best["rsu"]
+
+
+def test_H_with_alpha_zero_is_variant_A(cfg, world, trace):
+    a = run_closed_loop(cfg, world, trace, _settings("A"))
+    h0 = run_closed_loop(cfg, world, trace, _settings("H", alpha=0.0))
+    _same_tasks(a.observed.tasks, h0.observed.tasks)
 
 
 def test_B_oracle_trust_is_zero_exactly_from_the_fault_step(cfg, world, trace):
