@@ -11,9 +11,10 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 NEEDED = [REPO / "results" / "s9" / "results_table.csv", REPO / "results" / "s9b" / "tuning.json", REPO / "results" / "s4" / "summary-5seeds.json",
-          REPO / "results" / "s10" / "timeline.npz", REPO / "results" / "s10" / "example.json"]
+          REPO / "results" / "s10" / "timeline.npz", REPO / "results" / "s10" / "example.json",
+          REPO / "results" / "s18" / "summary-open-primary.json", REPO / "results" / "s18" / "summary-open-secondary.json"]
 FIGURES = ["fig1_architecture", "fig2_trust_timeline", "fig3_success_vs_fraction", "fig4_ablation",
-           "fig5_s4_gap_vs_correlation", "fig6_explanation"]
+           "fig5_s4_gap_vs_correlation", "fig6_explanation", "fig7_s18_gap_vs_lag"]
 TABLES = ["ablation_shared_point", "ablation_all_points", "paired_effects_shared_point", "latency_breakdown", "related_work",
           "paper_ablation_shared_point", "paper_fraction_effects", "paper_rho_sweep", "paper_graph_tests", "paper_d2_dispatch", "paper_latency",
           "paper_objective"]
