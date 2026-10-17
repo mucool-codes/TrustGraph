@@ -565,6 +565,11 @@ import re  # noqa: E402
 
 S13 = REPO_ROOT / "results" / "s13"
 S14 = REPO_ROOT / "results" / "s14"
+S15 = REPO_ROOT / "results" / "s15"
+S16 = REPO_ROOT / "results" / "s16"
+# CLAIMS.md (D78): the caveat carried by every detection latency the paper reports
+LATENCY_CAVEAT = ("Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32–0.44 of healthy RSUs "
+                  "where measured (S16) and was not measured elsewhere.")
 _NUM = r"([+-]?\d+\.\d+)"
 _CI = rf"{_NUM} \(sd [\d.]+\) 95% \[{_NUM}, {_NUM}\]"
 
@@ -575,7 +580,7 @@ def _ci(m_, lo, hi) -> str:
 
 def _read_report(path: Path) -> list[str]:
     if not path.exists():
-        raise SystemExit(f"{path} missing: it is written by the S13/S14 report commands (scripts/s13_stag.py, scripts/s14_d2.py)")
+        raise SystemExit(f"{path} missing: it is written by the S13-S16 report commands (scripts/s13_stag.py, s14_d2.py, s15_horizon.py, s16_confirm.py)")
     return path.read_text(encoding="utf-8").splitlines()
 
 
@@ -652,6 +657,38 @@ def _s13_closed(path: Path) -> dict:
     return out
 
 
+def _labelled(path: Path, pattern: str) -> dict:
+    """{rho: ("m [lo, hi]", label)} for one labelled line per rho block of a stored S15/S16 eval report (the label may be several words)."""
+    out, rho = {}, None
+    for ln in _read_report(path):
+        h = re.match(r"rho (\d)\s+\((CONTROL|TEST)\)", ln)
+        if h:
+            rho = h.group(1)
+        m_ = re.search(rf"{pattern}: {_CI}\s+([A-Z][A-Z ]*[A-Z])\s*$", ln)
+        if m_ and rho is not None:
+            out[rho] = (_ci(*m_.group(1, 2, 3)), m_.group(4))
+    return out
+
+
+def _s16_overall(path: Path) -> dict:
+    """{rho: overall D76 label} from the verdict block of the stored S16 eval report."""
+    out = {}
+    for ln in _read_report(path):
+        m_ = re.match(r"\s+rho (\d) \((?:test|control)\): .* -> ([A-Z ]+?)\s*$", ln)
+        if m_:
+            out[m_.group(1)] = m_.group(2)
+    return out
+
+
+def _closed_diff(path: Path, who: str) -> str:
+    """"m [lo, hi]" of one paired closed-loop success difference (descriptive) from a stored S15/S16 closed-loop report."""
+    for ln in _read_report(path):
+        m_ = re.search(rf"^\s+{re.escape(who)}: {_CI}", ln)
+        if m_:
+            return _ci(*m_.group(1, 2, 3))
+    raise SystemExit(f"{who} not found in {path}")
+
+
 def paper_tables(T, GT, HH) -> None:
     S = T[SHARED]
     # (1) ablation at the shared point, H1 triplet always together (R2)
@@ -670,7 +707,7 @@ def paper_tables(T, GT, HH) -> None:
                 ["Variant", "Success after onset", "n_av", "n_win", "Never avoided", "Detection latency (steps)", "Degraded RSUs detected"], rows,
                 "Closed-loop dispatch at the shared point (rho 1.0, 20% degraded), in this simulation: mean ± sd across 5 seeds",
                 "n_av: dispatches to degraded RSUs from onset to the run's own avoidance step; n_win: the same over the fixed window [400, 1200); never avoided: fraction of runs "
-                "that never reach the avoidance rule (the three are always read together). Detection latency is descriptive and censored at 399 steps; A and B cannot detect by construction. "
+                "that never reach the avoidance rule (the three are always read together). Detection latency is descriptive and censored at 399 steps; A and B cannot detect by construction. " + LATENCY_CAVEAT + " "
                 "Source: results/s10/tables/ablation_shared_point (F26, F29, F33).", wide=True)
 
     # (2) effects against the references at the four fraction-sweep points
@@ -707,6 +744,8 @@ def paper_tables(T, GT, HH) -> None:
     A14 = _shared_auc(S14 / "report-eval-verdict-5seeds.txt")
     C14 = _s14_closed(S14 / "report-closed-verdict.txt")
     C13 = _s13_closed(S13 / "stag" / "report-closed.txt")
+    L15 = _labelled(S15 / "report-eval-verdict-5seeds.txt", r"PRIMARY\s+D2-h - C-h latency")
+    C15 = _closed_diff(S15 / "report-closed-raw.txt", "D2_h - C_h")
     rows = [
         ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "1.0", d43("1.00"), "NEGATIVE (D43)"],
         ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "0", d43("0.00"), "no separate label (D43 judges rho 1.0)"],
@@ -722,12 +761,42 @@ def paper_tables(T, GT, HH) -> None:
         ["S14", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "0", A14["0"][0], f"{A14['0'][1]} (D68)"],
         ["S14", "shared", "D2 minus C", "closed-loop post-onset success", "1.0", C14["shared"]["diff"], f"{C14['shared']['label']} (D68)"],
         ["S14", "staggered", "D2 minus C", "closed-loop post-onset success", "1.0", C14["stag"]["diff"], f"{C14['stag']['label']} (D68)"],
+        ["S15", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (D72, primary)"],
+        ["S15", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (D72)"],
+        ["S15", "staggered", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
     ]
     write_table("paper_graph_tests", ["Session", "Onset", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
                 "Every test of a graph head against the node-local head C, in this simulation (5 seeds; 95% t-interval over seeds)",
-                "Negative latency means the first-named model detects earlier. The S4, S9, S13 and S14 rules were fixed in D43, D56, D65 and D68 before their numbers. "
-                "The staggered-regime heads of S13 and S14 were trained on the staggered regime; the S4 and S9 heads on the shared-onset regime. Sources: F17, F26/F27, F37/F38, F40, F44/F45 "
-                "(results/s4/summary-5seeds.json, results/s9/summary-verdict.json, and the stored S13/S14 report files).", wide=True)
+                "Negative latency means the first-named model detects earlier. The S4, S9, S13, S14 and S15 rules were fixed in D43, D56, D65, D68 and D72 before their numbers. "
+                "The staggered-regime heads of S13-S15 were trained on the staggered regime; the S4 and S9 heads on the shared-onset regime. C-h and D2-h were trained on the "
+                "forward-looking (horizon) objective of D72, every other head on the next-task objective. " + LATENCY_CAVEAT + " Sources: F17, F26/F27, F37/F38, F40, F44/F45, F48/F49 "
+                "(results/s4/summary-5seeds.json, results/s9/summary-verdict.json, and the stored S13-S15 report files).", wide=True)
+
+    # (3b) the training objective (A29, A30): the S15 primary and the S16 confirmatory test, side by side
+    E16 = S16 / "report-eval-verdict-5seeds.txt"
+    L16 = _labelled(E16, r"CO-PRIMARY 1\s+C-h - C latency")
+    F16 = _labelled(E16, r"CO-PRIMARY 2\s+C-h - C false-alarm rate")
+    O16 = _s16_overall(E16)
+    C16 = _closed_diff(S16 / "report-closed-raw.txt", "C_h - C")
+    rows = [
+        ["S15", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (D72, primary)"],
+        ["S15", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (D72, control)"],
+        ["S15", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
+        ["S16", "C-h minus C", "latency, all degraded RSUs (steps)", "1.0", L16["1"][0], f"{L16['1'][1]} (D76, co-primary 1)"],
+        ["S16", "C-h minus C", "false-alarm rate, healthy RSUs", "1.0", F16["1"][0], f"{F16['1'][1]} (D76, co-primary 2)"],
+        ["S16", "C-h minus C", "overall verdict", "1.0", "", f"{O16['1']} (D76)"],
+        ["S16", "C-h minus C", "latency, all degraded RSUs (steps)", "0", L16["0"][0], f"{L16['0'][1]} (D76, control)"],
+        ["S16", "C-h minus C", "false-alarm rate, healthy RSUs", "0", F16["0"][0], f"{F16['0'][1]} (D76, control)"],
+        ["S16", "C-h minus C", "overall verdict", "0", "", f"{O16['0']} (D76, control)"],
+        ["S16", "C-h minus C", "closed-loop post-onset success", "1.0", C16, "descriptive"],
+    ]
+    write_table("paper_objective", ["Session", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
+                "The training objective, in this simulation: staggered onset (S = 300), 20% degraded, 5 seeds, 95% t-interval over seeds",
+                "C-h and D2-h are C's and D2's architectures trained on the forward-looking objective of D72 (label 1 if fewer than 0.75 of an RSU's tasks in the next 150 steps meet "
+                "their deadline; windows with fewer than 5 tasks excluded); C is the staggered-regime head trained on the next-task objective. S15: draws 300-349, late-onset RSUs, rule "
+                "fixed in D72. S16: fresh draws 350-399, all degraded RSUs, a confirmatory test fixed in D76, whose verdict is OBJECTIVE HELPS only if the latency label is EARLIER and the "
+                "false-alarm label ACCEPTABLE (upper end of the interval at most 0.05). A negative difference means the first-named model detects earlier or raises fewer false alarms. "
+                + LATENCY_CAVEAT + " Sources: F48/F49, F50/F51 (the stored S15 and S16 report files).", wide=True)
 
     # (4) H1 triplet for D2 in both regimes (A28)
     rows = []

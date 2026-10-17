@@ -9,11 +9,16 @@ Most of that gain is already available from the node's own evidence: a non-learn
 We read this as a statement about the floor we fixed in advance and about this scenario, not as a statement that the learned head is unnecessary.
 % src: X18
 
-On graph structure, the load-bearing hypothesis was tested and is not supported.
-The graph head did not beat the node-local head on the pre-registered diagnostic (NEGATIVE), in the closed loop, under staggered onset where a neighbour lead exists, or as a contained head that starts as C (NULL); and we measured why the first test could not have succeeded in the shared-onset scenario, as a boundary condition of that scenario (Sec.~\ref{sec:graph}).
-% src: A9, A10, A11, A25, A28; X1, X2, X17, X21 (no generalisation: one injection model, S = 300, one scenario per seed, open-loop-trained heads, one D2 construction)
-These results are for one injection model, one stagger size, one scenario per seed and heads trained on open-loop dispatch; we make no claim about other regimes or architectures.
-% src: X17, X21
+On graph structure, the load-bearing hypothesis was tested four times and is not supported.
+The graph head did not beat the node-local head on the pre-registered diagnostic (NEGATIVE), in the closed loop, under staggered onset where a neighbour lead exists (NEGATIVE), or as a contained head that starts as C (NULL), including when both heads were trained on a forward-looking objective (NULL); and we measured why the first test could not have succeeded in the shared-onset scenario, as a boundary condition of that scenario (Secs.~\ref{sec:graph} and~\ref{sec:objective}).
+% src: A9, A10, A11, A25, A28, A29; X1, X2, X17, X21, X23 (no generalisation: one injection model, S = 300, one scenario per seed, open-loop-trained heads, one D2 construction, one horizon objective)
+These results are for one injection model, one stagger size, one scenario per seed, heads trained on open-loop dispatch, one contained-head construction and one forward-looking objective; we make no claim about other regimes, objectives or architectures.
+% src: X17, X21, X23
+
+On the training objective, the confirmatory test returned NOT CONFIRMED: in this simulation the forward-looking objective made the node-local head detect degraded RSUs earlier than the next-task objective (EARLIER), but more false alarms were not ruled out (NOT ACCEPTABLE), and closed-loop success did not differ ($-0.0008$, descriptive) (Sec.~\ref{sec:objective}).
+% src: A30; X24 (EARLIER only beside NOT ACCEPTABLE and NOT CONFIRMED; no claim that the objective improves dispatch); X23 (no mechanism)
+Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32--0.44 of healthy RSUs where measured (S16) and was not measured elsewhere.
+% src: A30 (D78 shared-rule caveat, verbatim); A19
 
 The weighted rule and a gate on the same head performed equivalently on task success (Sec.~\ref{sec:gate}).
 The case for a weighted term is therefore a design argument: an exactly decomposable score and no empty-candidate-set failure mode, and not a measured gain.
@@ -23,17 +28,18 @@ Layer 2 attributes the trust head's output weakly, unstably and only asynchronou
 % src: A12, A13, A14; X15, X5
 
 \paragraph*{Untested hypotheses}
-The following were not run, and none of them is a finding.
+The following were not run, except where an item says so, and none of them is a finding.
 They are the open questions that the record leaves, stated as hypotheses.
-% src: A20 (verbatim list; "None of these, other than the single D2 construction of A28, was run and none may be reported as a finding")
+% src: A20 as re-issued in S15b (D74), verbatim list; "None of these, other than the single D2 construction of A28 and the single horizon objective of A29, was run and none may be reported as a finding"
 \begin{itemize}
 \item An observation-count feature.
 \item Other architectures.
 \item Training the trust heads on closed-loop dispatch, and the shift between the open-loop training dispatch and the closed-loop evaluation dispatch as a possible cause of D trailing C.
-\item The self-supervised objective (next-task success of the node itself) rewards current behaviour only, so neighbour evidence that predicts a later failure may have no way to improve the objective (not tested).
+\item The next-task objective was departed from once (Sec.~\ref{sec:objective}): a forward-looking objective did not let the one contained graph construction (D2-h) detect earlier than C-h; other horizons, thresholds, regression targets and architectures are untested.
 \item Dilution of D's own-node signal by its aggregation over many neighbours: this was tested for one contained construction (D2, Sec.~\ref{sec:graph}), while dilution in general is untested.
 \item Cold-start and collusion conditions where a graph model might help.
 \item Gating a different head.
 \end{itemize}
+None of these, other than the single D2 construction and the single horizon objective, was run, and none is reported as a finding.
 Staggered onset, which an earlier version of this list included, was tested (Sec.~\ref{sec:graph}).
 % src: A20 (staggered onset tested in S13: A24, A25)
