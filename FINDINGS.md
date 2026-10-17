@@ -2605,3 +2605,520 @@ Cold start, f = 0.20, restart step 400, 4 RSUs restarted (all on segment 3), 2 f
 RSUs not restarted: success_ewma at step 400 untouched (min 0.9408, max 1.0000).
 Interpretation (one line): the spreading fault reaches each RSU at 400 + L x hop (the seed at 400, downstream RSUs 80 steps later at L = 80), and a restart resets a node's observable history at step 400 while keeping it in service; the generators do what D81 registers. Nothing here says anything about C, D or any detection or success rate.
 
+
+
+### F53 - S18 raw results: spreading fault (L 0/20/40/80) and cold start (f 0.10/0.20/0.40), draws 400-449, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-17 | Session: S18 | Code commit: d044171 (D83 19dd46e, D84 1f2f37f; scripts/s18_run.py) | Configs: configs/spread_L{0,20,40,80}.yaml, configs/restart_f{10,20,40}.yaml | Seeds 1-5 | Draws 400-449 (evaluation), 600-603 and 640 (secondary-arm training and validation), 900 (harness check, not a result)
+Setup: D81 as registered, amended by D83 (secondary arm, graph provenance, strict false-alarm reading printed) and D84 (implementation choices). PRIMARY ARM = frozen checkpoints (C, D: checkpoints/s3-seed{n}; D2: checkpoints/s14/shared), weights unchanged (weights.yaml, weights_h.yaml, weights_d2.yaml shared). SECONDARY ARM = C_r, D_r retrained per seed on draws 600-603 of each of the 7 conditions (validation draw 640), same objective, TrainSettings and parameter counts (C 1313, D 1614), primary C and D weights, no tuning. Harness check (draw 900): regenerated scenarios, trust and a closed-loop run repeat exactly. Process note: the first run of the secondary closed-loop report failed with a KeyError (it did not load the primary C and D for the C_r - C, D_r - D lines); fixed mechanically in d044171 and re-run; no result file changed. Times (UTC): {  "evaluation_first_trust_primary": "2026-10-17T08:52:44Z",  "closed_loop_first_result_primary": "2026-10-17T08:59:42Z",  "evaluation_first_trust_secondary": "2026-10-17T09:01:31Z",  "closed_loop_first_result_secondary": "2026-10-17T10:04:37Z" }
+Secondary-arm training diagnostics (validation BCE on draw 640; not evaluation numbers):
+seed 1: C params 1313 best epoch 21 stopped 26 (patience) val BCE 0.6838 -> 0.1542; D params 1614 best epoch 25 stopped 33 (patience) val BCE 0.9366 -> 0.1637 (train graphs 8400, val graphs 2100)
+seed 2: C params 1313 best epoch 40 stopped 43 (patience) val BCE 0.7551 -> 0.1452; D params 1614 best epoch 105 stopped 113 (patience) val BCE 3.9588 -> 0.1329 (train graphs 8400, val graphs 2100)
+seed 3: C params 1313 best epoch 35 stopped 42 (patience) val BCE 0.8014 -> 0.1677; D params 1614 best epoch 69 stopped 77 (patience) val BCE 2.5935 -> 0.1779 (train graphs 8400, val graphs 2100)
+seed 4: C params 1313 best epoch 30 stopped 38 (patience) val BCE 0.6670 -> 0.1666; D params 1614 best epoch 75 stopped 83 (patience) val BCE 0.3212 -> 0.1557 (train graphs 8400, val graphs 2100)
+seed 5: C params 1313 best epoch 11 stopped 15 (patience) val BCE 0.6406 -> 0.1639; D params 1614 best epoch 66 stopped 74 (patience) val BCE 0.4323 -> 0.1551 (train graphs 8400, val graphs 2100)
+Reading guide: no labels in these reports (raw mode). "latency" = detection latency under the shared D76 rule (D78 caveat: a comparison under one rule, not a time-to-alarm at a stated false-alarm rate; the false-alarm rate is beside every latency). AUC = trust AUC in the first 100 steps (D84 item 3). "run-level never-avoided" = D56 rate over runs; "faulty RSUs never avoided" = per-RSU reading (D84 item 4). M = success_ewma monitor.
+
+#### F53a - PRIMARY ARM, open loop (results/s18/report-open-primary-raw.txt)
+```
+============================================================================================================================
+S18 OPEN LOOP (PRIMARY ARM): frozen heads (C, D, D2, M = success_ewma), draws 400-449, seeds [1, 2, 3, 4, 5], shared D76 rule (RAW: no labels)
+============================================================================================================================
+
+--- condition L0 (spreading fault, L = 0) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C    latency  136.9 +/-   9.5  detected 1.000  | false-alarm rate 0.4730 +/- 0.1698 (starting pre-onset 0.1098, only after 0.3632)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6192 +/- 0.0397
+    D    latency  214.7 +/-  26.4  detected 0.968  | false-alarm rate 0.1385 +/- 0.0739 (starting pre-onset 0.0407, only after 0.0978)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5738 +/- 0.0443
+    D2   latency  134.9 +/-   9.7  detected 1.000  | false-alarm rate 0.4385 +/- 0.1347 (starting pre-onset 0.0780, only after 0.3605)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6203 +/- 0.0475
+    M    latency  138.9 +/-  13.5  detected 1.000  | false-alarm rate 0.4390 +/- 0.0944 (starting pre-onset 0.1120, only after 0.3270)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6510 +/- 0.0414
+  D - C latency: +77.8 (sd 27.4) 95% [+43.8, +111.8]   per seed [55.5, 104.5, 99.6, 86.6, 42.7]
+  D - C false-alarm rate: -0.3345 (sd 0.1310) 95% [-0.4972, -0.1718]   per seed [-0.3337, -0.2963, -0.1613, -0.355, -0.5262]
+  D - C trust AUC (first 100 steps): -0.0454 (sd 0.0330) 95% [-0.0864, -0.0045]  (descriptive)
+  D2 - C latency: -2.1 (sd 4.9) 95% [-8.2, +4.0]   per seed [-5.5, -4.8, 6.5, -4.1, -2.4]
+  D2 - C false-alarm rate: -0.0345 (sd 0.0363) 95% [-0.0796, +0.0106]   per seed [-0.0037, -0.0462, 0.0025, -0.0375, -0.0875]
+  M - C latency: +1.9 (sd 12.2) 95% [-13.2, +17.1]   per seed [-3.3, 10.1, -14.6, 0.6, 17.0]
+  M - C false-alarm rate: -0.0340 (sd 0.2107) 95% [-0.2955, +0.2275]   per seed [0.0638, -0.155, 0.1138, 0.1525, -0.345]
+
+--- condition L20 (spreading fault, L = 20) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C    latency  130.6 +/-   9.3  detected 1.000  | false-alarm rate 0.4730 +/- 0.1698 (starting pre-onset 0.1098, only after 0.3632)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6294 +/- 0.0355
+    D    latency  210.0 +/-  24.2  detected 0.980  | false-alarm rate 0.1390 +/- 0.0724 (starting pre-onset 0.0407, only after 0.0983)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5789 +/- 0.0373
+    D2   latency  127.7 +/-  10.3  detected 1.000  | false-alarm rate 0.4385 +/- 0.1347 (starting pre-onset 0.0780, only after 0.3605)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6214 +/- 0.0395
+    M    latency  135.2 +/-  20.6  detected 1.000  | false-alarm rate 0.4390 +/- 0.0944 (starting pre-onset 0.1120, only after 0.3270)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6703 +/- 0.0365
+  D - C latency: +79.4 (sd 27.0) 95% [+45.9, +112.9]   per seed [52.5, 104.5, 95.1, 97.1, 47.8]
+  D - C false-alarm rate: -0.3340 (sd 0.1310) 95% [-0.4966, -0.1714]   per seed [-0.33, -0.2975, -0.1613, -0.355, -0.5262]
+  D - C trust AUC (first 100 steps): -0.0505 (sd 0.0223) 95% [-0.0782, -0.0228]  (descriptive)
+  D2 - C latency: -2.8 (sd 7.1) 95% [-11.6, +6.0]   per seed [-10.2, 0.3, 7.9, -7.1, -5.0]
+  D2 - C false-alarm rate: -0.0345 (sd 0.0363) 95% [-0.0796, +0.0106]   per seed [-0.0037, -0.0462, 0.0025, -0.0375, -0.0875]
+  M - C latency: +4.6 (sd 18.4) 95% [-18.3, +27.5]   per seed [-2.4, 29.5, -15.5, -6.1, 17.5]
+  M - C false-alarm rate: -0.0340 (sd 0.2107) 95% [-0.2955, +0.2275]   per seed [0.0638, -0.155, 0.1138, 0.1525, -0.345]
+  change of the D - C latency gap from L = 0 to this L (same draws): +1.6 95% [-6.1, +9.3]  (descriptive)
+
+--- condition L40 (spreading fault, L = 40) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C    latency  132.8 +/-  10.5  detected 1.000  | false-alarm rate 0.4730 +/- 0.1698 (starting pre-onset 0.1098, only after 0.3632)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6324 +/- 0.0271
+    D    latency  212.8 +/-  17.2  detected 0.969  | false-alarm rate 0.1420 +/- 0.0744 (starting pre-onset 0.0407, only after 0.1012)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5985 +/- 0.0318
+    D2   latency  130.7 +/-  12.7  detected 1.000  | false-alarm rate 0.4383 +/- 0.1341 (starting pre-onset 0.0780, only after 0.3603)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6306 +/- 0.0374
+    M    latency  135.3 +/-  21.7  detected 1.000  | false-alarm rate 0.4390 +/- 0.0944 (starting pre-onset 0.1120, only after 0.3270)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6870 +/- 0.0261
+  D - C latency: +80.0 (sd 20.0) 95% [+55.2, +104.8]   per seed [54.7, 89.3, 91.1, 101.7, 63.3]
+  D - C false-alarm rate: -0.3310 (sd 0.1309) 95% [-0.4935, -0.1685]   per seed [-0.325, -0.2838, -0.165, -0.355, -0.5262]
+  D - C trust AUC (first 100 steps): -0.0339 (sd 0.0209) 95% [-0.0599, -0.0080]  (descriptive)
+  D2 - C latency: -2.1 (sd 4.8) 95% [-8.0, +3.8]   per seed [-4.2, 2.0, 3.3, -3.4, -8.3]
+  D2 - C false-alarm rate: -0.0347 (sd 0.0368) 95% [-0.0804, +0.0109]   per seed [-0.0037, -0.0462, 0.0025, -0.0375, -0.0887]
+  M - C latency: +2.5 (sd 15.5) 95% [-16.7, +21.8]   per seed [-2.1, 16.7, -14.2, -8.6, 20.8]
+  M - C false-alarm rate: -0.0340 (sd 0.2107) 95% [-0.2955, +0.2275]   per seed [0.0638, -0.155, 0.1138, 0.1525, -0.345]
+  change of the D - C latency gap from L = 0 to this L (same draws): +2.2 95% [-16.8, +21.2]  (descriptive)
+
+--- condition L80 (spreading fault, L = 80) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C    latency  130.7 +/-  14.3  detected 1.000  | false-alarm rate 0.4730 +/- 0.1698 (starting pre-onset 0.1098, only after 0.3632)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6239 +/- 0.0470
+    D    latency  214.0 +/-  16.6  detected 0.977  | false-alarm rate 0.1373 +/- 0.0779 (starting pre-onset 0.0407, only after 0.0965)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6136 +/- 0.0407
+    D2   latency  130.5 +/-  12.4  detected 1.000  | false-alarm rate 0.4377 +/- 0.1331 (starting pre-onset 0.0780, only after 0.3598)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6244 +/- 0.0453
+    M    latency  134.2 +/-  25.5  detected 1.000  | false-alarm rate 0.4390 +/- 0.0944 (starting pre-onset 0.1120, only after 0.3270)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6948 +/- 0.0418
+  D - C latency: +83.4 (sd 22.7) 95% [+55.2, +111.5]   per seed [55.5, 77.6, 93.2, 116.1, 74.5]
+  D - C false-alarm rate: -0.3357 (sd 0.1254) 95% [-0.4914, -0.1801]   per seed [-0.3337, -0.2863, -0.1787, -0.3563, -0.5238]
+  D - C trust AUC (first 100 steps): -0.0103 (sd 0.0283) 95% [-0.0454, +0.0248]  (descriptive)
+  D2 - C latency: -0.1 (sd 3.6) 95% [-4.6, +4.3]   per seed [-2.6, 0.9, -2.3, 5.7, -2.3]
+  D2 - C false-alarm rate: -0.0352 (sd 0.0377) 95% [-0.0820, +0.0115]   per seed [-0.0037, -0.0462, 0.0025, -0.0375, -0.0912]
+  M - C latency: +3.6 (sd 19.0) 95% [-20.0, +27.2]   per seed [-0.1, 22.8, -18.4, -9.8, 23.5]
+  M - C false-alarm rate: -0.0340 (sd 0.2107) 95% [-0.2955, +0.2275]   per seed [0.0638, -0.155, 0.1138, 0.1525, -0.345]
+  change of the D - C latency gap from L = 0 to this L (same draws): +5.6 95% [-25.4, +36.6]  (descriptive)
+
+--- condition f10 (cold start, f = 0.1) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [50, 50, 50, 50, 50]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C    latency   68.6 +/-   3.7  detected 1.000  | false-alarm rate 0.4764 +/- 0.1691 (starting pre-onset 0.1088, only after 0.3676)  restarted-healthy 0.4440  not restarted 0.4782
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7823 +/- 0.0501;  failing vs restarted-healthy only: 0.8920
+    D    latency  129.0 +/-  32.3  detected 0.980  | false-alarm rate 0.1124 +/- 0.0792 (starting pre-onset 0.0396, only after 0.0728)  restarted-healthy 0.1760  not restarted 0.1089
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6171 +/- 0.0430;  failing vs restarted-healthy only: 0.6440
+    D2   latency   67.9 +/-   5.4  detected 1.000  | false-alarm rate 0.4432 +/- 0.1364 (starting pre-onset 0.0779, only after 0.3653)  restarted-healthy 0.4640  not restarted 0.4420
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7865 +/- 0.0359;  failing vs restarted-healthy only: 0.8920
+    M    latency   70.3 +/-   4.3  detected 1.000  | false-alarm rate 0.4413 +/- 0.0946 (starting pre-onset 0.1118, only after 0.3295)  restarted-healthy 0.4240  not restarted 0.4422
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7749 +/- 0.0532;  failing vs restarted-healthy only: 0.8780
+  D - C latency: +60.5 (sd 32.6) 95% [+20.0, +100.9]   per seed [48.2, 114.5, 66.3, 38.1, 35.1]
+  D - C false-alarm rate: -0.3640 (sd 0.1080) 95% [-0.4981, -0.2299]   per seed [-0.3453, -0.3137, -0.2411, -0.3884, -0.5316]
+  D - C trust AUC (first 100 steps): -0.1653 (sd 0.0611) 95% [-0.2412, -0.0894]  (descriptive)
+  D2 - C latency: -0.7 (sd 2.0) 95% [-3.1, +1.8]   per seed [1.6, 0.6, -0.1, -3.3, -2.1]
+  D2 - C false-alarm rate: -0.0333 (sd 0.0357) 95% [-0.0775, +0.0110]   per seed [0.0, -0.0347, 0.0, -0.0463, -0.0853]
+  M - C latency: +1.7 (sd 2.8) 95% [-1.8, +5.2]   per seed [0.7, 2.1, -0.3, -0.4, 6.4]
+  M - C false-alarm rate: -0.0352 (sd 0.2066) 95% [-0.2916, +0.2213]   per seed [0.0558, -0.1421, 0.1105, 0.1463, -0.3463]
+
+--- condition f20 (cold start, f = 0.2) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [96, 100, 91, 100, 100]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C    latency   69.5 +/-   3.1  detected 1.000  | false-alarm rate 0.4700 +/- 0.1689 (starting pre-onset 0.1091, only after 0.3609)  restarted-healthy 0.3860  not restarted 0.4805
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7799 +/- 0.0459;  failing vs restarted-healthy only: 0.8930
+    D    latency  128.0 +/-  27.1  detected 0.976  | false-alarm rate 0.1311 +/- 0.0758 (starting pre-onset 0.0400, only after 0.0911)  restarted-healthy 0.2600  not restarted 0.1150
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6443 +/- 0.0490;  failing vs restarted-healthy only: 0.7010
+    D2   latency   68.7 +/-   3.4  detected 1.000  | false-alarm rate 0.4449 +/- 0.1397 (starting pre-onset 0.0791, only after 0.3658)  restarted-healthy 0.4540  not restarted 0.4437
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7809 +/- 0.0347;  failing vs restarted-healthy only: 0.8900
+    M    latency   70.1 +/-   2.0  detected 1.000  | false-alarm rate 0.4400 +/- 0.0931 (starting pre-onset 0.1124, only after 0.3276)  restarted-healthy 0.4180  not restarted 0.4427
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7703 +/- 0.0376;  failing vs restarted-healthy only: 0.8585
+  D - C latency: +58.5 (sd 29.2) 95% [+22.2, +94.8]   per seed [42.8, 107.2, 60.3, 51.0, 31.3]
+  D - C false-alarm rate: -0.3389 (sd 0.1124) 95% [-0.4785, -0.1993]   per seed [-0.3333, -0.2956, -0.2056, -0.3456, -0.5144]
+  D - C trust AUC (first 100 steps): -0.1356 (sd 0.0680) 95% [-0.2200, -0.0511]  (descriptive)
+  D2 - C latency: -0.8 (sd 1.9) 95% [-3.1, +1.6]   per seed [0.5, 0.9, 0.2, -3.5, -1.9]
+  D2 - C false-alarm rate: -0.0251 (sd 0.0297) 95% [-0.0620, +0.0118]   per seed [-0.01, -0.0333, 0.0011, -0.01, -0.0733]
+  M - C latency: +0.7 (sd 2.5) 95% [-2.4, +3.7]   per seed [0.3, 3.4, -2.3, -1.1, 3.0]
+  M - C false-alarm rate: -0.0300 (sd 0.2130) 95% [-0.2945, +0.2345]   per seed [0.0544, -0.1422, 0.1189, 0.1667, -0.3478]
+
+--- condition f40 (cold start, f = 0.4) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C 0.8393 D 0.5808 D2 0.8509 M 0.8453
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C 0.8396 D 0.6952 D2 0.8423 M 0.8366
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C 0.8396 D 0.5774 D2 0.8003 M 0.8719
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C 0.8580 D 0.5292 D2 0.8583 M 0.8533
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C 0.8577 D 0.6128 D2 0.8727 M 0.8534
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [184, 198, 183, 189, 190]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C    latency   71.9 +/-   4.5  detected 1.000  | false-alarm rate 0.4693 +/- 0.1682 (starting pre-onset 0.1087, only after 0.3605)  restarted-healthy 0.4250  not restarted 0.4840
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7728 +/- 0.0776;  failing vs restarted-healthy only: 0.8340
+    D    latency  122.6 +/-  16.2  detected 0.989  | false-alarm rate 0.1885 +/- 0.0876 (starting pre-onset 0.0415, only after 0.1470)  restarted-healthy 0.3400  not restarted 0.1380
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6326 +/- 0.0632;  failing vs restarted-healthy only: 0.6545
+    D2   latency   71.0 +/-   5.4  detected 1.000  | false-alarm rate 0.4545 +/- 0.1476 (starting pre-onset 0.0773, only after 0.3772)  restarted-healthy 0.4740  not restarted 0.4480
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7733 +/- 0.0650;  failing vs restarted-healthy only: 0.8313
+    M    latency   72.5 +/-   4.4  detected 1.000  | false-alarm rate 0.4410 +/- 0.1002 (starting pre-onset 0.1097, only after 0.3312)  restarted-healthy 0.4390  not restarted 0.4417
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7754 +/- 0.0570;  failing vs restarted-healthy only: 0.8530
+  D - C latency: +50.7 (sd 19.1) 95% [+26.9, +74.5]   per seed [45.3, 79.2, 55.9, 46.5, 26.6]
+  D - C false-alarm rate: -0.2807 (sd 0.1386) 95% [-0.4528, -0.1087]   per seed [-0.3312, -0.2213, -0.1087, -0.26, -0.4825]
+  D - C trust AUC (first 100 steps): -0.1403 (sd 0.0558) 95% [-0.2095, -0.0710]  (descriptive)
+  D2 - C latency: -0.9 (sd 2.3) 95% [-3.7, +2.0]   per seed [1.4, 0.8, 0.0, -4.0, -2.6]
+  D2 - C false-alarm rate: -0.0147 (sd 0.0287) 95% [-0.0504, +0.0209]   per seed [-0.0225, -0.0238, 0.0013, 0.0238, -0.0525]
+  M - C latency: +0.6 (sd 3.2) 95% [-3.4, +4.6]   per seed [-0.4, 3.5, -4.3, 1.0, 3.3]
+  M - C false-alarm rate: -0.0282 (sd 0.2200) 95% [-0.3013, +0.2448]   per seed [0.0675, -0.1487, 0.1025, 0.19, -0.3525]
+```
+
+#### F53b - PRIMARY ARM, closed loop (results/s18/report-closed-primary-raw.txt)
+```
+============================================================================================================================
+S18 CLOSED LOOP (PRIMARY ARM): dwell filter and handoff on, draws 400-449, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+============================================================================================================================
+weights (alpha, beta, gamma): A (0.0, 0.25, 0.6)  M (0.5, 0.25, 0.3)  C (1.0, 0.25, 0.6)  D (2.0, 0.25, 0.6)  D2 (2.0, 0.25, 0.6)  B_oracle (0.5, 0.25, 0.6)  (existing tuned files; no new tuning)
+
+--- condition L0 (spreading fault, L = 0) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,1200) 0.8724 +/- 0.0019  | n_av   579.0 +/-  106.9 n_win   899.2 +/-   21.4 run-level never-avoided 0.460 +/- 0.131 | faulty RSUs never avoided 0.066 (66/1000)
+  M        success [400,1200) 0.9193 +/- 0.0108  | n_av   138.4 +/-   48.9 n_win   491.5 +/-   78.9 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.003 (3/1000)
+  C        success [400,1200) 0.9231 +/- 0.0110  | n_av   139.2 +/-   46.2 n_win   488.6 +/-   82.1 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.015 (15/1000)
+  D        success [400,1200) 0.9062 +/- 0.0104  | n_av   187.7 +/-   67.5 n_win   596.0 +/-   99.7 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.021 (21/1000)
+  D2       success [400,1200) 0.9235 +/- 0.0108  | n_av   122.3 +/-   40.6 n_win   469.3 +/-   80.5 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.012 (12/1000)
+  B_oracle success [400,1200) 0.9255 +/- 0.0108  | n_av    22.6 +/-   28.2 n_win   377.6 +/-   96.3 run-level never-avoided 0.012 +/- 0.027 | faulty RSUs never avoided 0.010 (10/1000)
+  D - C: -0.0168 (sd 0.0097) 95% [-0.0288, -0.0048]   per seed [-0.0054, -0.0277, -0.026, -0.0135, -0.0114]
+  D2 - C: +0.0004 (sd 0.0003) 95% [+0.0000, +0.0008]   per seed [0.0002, 0.0002, 0.0004, 0.0004, 0.0009]
+  M - C: -0.0038 (sd 0.0006) 95% [-0.0045, -0.0030]   per seed [-0.0036, -0.0047, -0.0036, -0.0037, -0.0032]
+  C - A: +0.0506 (sd 0.0093) 95% [+0.0391, +0.0622]   per seed [0.0533, 0.0536, 0.0626, 0.0379, 0.0456]
+  D - A: +0.0338 (sd 0.0095) 95% [+0.0221, +0.0456]   per seed [0.048, 0.0259, 0.0365, 0.0245, 0.0343]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.087 [-0.191, +0.016]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.119 [-0.225, -0.012]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition L20 (spreading fault, L = 20) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,1200) 0.8760 +/- 0.0024  | n_av   579.0 +/-  106.9 n_win   899.2 +/-   21.4 run-level never-avoided 0.460 +/- 0.131 | faulty RSUs never avoided 0.066 (66/1000)
+  M        success [400,1200) 0.9206 +/- 0.0105  | n_av   156.4 +/-   47.2 n_win   506.2 +/-   73.9 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.006 (6/1000)
+  C        success [400,1200) 0.9245 +/- 0.0106  | n_av   157.6 +/-   45.4 n_win   504.2 +/-   79.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.015 (15/1000)
+  D        success [400,1200) 0.9081 +/- 0.0100  | n_av   203.6 +/-   62.7 n_win   606.2 +/-   95.5 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.025 (25/1000)
+  D2       success [400,1200) 0.9249 +/- 0.0105  | n_av   142.4 +/-   44.4 n_win   484.4 +/-   77.6 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.021 (21/1000)
+  B_oracle success [400,1200) 0.9268 +/- 0.0105  | n_av    27.1 +/-   29.2 n_win   392.9 +/-   92.1 run-level never-avoided 0.012 +/- 0.027 | faulty RSUs never avoided 0.010 (10/1000)
+  D - C: -0.0164 (sd 0.0088) 95% [-0.0274, -0.0054]   per seed [-0.0057, -0.0265, -0.0245, -0.0135, -0.0118]
+  D2 - C: +0.0004 (sd 0.0002) 95% [+0.0001, +0.0007]   per seed [0.0002, 0.0001, 0.0005, 0.0003, 0.0007]
+  M - C: -0.0039 (sd 0.0006) 95% [-0.0047, -0.0031]   per seed [-0.0038, -0.005, -0.0035, -0.0037, -0.0035]
+  C - A: +0.0485 (sd 0.0085) 95% [+0.0379, +0.0591]   per seed [0.0506, 0.0516, 0.0593, 0.0366, 0.0443]
+  D - A: +0.0321 (sd 0.0087) 95% [+0.0213, +0.0429]   per seed [0.0449, 0.0251, 0.0348, 0.0231, 0.0326]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.082 [-0.165, +0.001]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.113 [-0.213, -0.013]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition L40 (spreading fault, L = 40) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,1200) 0.8797 +/- 0.0030  | n_av   579.0 +/-  106.9 n_win   899.2 +/-   21.4 run-level never-avoided 0.460 +/- 0.131 | faulty RSUs never avoided 0.066 (66/1000)
+  M        success [400,1200) 0.9222 +/- 0.0103  | n_av   175.8 +/-   42.9 n_win   521.2 +/-   69.9 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.005 (5/1000)
+  C        success [400,1200) 0.9261 +/- 0.0104  | n_av   180.4 +/-   41.0 n_win   521.6 +/-   72.8 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.014 (14/1000)
+  D        success [400,1200) 0.9103 +/- 0.0098  | n_av   219.3 +/-   60.6 n_win   618.0 +/-   90.1 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.026 (26/1000)
+  D2       success [400,1200) 0.9264 +/- 0.0104  | n_av   165.1 +/-   37.0 n_win   500.7 +/-   71.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.023 (23/1000)
+  B_oracle success [400,1200) 0.9282 +/- 0.0103  | n_av    40.5 +/-   29.5 n_win   408.1 +/-   88.2 run-level never-avoided 0.012 +/- 0.027 | faulty RSUs never avoided 0.010 (10/1000)
+  D - C: -0.0158 (sd 0.0082) 95% [-0.0260, -0.0056]   per seed [-0.0057, -0.0252, -0.0232, -0.0133, -0.0116]
+  D2 - C: +0.0003 (sd 0.0003) 95% [-0.0000, +0.0006]   per seed [0.0002, 0.0002, 0.0003, 0.0001, 0.0007]
+  M - C: -0.0038 (sd 0.0006) 95% [-0.0046, -0.0031]   per seed [-0.0038, -0.0048, -0.0035, -0.0038, -0.0033]
+  C - A: +0.0464 (sd 0.0078) 95% [+0.0368, +0.0560]   per seed [0.048, 0.0496, 0.0561, 0.0354, 0.043]
+  D - A: +0.0306 (sd 0.0080) 95% [+0.0207, +0.0405]   per seed [0.0423, 0.0244, 0.0329, 0.022, 0.0313]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.069 [-0.148, +0.009]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.107 [-0.200, -0.013]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition L80 (spreading fault, L = 80) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,1200) 0.8865 +/- 0.0038  | n_av   579.0 +/-  106.9 n_win   899.2 +/-   21.4 run-level never-avoided 0.460 +/- 0.131 | faulty RSUs never avoided 0.073 (73/1000)
+  M        success [400,1200) 0.9253 +/- 0.0100  | n_av   207.2 +/-   38.2 n_win   554.3 +/-   60.7 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.008 (8/1000)
+  C        success [400,1200) 0.9292 +/- 0.0100  | n_av   212.9 +/-   29.5 n_win   553.0 +/-   63.0 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.013 (13/1000)
+  D        success [400,1200) 0.9145 +/- 0.0095  | n_av   244.7 +/-   56.4 n_win   640.4 +/-   81.4 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.018 (18/1000)
+  D2       success [400,1200) 0.9295 +/- 0.0100  | n_av   201.1 +/-   30.5 n_win   533.7 +/-   60.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.022 (22/1000)
+  B_oracle success [400,1200) 0.9310 +/- 0.0100  | n_av    84.4 +/-   35.6 n_win   441.5 +/-   78.9 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.006 (6/1000)
+  D - C: -0.0147 (sd 0.0072) 95% [-0.0237, -0.0058]   per seed [-0.0056, -0.0231, -0.0209, -0.0129, -0.0112]
+  D2 - C: +0.0003 (sd 0.0001) 95% [+0.0002, +0.0005]   per seed [0.0003, 0.0002, 0.0003, 0.0004, 0.0005]
+  M - C: -0.0039 (sd 0.0006) 95% [-0.0047, -0.0032]   per seed [-0.0042, -0.0049, -0.0033, -0.0037, -0.0036]
+  C - A: +0.0427 (sd 0.0066) 95% [+0.0344, +0.0509]   per seed [0.0434, 0.0463, 0.0505, 0.033, 0.04]
+  D - A: +0.0279 (sd 0.0068) 95% [+0.0195, +0.0364]   per seed [0.0378, 0.0232, 0.0296, 0.0201, 0.0289]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.058 [-0.139, +0.023]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.097 [-0.182, -0.011]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition f10 (cold start, f = 0.1) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,500) 0.9702 +/- 0.0090   after the window [500,1200) 0.9385 +/- 0.0019  | n_av    63.7 +/-   18.0 n_win   228.4 +/-   10.4 run-level never-avoided 0.052 +/- 0.046 | faulty RSUs never avoided 0.052 (13/250)
+  M        success [400,500) 0.9690 +/- 0.0096   after the window [500,1200) 0.9647 +/- 0.0019  | n_av    12.5 +/-    1.3 n_win    41.8 +/-    2.9 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  C        success [400,500) 0.9725 +/- 0.0092   after the window [500,1200) 0.9682 +/- 0.0023  | n_av    11.7 +/-    2.1 n_win    38.1 +/-    3.8 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  D        success [400,500) 0.9674 +/- 0.0104   after the window [500,1200) 0.9629 +/- 0.0010  | n_av    16.1 +/-    2.2 n_win    58.0 +/-   15.5 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  D2       success [400,500) 0.9724 +/- 0.0097   after the window [500,1200) 0.9680 +/- 0.0024  | n_av    10.6 +/-    1.7 n_win    34.4 +/-    3.5 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  B_oracle success [400,500) 0.9750 +/- 0.0085   after the window [500,1200) 0.9693 +/- 0.0020  | n_av     0.2 +/-    0.2 n_win    13.5 +/-    3.8 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  D - C: -0.0051 (sd 0.0041) 95% [-0.0102, +0.0000]   per seed [-0.0121, -0.0016, -0.0033, -0.0042, -0.0042]
+  D - C after the window [500,1200): -0.0053 95% [-0.0077, -0.0029]  (descriptive)
+  D2 - C: -0.0001 (sd 0.0005) 95% [-0.0007, +0.0006]   per seed [0.0001, 0.0001, 0.0003, -0.001, 0.0001]
+  M - C: -0.0035 (sd 0.0018) 95% [-0.0056, -0.0013]   per seed [-0.0055, -0.002, -0.0023, -0.0022, -0.0053]
+  C - A: +0.0022 (sd 0.0005) 95% [+0.0016, +0.0029]   per seed [0.002, 0.0024, 0.0023, 0.0015, 0.0029]
+  D - A: -0.0028 (sd 0.0043) 95% [-0.0082, +0.0025]   per seed [-0.0102, 0.0008, -0.0009, -0.0027, -0.0012]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.076 [-0.142, -0.010]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.088 [-0.183, +0.007]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition f20 (cold start, f = 0.2) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,500) 0.9645 +/- 0.0090   after the window [500,1200) 0.9044 +/- 0.0031  | n_av   209.0 +/-   15.0 n_win   456.0 +/-   10.4 run-level never-avoided 0.244 +/- 0.093 | faulty RSUs never avoided 0.064 (32/500)
+  M        success [400,500) 0.9645 +/- 0.0098   after the window [500,1200) 0.9521 +/- 0.0045  | n_av    25.9 +/-    2.4 n_win   131.7 +/-   16.9 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  C        success [400,500) 0.9680 +/- 0.0093   after the window [500,1200) 0.9556 +/- 0.0049  | n_av    26.5 +/-    5.9 n_win   128.0 +/-   22.2 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  D        success [400,500) 0.9622 +/- 0.0102   after the window [500,1200) 0.9439 +/- 0.0027  | n_av    36.9 +/-    8.1 n_win   185.5 +/-   34.0 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  D2       success [400,500) 0.9682 +/- 0.0097   after the window [500,1200) 0.9558 +/- 0.0049  | n_av    23.7 +/-    4.6 n_win   120.3 +/-   20.7 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  B_oracle success [400,500) 0.9717 +/- 0.0087   after the window [500,1200) 0.9573 +/- 0.0046  | n_av     2.4 +/-    1.6 n_win    86.5 +/-   20.6 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  D - C: -0.0057 (sd 0.0039) 95% [-0.0105, -0.0009]   per seed [-0.0125, -0.0025, -0.0043, -0.0044, -0.005]
+  D - C after the window [500,1200): -0.0117 95% [-0.0203, -0.0031]  (descriptive)
+  D2 - C: +0.0002 (sd 0.0005) 95% [-0.0004, +0.0009]   per seed [0.0004, 0.0003, 0.0007, -0.0006, 0.0004]
+  M - C: -0.0034 (sd 0.0016) 95% [-0.0054, -0.0015]   per seed [-0.0055, -0.0019, -0.0026, -0.0025, -0.0047]
+  C - A: +0.0035 (sd 0.0006) 95% [+0.0028, +0.0042]   per seed [0.0028, 0.0038, 0.0041, 0.0029, 0.0037]
+  D - A: -0.0023 (sd 0.0043) 95% [-0.0076, +0.0030]   per seed [-0.0096, 0.0013, -0.0002, -0.0015, -0.0013]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.050 [-0.098, -0.003]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.126 [-0.259, +0.006]  (positive = D sends fewer to the faulty RSUs; descriptive)
+
+--- condition f40 (cold start, f = 0.4) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  A        success [400,500) 0.9536 +/- 0.0088   after the window [500,1200) 0.8395 +/- 0.0018  | n_av   619.9 +/-   50.0 n_win   899.3 +/-   14.6 run-level never-avoided 0.508 +/- 0.074 | faulty RSUs never avoided 0.063 (63/1000)
+  M        success [400,500) 0.9554 +/- 0.0093   after the window [500,1200) 0.9285 +/- 0.0060  | n_av    51.0 +/-    4.2 n_win   306.9 +/-   35.3 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.001 (1/1000)
+  C        success [400,500) 0.9592 +/- 0.0089   after the window [500,1200) 0.9323 +/- 0.0063  | n_av    52.8 +/-    7.6 n_win   302.6 +/-   37.5 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.003 (3/1000)
+  D        success [400,500) 0.9520 +/- 0.0102   after the window [500,1200) 0.9103 +/- 0.0092  | n_av    78.1 +/-   13.9 n_win   422.8 +/-   69.4 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.006 (6/1000)
+  D2       success [400,500) 0.9599 +/- 0.0094   after the window [500,1200) 0.9329 +/- 0.0061  | n_av    45.4 +/-    5.4 n_win   288.1 +/-   35.3 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.004 (4/1000)
+  B_oracle success [400,500) 0.9658 +/- 0.0090   after the window [500,1200) 0.9350 +/- 0.0061  | n_av     3.7 +/-    4.1 n_win   226.4 +/-   37.0 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.001 (1/1000)
+  D - C: -0.0072 (sd 0.0035) 95% [-0.0116, -0.0028]   per seed [-0.0132, -0.0042, -0.0059, -0.0071, -0.0056]
+  D - C after the window [500,1200): -0.0220 95% [-0.0389, -0.0050]  (descriptive)
+  D2 - C: +0.0007 (sd 0.0004) 95% [+0.0002, +0.0012]   per seed [0.0009, 0.0012, 0.0008, 0.0, 0.0005]
+  M - C: -0.0038 (sd 0.0008) 95% [-0.0048, -0.0027]   per seed [-0.0047, -0.0032, -0.0029, -0.0034, -0.0047]
+  C - A: +0.0056 (sd 0.0009) 95% [+0.0045, +0.0068]   per seed [0.0044, 0.0065, 0.006, 0.0063, 0.0049]
+  D - A: -0.0016 (sd 0.0042) 95% [-0.0068, +0.0037]   per seed [-0.0088, 0.0024, 0.0001, -0.0008, -0.0007]
+  D57-normalised (n_C - n_D)/n_A on n_av: -0.042 [-0.083, -0.001]  (positive = D sends fewer to the faulty RSUs; descriptive)
+  D57-normalised (n_C - n_D)/n_A on n_win: -0.134 [-0.256, -0.013]  (positive = D sends fewer to the faulty RSUs; descriptive)
+```
+
+#### F53c - SECONDARY ARM (C_r, D_r; descriptive, cannot change a verdict), open loop (results/s18/report-open-secondary-raw.txt)
+```
+============================================================================================================================
+S18 OPEN LOOP (SECONDARY ARM): frozen heads (C_r, D_r retrained on draws 600-640, D83), draws 400-449, seeds [1, 2, 3, 4, 5], shared D76 rule (RAW: no labels)
+============================================================================================================================
+
+--- condition L0 (spreading fault, L = 0) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8745 D_r 0.7173
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C_r  latency  135.7 +/-  10.7  detected 1.000  | false-alarm rate 0.4428 +/- 0.2096 (starting pre-onset 0.1190, only after 0.3237)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6332 +/- 0.0500
+    D_r  latency  210.7 +/-  32.5  detected 0.975  | false-alarm rate 0.2605 +/- 0.1740 (starting pre-onset 0.0618, only after 0.1988)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5717 +/- 0.0539
+  D_r - C_r latency: +75.1 (sd 36.7) 95% [+29.6, +120.6]   per seed [29.1, 124.2, 95.3, 72.3, 54.5]
+  D_r - C_r false-alarm rate: -0.1822 (sd 0.3005) 95% [-0.5554, +0.1909]   per seed [0.1737, -0.3025, 0.035, -0.2213, -0.5962]
+  D_r - C_r trust AUC (first 100 steps): -0.0616 (sd 0.0290) 95% [-0.0976, -0.0255]  (descriptive)
+
+--- condition L20 (spreading fault, L = 20) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8745 D_r 0.7173
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C_r  latency  131.2 +/-  11.3  detected 1.000  | false-alarm rate 0.4428 +/- 0.2096 (starting pre-onset 0.1190, only after 0.3237)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6381 +/- 0.0356
+    D_r  latency  210.7 +/-  36.0  detected 0.976  | false-alarm rate 0.2590 +/- 0.1782 (starting pre-onset 0.0618, only after 0.1973)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5767 +/- 0.0408
+  D_r - C_r latency: +79.5 (sd 35.3) 95% [+35.7, +123.3]   per seed [29.5, 115.5, 107.0, 85.4, 59.9]
+  D_r - C_r false-alarm rate: -0.1837 (sd 0.3024) 95% [-0.5591, +0.1916]   per seed [0.1762, -0.3, 0.0387, -0.2375, -0.5962]
+  D_r - C_r trust AUC (first 100 steps): -0.0614 (sd 0.0384) 95% [-0.1091, -0.0138]  (descriptive)
+  change of the D_r - C_r latency gap from L = 0 to this L (same draws): +4.4 95% [-6.7, +15.4]  (descriptive)
+
+--- condition L40 (spreading fault, L = 40) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8745 D_r 0.7173
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C_r  latency  132.0 +/-  11.3  detected 1.000  | false-alarm rate 0.4428 +/- 0.2096 (starting pre-onset 0.1190, only after 0.3237)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6407 +/- 0.0295
+    D_r  latency  208.4 +/-  41.5  detected 0.972  | false-alarm rate 0.2602 +/- 0.1834 (starting pre-onset 0.0618, only after 0.1985)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5827 +/- 0.0463
+  D_r - C_r latency: +76.5 (sd 37.1) 95% [+30.5, +122.5]   per seed [22.6, 109.4, 106.8, 88.1, 55.4]
+  D_r - C_r false-alarm rate: -0.1825 (sd 0.3057) 95% [-0.5620, +0.1970]   per seed [0.185, -0.3013, 0.0425, -0.2437, -0.595]
+  D_r - C_r trust AUC (first 100 steps): -0.0580 (sd 0.0357) 95% [-0.1023, -0.0137]  (descriptive)
+  change of the D_r - C_r latency gap from L = 0 to this L (same draws): +1.4 95% [-14.3, +17.0]  (descriptive)
+
+--- condition L80 (spreading fault, L = 80) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 150 healthy 800 restarted-healthy 0 | tau C_r 0.8745 D_r 0.7173
+  realised hop histogram of the degraded RSUs (hop 0, 1, 2, ...): [250, 507, 199, 40, 4]
+  per model (degraded RSUs with hop >= 1); mean +/- sd over seeds of per-seed draw means
+    C_r  latency  132.0 +/-  12.4  detected 1.000  | false-alarm rate 0.4428 +/- 0.2096 (starting pre-onset 0.1190, only after 0.3237)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.6366 +/- 0.0528
+    D_r  latency  204.1 +/-  45.8  detected 0.965  | false-alarm rate 0.2638 +/- 0.1884 (starting pre-onset 0.0618, only after 0.2020)
+         trust AUC, first 100 steps after own onset (vs healthy): 0.5963 +/- 0.0399
+  D_r - C_r latency: +72.1 (sd 38.2) 95% [+24.6, +119.5]   per seed [15.8, 97.5, 114.3, 75.4, 57.3]
+  D_r - C_r false-alarm rate: -0.1790 (sd 0.3064) 95% [-0.5593, +0.2013]   per seed [0.1988, -0.3025, 0.0387, -0.2437, -0.5863]
+  D_r - C_r trust AUC (first 100 steps): -0.0403 (sd 0.0375) 95% [-0.0868, +0.0063]  (descriptive)
+  change of the D_r - C_r latency gap from L = 0 to this L (same draws): -3.0 95% [-24.7, +18.7]  (descriptive)
+
+--- condition f10 (cold start, f = 0.1) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 50 healthy 950 restarted-healthy 50 | tau C_r 0.8745 D_r 0.7173
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [50, 50, 50, 50, 50]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C_r  latency   68.9 +/-   5.8  detected 1.000  | false-alarm rate 0.4455 +/- 0.2101 (starting pre-onset 0.1192, only after 0.3263)  restarted-healthy 0.4000  not restarted 0.4480
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7935 +/- 0.0621;  failing vs restarted-healthy only: 0.8920
+    D_r  latency  122.4 +/-  12.2  detected 1.000  | false-alarm rate 0.2215 +/- 0.1808 (starting pre-onset 0.0604, only after 0.1611)  restarted-healthy 0.2760  not restarted 0.2184
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6179 +/- 0.0323;  failing vs restarted-healthy only: 0.6960
+  D_r - C_r latency: +53.4 (sd 10.6) 95% [+40.2, +66.6]   per seed [42.9, 62.5, 59.2, 61.7, 40.9]
+  D_r - C_r false-alarm rate: -0.2240 (sd 0.2921) 95% [-0.5867, +0.1387]   per seed [0.1284, -0.3358, -0.0126, -0.28, -0.62]
+  D_r - C_r trust AUC (first 100 steps): -0.1756 (sd 0.0524) 95% [-0.2406, -0.1105]  (descriptive)
+
+--- condition f20 (cold start, f = 0.2) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 100 healthy 900 restarted-healthy 100 | tau C_r 0.8745 D_r 0.7173
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [96, 100, 91, 100, 100]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C_r  latency   70.0 +/-   5.7  detected 1.000  | false-alarm rate 0.4402 +/- 0.2105 (starting pre-onset 0.1204, only after 0.3198)  restarted-healthy 0.3660  not restarted 0.4495
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7924 +/- 0.0480;  failing vs restarted-healthy only: 0.8890
+    D_r  latency  115.0 +/-  13.9  detected 0.998  | false-alarm rate 0.2404 +/- 0.1729 (starting pre-onset 0.0604, only after 0.1800)  restarted-healthy 0.4140  not restarted 0.2188
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6547 +/- 0.0438;  failing vs restarted-healthy only: 0.7160
+  D_r - C_r latency: +45.0 (sd 12.7) 95% [+29.2, +60.8]   per seed [30.6, 61.3, 48.9, 50.6, 33.7]
+  D_r - C_r false-alarm rate: -0.1998 (sd 0.2794) 95% [-0.5466, +0.1470]   per seed [0.1367, -0.3033, -0.0056, -0.2411, -0.5856]
+  D_r - C_r trust AUC (first 100 steps): -0.1378 (sd 0.0336) 95% [-0.1795, -0.0960]  (descriptive)
+
+--- condition f40 (cold start, f = 0.4) ---
+  D42 per seed: attempted / failed 0 / aggregated (draws with a latency population) | RSUs in population, healthy, restarted-healthy (sums over draws) | tau
+    seed 1: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C_r 0.8309 D_r 0.8409
+    seed 2: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C_r 0.8364 D_r 0.4930
+    seed 3: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C_r 0.8132 D_r 0.6783
+    seed 4: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C_r 0.8494 D_r 0.6406
+    seed 5: attempted 50 failed 0 aggregated 50 | pop 200 healthy 800 restarted-healthy 200 | tau C_r 0.8745 D_r 0.7173
+  restarted-but-healthy RSUs sharing a backhaul segment with a failing RSU (sum over draws, per seed): [184, 198, 183, 189, 190]
+  per model (failing RSUs, from onset 420); mean +/- sd over seeds of per-seed draw means
+    C_r  latency   71.9 +/-   6.6  detected 1.000  | false-alarm rate 0.4387 +/- 0.2116 (starting pre-onset 0.1202, only after 0.3185)  restarted-healthy 0.4130  not restarted 0.4473
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.7826 +/- 0.0869;  failing vs restarted-healthy only: 0.8380
+    D_r  latency  113.0 +/-  16.4  detected 0.997  | false-alarm rate 0.3010 +/- 0.1604 (starting pre-onset 0.0590, only after 0.2420)  restarted-healthy 0.4940  not restarted 0.2367
+         trust AUC, first 100 steps after restart [400, 500) (failing vs all non-failing): 0.6429 +/- 0.0655;  failing vs restarted-healthy only: 0.6535
+  D_r - C_r latency: +41.1 (sd 17.0) 95% [+20.0, +62.2]   per seed [25.4, 65.8, 45.9, 43.8, 24.6]
+  D_r - C_r false-alarm rate: -0.1377 (sd 0.2758) 95% [-0.4802, +0.2047]   per seed [0.1762, -0.2587, 0.0712, -0.1562, -0.5212]
+  D_r - C_r trust AUC (first 100 steps): -0.1398 (sd 0.0391) 95% [-0.1883, -0.0912]  (descriptive)
+```
+
+#### F53d - SECONDARY ARM, closed loop (results/s18/report-closed-secondary-raw.txt)
+```
+============================================================================================================================
+S18 CLOSED LOOP (SECONDARY ARM): dwell filter and handoff on, draws 400-449, seeds [1, 2, 3, 4, 5] (RAW: no labels)
+============================================================================================================================
+weights (alpha, beta, gamma): C_r (1.0, 0.25, 0.6)  D_r (2.0, 0.25, 0.6)  (existing tuned files; no new tuning)
+
+--- condition L0 (spreading fault, L = 0) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,1200) 0.9232 +/- 0.0105  | n_av   139.4 +/-   44.9 n_win   489.3 +/-   78.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.015 (15/1000)
+  D_r      success [400,1200) 0.9080 +/- 0.0062  | n_av   176.7 +/-   43.3 n_win   585.6 +/-   45.7 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.018 (18/1000)
+  D_r - C_r: -0.0152 (sd 0.0060) 95% [-0.0227, -0.0078]   per seed [-0.0144, -0.0136, -0.0257, -0.0109, -0.0116]
+  D_r - D: +0.0017 (sd 0.0081) 95% [-0.0083, +0.0118]   per seed [-0.0086, 0.0138, -0.0001, 0.0034, 0.0001]
+  C_r - C: +0.0002 (sd 0.0005) 95% [-0.0005, +0.0008]   per seed [0.0005, -0.0003, -0.0005, 0.0008, 0.0002]
+
+--- condition L20 (spreading fault, L = 20) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,1200) 0.9246 +/- 0.0102  | n_av   158.6 +/-   46.4 n_win   503.8 +/-   75.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.014 (14/1000)
+  D_r      success [400,1200) 0.9096 +/- 0.0059  | n_av   201.9 +/-   39.5 n_win   598.5 +/-   43.0 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.022 (22/1000)
+  D_r - C_r: -0.0150 (sd 0.0058) 95% [-0.0222, -0.0078]   per seed [-0.0144, -0.0133, -0.0251, -0.0108, -0.0114]
+  D_r - D: +0.0014 (sd 0.0076) 95% [-0.0080, +0.0109]   per seed [-0.0083, 0.0126, -0.001, 0.0035, 0.0004]
+  C_r - C: +0.0000 (sd 0.0006) 95% [-0.0007, +0.0008]   per seed [0.0004, -0.0006, -0.0004, 0.0008, 0.0]
+
+--- condition L40 (spreading fault, L = 40) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,1200) 0.9261 +/- 0.0100  | n_av   181.8 +/-   45.8 n_win   521.0 +/-   69.5 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.016 (16/1000)
+  D_r      success [400,1200) 0.9116 +/- 0.0060  | n_av   222.3 +/-   35.1 n_win   612.3 +/-   39.8 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.022 (22/1000)
+  D_r - C_r: -0.0146 (sd 0.0054) 95% [-0.0213, -0.0078]   per seed [-0.0141, -0.0129, -0.024, -0.0107, -0.0112]
+  D_r - D: +0.0013 (sd 0.0073) 95% [-0.0077, +0.0103]   per seed [-0.0081, 0.0119, -0.0012, 0.0033, 0.0006]
+  C_r - C: +0.0000 (sd 0.0005) 95% [-0.0005, +0.0006]   per seed [0.0003, -0.0004, -0.0004, 0.0006, 0.0001]
+
+--- condition L80 (spreading fault, L = 80) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,1200) 0.9293 +/- 0.0097  | n_av   217.1 +/-   34.0 n_win   552.3 +/-   60.2 run-level never-avoided 0.016 +/- 0.026 | faulty RSUs never avoided 0.018 (18/1000)
+  D_r      success [400,1200) 0.9157 +/- 0.0064  | n_av   252.4 +/-   29.2 n_win   637.6 +/-   32.8 run-level never-avoided 0.020 +/- 0.024 | faulty RSUs never avoided 0.025 (25/1000)
+  D_r - C_r: -0.0136 (sd 0.0047) 95% [-0.0194, -0.0078]   per seed [-0.0131, -0.0119, -0.0218, -0.0107, -0.0105]
+  D_r - D: +0.0012 (sd 0.0066) 95% [-0.0070, +0.0095]   per seed [-0.0072, 0.0111, -0.0012, 0.0028, 0.0006]
+  C_r - C: +0.0001 (sd 0.0004) 95% [-0.0004, +0.0006]   per seed [0.0004, -0.0001, -0.0004, 0.0006, -0.0001]
+
+--- condition f10 (cold start, f = 0.1) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,500) 0.9724 +/- 0.0091   after the window [500,1200) 0.9681 +/- 0.0022  | n_av    12.3 +/-    1.7 n_win    38.6 +/-    3.1 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  D_r      success [400,500) 0.9682 +/- 0.0101   after the window [500,1200) 0.9636 +/- 0.0028  | n_av    16.4 +/-    1.1 n_win    55.9 +/-    5.4 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/250)
+  D_r - C_r: -0.0042 (sd 0.0044) 95% [-0.0097, +0.0013]   per seed [-0.0119, -0.0013, -0.0022, -0.004, -0.0015]
+  D_r - C_r after the window [500,1200): -0.0046 95% [-0.0064, -0.0027]  (descriptive)
+  D_r - D: +0.0008 (sd 0.0010) 95% [-0.0004, +0.0020]   per seed [0.0005, -0.0001, 0.0009, 0.0004, 0.0025]
+  C_r - C: -0.0001 (sd 0.0002) 95% [-0.0004, +0.0002]   per seed [0.0002, -0.0004, -0.0001, 0.0001, -0.0002]
+
+--- condition f20 (cold start, f = 0.2) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,500) 0.9679 +/- 0.0093   after the window [500,1200) 0.9556 +/- 0.0045  | n_av    27.0 +/-    5.2 n_win   128.1 +/-   17.7 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  D_r      success [400,500) 0.9630 +/- 0.0100   after the window [500,1200) 0.9449 +/- 0.0033  | n_av    34.7 +/-    4.7 n_win   180.3 +/-    4.2 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.000 (0/500)
+  D_r - C_r: -0.0048 (sd 0.0037) 95% [-0.0095, -0.0002]   per seed [-0.0113, -0.0026, -0.0031, -0.0049, -0.0023]
+  D_r - C_r after the window [500,1200): -0.0107 95% [-0.0132, -0.0082]  (descriptive)
+  D_r - D: +0.0008 (sd 0.0014) 95% [-0.0009, +0.0025]   per seed [0.0016, -0.0004, 0.0011, -0.0007, 0.0026]
+  C_r - C: -0.0001 (sd 0.0003) 95% [-0.0004, +0.0003]   per seed [0.0004, -0.0003, -0.0001, -0.0002, -0.0001]
+
+--- condition f40 (cold start, f = 0.4) ---
+  D42: attempted 250 per model, failed 0, aggregated 250
+  C_r      success [400,500) 0.9593 +/- 0.0089   after the window [500,1200) 0.9323 +/- 0.0059  | n_av    53.3 +/-    6.7 n_win   302.7 +/-   33.8 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.002 (2/1000)
+  D_r      success [400,500) 0.9525 +/- 0.0105   after the window [500,1200) 0.9101 +/- 0.0051  | n_av    74.5 +/-    6.0 n_win   424.6 +/-   14.0 run-level never-avoided 0.000 +/- 0.000 | faulty RSUs never avoided 0.011 (11/1000)
+  D_r - C_r: -0.0069 (sd 0.0048) 95% [-0.0128, -0.0009]   per seed [-0.0147, -0.0044, -0.0048, -0.0078, -0.0026]
+  D_r - C_r after the window [500,1200): -0.0222 95% [-0.0323, -0.0122]  (descriptive)
+  D_r - D: +0.0005 (sd 0.0015) 95% [-0.0014, +0.0024]   per seed [-0.0003, -0.0005, 0.0012, -0.0008, 0.0028]
+  C_r - C: +0.0001 (sd 0.0006) 95% [-0.0006, +0.0009]   per seed [0.0012, -0.0003, 0.0, -0.0001, -0.0001]
+```
+Interpretation: not yet recorded (raw table first, Standing Rule 6); F54 gives the verdicts and the one-line interpretation.
