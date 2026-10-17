@@ -390,6 +390,34 @@ def fig_s4_gap() -> None:
     save(fig, "fig5_s4_gap_vs_correlation")
 
 
+# ------------------------------------------------------------------ Figure 7: S18 D-minus-C gap vs spreading-fault lag (D81)
+S18 = REPO_ROOT / "results" / "s18"
+
+
+def fig_s18_gap() -> None:
+    P = json.loads((S18 / "summary-open-primary.json").read_text(encoding="utf-8"))
+    Q = json.loads((S18 / "summary-open-secondary.json").read_text(encoding="utf-8"))
+    conds, Ls = ["L0", "L20", "L40", "L80"], [0, 20, 40, 80]
+    fig, ax = plt.subplots(1, 2, figsize=(13, 5.2), gridspec_kw={"wspace": 0.22})
+    for a, key, ylab, ttl in ((ax[0], "lat", "D minus C detection latency (steps)", "(a) Detection latency"),
+                              (ax[1], "fa", "D minus C healthy false-alarm rate", "(b) False alarms")):
+        for S, dx, fill, lab in ((P, -2.0, True, "frozen heads (primary; decides Sa, Sc)"), (Q, 2.0, False, "retrained heads (secondary; descriptive)")):
+            m = np.array([S[c][key][0] for c in conds]); lo = np.array([S[c][key][2] for c in conds]); hi = np.array([S[c][key][3] for c in conds])
+            a.errorbar(np.array(Ls) + dx, m, yerr=[m - lo, hi - m], color=COL["D"], marker="o", ms=8, capsize=5, ls="-" if fill else ":",
+                       mfc=COL["D"] if fill else "white", label=lab)
+        a.axhline(0, color=MUTED, lw=1.2)
+        if key == "lat":
+            a.axhline(-20, color=COL["C"], lw=1.6, ls="--"); a.text(1, -17, "WIN floor: D earlier by 20 steps", color=COL["C"], fontsize=11, va="bottom")
+        else:
+            a.axhline(0.05, color=COL["C"], lw=1.6, ls="--"); a.text(1, 0.06, "tolerance +0.05", color=COL["C"], fontsize=11, va="bottom")
+        a.set_xticks(Ls); a.set_xlabel("lag L per hop (steps); L = 0 is the control"); a.set_ylabel(ylab); a.set_title(ttl)
+    ax[0].legend(frameon=False, loc="upper left", bbox_to_anchor=(0, -0.2), fontsize=11)
+    fig.suptitle("The graph head detects later than the node-local head at every lag, including the L = 0 control\n"
+                 "Spreading fault, draws 400-449, 5 seeds, 95% intervals; shared-rule latency (not a time-to-alarm), false alarms beside it. Sa NOT SUPPORTED.",
+                 x=0.125, ha="left", fontsize=14, fontweight="bold", y=1.06)
+    save(fig, "fig7_s18_gap_vs_lag")
+
+
 # ------------------------------------------------------------------ Figure 6: worked explanation
 def fig_explanation() -> None:
     d = json.loads((S10 / "example.json").read_text(encoding="utf-8"))
@@ -827,6 +855,8 @@ def main() -> int:
     T, P, GT, HH = load_table(), load_paired(), load_gate(), load_h()
     print("figures:")
     fig_architecture(); fig_timeline(); fig_success_vs_fraction(T, P, GT, HH); fig_ablation(T, P, GT, HH); fig_s4_gap(); fig_explanation()
+    if (S18 / "summary-open-primary.json").exists() and (S18 / "summary-open-secondary.json").exists():
+        fig_s18_gap()
     print("tables:")
     tables(T, P, GT, HH)
     paper_tables(T, GT, HH)
