@@ -1,0 +1,180 @@
+# S17 spreading-fault regime, L = 80 steps per hop (DECISIONS.md D81): configs/demo.yaml with ONE added key,
+# degradation.spread_lag_steps. A separate file per L so scenario, trace and checkpoint names never collide.
+# TrustGraph demo scenario.
+#
+# Every value that affects the run lives here. A run is reproducible from
+# (this file, seed) alone - Standing Rule 7.
+
+seed: 20260903
+
+# CPU by default. GraphSAGE aggregation on GPU uses non-deterministic scatter
+# reductions, which would break byte-identical output across processes. At the L9
+# scale (<=30 RSUs) the GPU buys nothing here anyway (DECISIONS.md D19). GPU
+# availability is verified separately by scripts/verify_env.py.
+device: cpu
+
+scenario:
+  # 1200 x dt = 20 minutes of traffic. S1 used 300 steps; S2 needs room for a
+  # pre-onset baseline, a gradual onset ramp, and a post-ramp plateau, each long
+  # enough for the EWMA features to settle (DECISIONS.md D28).
+  num_steps: 1200
+  # Which injection draw of this seed (DECISIONS.md D39). A frozen model is evaluated
+  # over many draws per seed: each redraws which RSUs degrade, collude, or cold-start,
+  # while traffic and execution noise stay fixed. 0 is the default scenario.
+  injection_draw: 0
+
+# The road layout. A Manhattan grid of arterials: blocks_x + 1 vertical roads
+# crossing blocks_y + 1 horizontal roads over a square region. A dense urban
+# district, ~12.8 km of road - sized so that 20 RSUs (L9) can give the redundant
+# coverage the selection rule needs (FINDINGS.md F3, F4).
+road:
+  extent_m: 1600.0
+  blocks_x: 3          # -> 4 vertical roads, 533 m blocks
+  blocks_y: 3          # -> 4 horizontal roads
+
+topology:
+  num_rsus: 20                # L9: 15-30
+  num_backhaul_segments: 4    # L5: degradation applies per segment
+  placement_jitter_m: 25.0    # a mast stands beside the road, not on it
+  coverage_radius_m: 400.0    # vehicle <-> RSU link threshold
+  rsu_link_radius_m: 650.0    # RSU <-> RSU coordination threshold (L6)
+  # Siting: greedy maximisation of covered road, discounting road already covered
+  # by `redundancy_decay` per RSU that reaches it. Below 1.0 the RSUs left over
+  # after the road is covered build a second layer, which is what gives a vehicle
+  # more than one candidate to choose between.
+  site_sample_spacing_m: 25.0
+  redundancy_decay: 0.5
+  # A minority of RSUs are homed to a segment other than their geographic one, so
+  # same_segment is not recoverable from position alone (see topology.py).
+  segment_swap_prob: 0.10
+  # Deterministic floor on the swap count. The probabilistic pass above is a binomial
+  # draw and comes out at zero often enough to matter (seed 4 produced none), which
+  # would make the property silently false for one seed of a multi-seed evaluation.
+  # Below the floor, further RSUs are moved starting from those nearest a segment
+  # boundary. 0.15 x 20 RSUs = 3.
+  min_swap_fraction: 0.15
+  min_segment_size: 3
+
+mobility:
+  source: synthetic_road      # L7: synthetic is the default and on the critical path
+  num_vehicles: 60            # L9: 50-100
+  dt_s: 1.0
+  # ~50 km/h urban arterial, spread across the population.
+  speed_mean_mps: 13.9
+  speed_std_mps: 3.0
+  speed_min_mps: 5.0
+  speed_max_mps: 22.0
+  speed_jitter_mps: 0.8       # per-step variation about a vehicle's own speed
+  intersection_stop_prob: 0.25
+  intersection_stop_mean_s: 8.0
+  straight_preference: 3.0    # relative odds of carrying straight on vs turning
+
+# Radio and backhaul link model (links.py). Defaults describe a 5.9 GHz roadside
+# link; every field here has a documented default, so this block may be omitted.
+link:
+  tx_power_dbm: 23.0
+  reference_loss_db: 47.9
+  path_loss_exponent: 2.7
+  rssi_max_dbm: -40.0
+  # Receiver sensitivity. Must sit below the RSSI at coverage_radius_m (-95.2 dBm at
+  # 400 m under these defaults) or every boundary link saturates at signal 0.
+  rssi_min_dbm: -101.0
+  access_base_ms: 4.0
+  access_span_ms: 16.0
+  backhaul_base_ms: 2.0
+  backhaul_span_ms: 4.0
+  latency_norm_ms: 25.0       # divisor putting latency on the [0, 1] feature scale
+
+# Graph construction (graph.py): the scales that map physical quantities onto the
+# [0, 1] range the model reads. The two _norm_s values are set near the measured
+# mean dwell time (~30 s, FINDINGS.md F4) so link_age and dwell_estimate use the
+# middle of their range rather than saturating at one end.
+graph:
+  link_age_norm_s: 30.0
+  dwell_norm_s: 30.0
+  speed_norm_mps: 22.0
+
+# ---------------------------------------------------------------- S2: the scenario
+
+# Task model (tasks.py). Three types; deadline = comm_allowance + slack x (compute
+# time on an idle reference node), capped - heavier tasks get longer deadlines, but
+# not unlimited ones (DECISIONS.md D30).
+tasks:
+  rate_per_vehicle_hz: 0.1              # 60 vehicles -> ~6 tasks/s network-wide
+  cycles: [2.0e+8, 1.0e+9, 3.0e+9]      # light / medium / heavy
+  shares: [0.5, 0.35, 0.15]
+  reference_capacity_cycles_per_s: 1.0e+10
+  comm_allowance_s: 0.05
+  slack_min: 2.0
+  slack_max: 4.0
+  deadline_cap_s: 1.0
+
+# Node execution model (execution.py).
+execution:
+  capacity_cycles_per_s: 1.0e+10        # ~4 cores x 2.5 GHz roadside edge server
+  rsu_capacity_vehicles: 10.0           # coverage demand at which true load = 1
+  load_sensitivity: 0.6                 # a fully loaded node runs at 40% speed
+  noise_sigma: 0.25                     # mean-one lognormal runtime scatter
+
+# Advertised-vs-observed tracking (tracking.py, L8).
+tracking:
+  ewma_weight: 0.1
+  latency_dev_cap: 2.0
+
+# Which rule dispatched the scenario's tasks. baseline_a = the L1 rule with alpha=0,
+# trust-agnostic. The only policy S2 implements (DECISIONS.md D33, FINDINGS.md F9).
+dispatch:
+  policy: baseline_a
+
+# Degradation injector (sealed/injector.py). Defaults are the operating point shared
+# by both L12 sweeps: 20% degraded at high rho.
+degradation:
+  fraction: 0.20
+  rho: 1.0
+  onset_step: 400        # shared by every degraded node (DECISIONS.md D31)
+  ramp_steps: 300        # linear ramp to full severity - gradual, not instantaneous
+  severity: 0.6          # compute capacity lost at full degradation
+  drop_prob: 0.15        # silent drop probability at full degradation
+  spread_lag_steps: 80  # S17 (D81): onset = onset_step + 80 x hops from a seed RSU over the RSU-RSU edges
+
+# Colluding groups advertise (1 - under_report) x their true load. Off by default:
+# S4 reports the collusion condition separately from the L12 sweeps.
+collusion:
+  num_groups: 0
+  group_size: 3
+  under_report: 0.5
+
+# Cold-start RSUs are absent until join_step and join with no history. Off by default,
+# for the same reason. S4 runs two separate conditions (DECISIONS.md D38):
+#   placement: healthy_segment   CONTROL - joins a segment with no degraded RSU
+#   placement: degraded_segment  TEST    - is one of a degraded segment's degraded RSUs
+cold_start:
+  num_nodes: 0
+  join_step: 600
+  placement: uniform
+
+model:
+  hidden_dim: 32
+  num_layers: 2               # 2-layer GraphSAGE trust head (L1)
+
+# L1: score(v) = alpha*trust_v - beta*latency_v - gamma*load_v
+# Hand-tuned. Set alpha to 0 for Baseline A (L2).
+selection:
+  alpha: 1.0
+  beta: 0.5
+  gamma: 0.3
+
+# ---------------------------------------------------------------- S6: the offloading engine
+# Closed-loop dispatch (offload.py, DECISIONS.md D50/D51). Read by scripts/s6_run.py and the
+# S6 scripts; the open-loop scenario generator (dispatch.policy: baseline_a) ignores it.
+#   variant      A (alpha 0) | B (certificate only; equals A here, D50) | B_oracle (sensitivity)
+#                | C (frozen MLP) | D (frozen GNN) | E (D; explanation lands in S7/S8)
+#   dwell_filter drop in-range RSUs the vehicle will leave before the result is due
+#   handoff      relay | off - what happens if the vehicle leaves coverage mid-task
+# Selection weights come from `selection:` above, or per variant from configs/weights.yaml
+# (tuned on seed 100 by the D50 procedure; pass --weights-file).
+offload:
+  variant: A
+  dwell_filter: true
+  handoff: relay
+  checkpoint_dir: checkpoints

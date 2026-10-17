@@ -77,6 +77,8 @@ class Config:
     degradation: dict[str, Any] = field(default_factory=dict)
     collusion: dict[str, Any] = field(default_factory=dict)
     cold_start: dict[str, Any] = field(default_factory=dict)
+    # S17 (D81): restart-then-fail scenario; absent = off. Validated by sealed/injector.py.
+    restart: dict[str, Any] = field(default_factory=dict)
     # S6: closed-loop offloading engine settings (offload.py validates them).
     offload: dict[str, Any] = field(default_factory=dict)
 
@@ -165,6 +167,7 @@ def load_config(path: str | Path) -> Config:
         degradation=raw.get("degradation") or {},
         collusion=raw.get("collusion") or {},
         cold_start=raw.get("cold_start") or {},
+        restart=raw.get("restart") or {},
         offload=raw.get("offload") or {},
     )
     _validate(cfg)

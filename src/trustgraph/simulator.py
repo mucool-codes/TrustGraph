@@ -128,6 +128,8 @@ def generate_scenario(
             purpose: seeds.generator(injection_stream_name(purpose, cfg.injection_draw))
             for purpose in INJECTION_PURPOSES
         },
+        cfg_restart=cfg.restart,
+        rsu_edges=topo.rsu_edges,
     )
     task_rng = seeds.generator("tasks")
     exec_rng = seeds.generator("execution")
@@ -166,6 +168,13 @@ def generate_scenario(
         for r in np.flatnonzero(plan.join_step == t):
             if t > 0:
                 tracker.reset(int(r))  # joins with no history
+        if plan.restart_steps is not None:
+            # S17 (D81 section 2): a restart keeps the RSU in service but forgets its history,
+            # including any outcome still in flight from before the restart.
+            for r in np.flatnonzero(plan.restart_steps == t):
+                tracker.reset(int(r))
+                pending = [item for item in pending if records["rsu"][item[1]] != int(r)]
+                heapq.heapify(pending)
 
         # --- 1. coverage over present RSUs -----------------------------------------
         veh_dist = pairwise_distances(trace.positions[t], topo.positions)
