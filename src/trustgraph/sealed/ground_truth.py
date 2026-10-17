@@ -70,6 +70,11 @@ class GroundTruth:
     # S13 (D65): per-RSU onset steps when `onset_spread_steps` > 0; None = every degraded RSU
     # starts at `onset_step` (the shared onset of D31). `onset_step` stays the earliest possible onset.
     onset_steps: np.ndarray | None = None
+    # S17 (D81): per-RSU step at which an RSU restarts with no history (-1 = never); None = no restart scenario.
+    restart_steps: np.ndarray | None = None
+    # S17 (D81): per-RSU hop count from the seed RSU of a spreading fault (-1 = not degraded, 0 = the seed);
+    # None = no spreading scenario.
+    spread_hop: np.ndarray | None = None
 
     # ------------------------------------------------------------------ membership
 
@@ -164,6 +169,10 @@ class GroundTruth:
         if self.true_load is None:
             raise ValueError("refusing to save a GroundTruth with no realised state")
         extra = {} if self.onset_steps is None else {"onset_steps": np.asarray(self.onset_steps, dtype=np.int64)}
+        if self.restart_steps is not None:
+            extra["restart_steps"] = np.asarray(self.restart_steps, dtype=np.int64)
+        if self.spread_hop is not None:
+            extra["spread_hop"] = np.asarray(self.spread_hop, dtype=np.int64)
         np.savez_compressed(
             path,
             **extra,
@@ -215,6 +224,8 @@ def load_ground_truth(path: str | Path) -> GroundTruth:
             task_true_completion_s=blob["task_true_completion_s"],
             task_dropped=blob["task_dropped"],
             onset_steps=blob["onset_steps"] if "onset_steps" in blob.files else None,
+            restart_steps=blob["restart_steps"] if "restart_steps" in blob.files else None,
+            spread_hop=blob["spread_hop"] if "spread_hop" in blob.files else None,
         )
 
 

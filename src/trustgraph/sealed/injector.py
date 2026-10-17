@@ -8,6 +8,10 @@ not reshuffle the others (DECISIONS.md D17):
   collusion     groups of RSUs that advertise a load below their true one (L8). They
                 execute honestly; the lie is only in the advertisement.
   cold start    RSUs that are absent until `join_step` and join with no history.
+  spread        S17 (D81): the degraded set's onsets are delayed by `spread_lag_steps` per hop
+                from a seed RSU over the RSU-RSU edges. Absent = off.
+  restart       S17 (D81): at `step` a set of RSUs restarts with no history and a registered
+                subset of them then fails. Absent = off.
 
 SEALED (L4): this module lives in `trustgraph.sealed` and produces the ground truth.
 """
@@ -32,10 +36,20 @@ class DegradationConfig:
     # S13 (D65): each degraded RSU's onset is drawn uniformly from [onset_step, onset_step + spread];
     # 0 = the shared onset of D31 (the default; nothing changes).
     onset_spread_steps: int = 0
+    # S17 (D81): None = off; L >= 0 delays each degraded RSU's onset by L steps per RSU-RSU hop
+    # from a seed RSU. L = 0 is the shared onset, exactly.
+    spread_lag_steps: int | None = None
 
     def __post_init__(self) -> None:
         if self.onset_spread_steps < 0:
             raise ValueError("degradation.onset_spread_steps must be >= 0")
+        if self.spread_lag_steps is not None:
+            if self.spread_lag_steps < 0:
+                raise ValueError("degradation.spread_lag_steps must be >= 0")
+            if self.onset_spread_steps > 0:
+                raise ValueError(
+                    "degradation.spread_lag_steps and onset_spread_steps are separate scenarios (D81)"
+                )
         if not 0.0 <= self.fraction <= 1.0:
             raise ValueError("degradation.fraction must lie in [0, 1]")
         if not 0.0 <= self.rho <= 1.0:
@@ -92,7 +106,34 @@ class ColdStartConfig:
             )
 
 
-_INT_FIELDS = {"onset_step", "onset_spread_steps", "ramp_steps", "num_groups", "group_size", "num_nodes", "join_step"}
+@dataclass(frozen=True)
+class RestartConfig:
+    """S17 (D81): `fraction` of the RSUs restart at `step` with an empty history; `fail_fraction`
+    of them (halves rounded up) then fail, from step + `fail_delay_steps`."""
+
+    fraction: float = 0.0
+    step: int = 0
+    rho: float = 1.0
+    fail_fraction: float = 0.5
+    fail_delay_steps: int = 0
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.fraction <= 1.0:
+            raise ValueError("restart.fraction must lie in [0, 1]")
+        if self.fraction > 0 and self.step < 1:
+            raise ValueError("restart.step must be >= 1 when RSUs restart")
+        if not 0.0 <= self.rho <= 1.0:
+            raise ValueError("restart.rho must lie in [0, 1]")
+        if not 0.0 <= self.fail_fraction <= 1.0:
+            raise ValueError("restart.fail_fraction must lie in [0, 1]")
+        if self.fail_delay_steps < 0:
+            raise ValueError("restart.fail_delay_steps must be >= 0")
+
+
+_INT_FIELDS = {
+    "onset_step", "onset_spread_steps", "ramp_steps", "num_groups", "group_size", "num_nodes", "join_step",
+    "spread_lag_steps", "step", "fail_delay_steps",
+}
 _STR_FIELDS = {"placement"}
 
 
@@ -114,7 +155,7 @@ def _build(cls, raw: dict | None, section: str):
     return cls(**{k: _coerce(k, v) for k, v in raw.items()})
 
 
-INJECTION_PURPOSES: tuple[str, ...] = ("degradation", "collusion", "cold_start", "onset")
+INJECTION_PURPOSES: tuple[str, ...] = ("degradation", "collusion", "cold_start", "onset", "spread", "restart")
 
 
 def injection_stream_name(purpose: str, draw: int) -> str:
@@ -205,23 +246,106 @@ def select_degraded(
     return degraded, correlated
 
 
+def hop_distances(rsu_edges: np.ndarray, num_rsus: int, source: int) -> np.ndarray:
+    """(num_rsus,) shortest-path hop count from `source` over the undirected RSU-RSU edges; -1 = unreachable."""
+    adjacency: list[list[int]] = [[] for _ in range(num_rsus)]
+    for a, b in np.asarray(rsu_edges, dtype=np.int64).reshape(-1, 2):
+        adjacency[int(a)].append(int(b))
+        adjacency[int(b)].append(int(a))
+    hops = np.full(num_rsus, -1, dtype=np.int64)
+    hops[source] = 0
+    frontier = [int(source)]
+    while frontier:
+        nxt: list[int] = []
+        for u in frontier:
+            for v in adjacency[u]:
+                if hops[v] < 0:
+                    hops[v] = hops[u] + 1
+                    nxt.append(v)
+        frontier = nxt
+    return hops
+
+
+def spread_onsets(
+    degraded: np.ndarray,
+    rsu_edges: np.ndarray,
+    onset_step: int,
+    lag_steps: int,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """S17 (D81 section 1): (onset per RSU, hop per RSU or -1, seed RSU).
+
+    The seed RSU is drawn uniformly from the degraded set; a degraded RSU's onset is
+    `onset_step + lag_steps * hop`, the hop count from the seed over the RSU-RSU edges.
+    Non-degraded RSUs keep `onset_step` (their onset is never read). Lag 0 gives every
+    degraded RSU `onset_step`: the shared onset.
+    """
+    members = np.flatnonzero(degraded)
+    if members.size == 0:
+        raise ValueError("spread_lag_steps needs at least one degraded RSU")
+    seed_rsu = int(members[int(rng.integers(0, members.size))])
+    hops = hop_distances(rsu_edges, int(degraded.shape[0]), seed_rsu)
+    if (hops[members] < 0).any():
+        raise ValueError("a degraded RSU is unreachable from the seed RSU over the RSU-RSU edges")
+    onsets = np.where(degraded, onset_step + lag_steps * hops, onset_step).astype(np.int64)
+    return onsets, np.where(degraded, hops, -1).astype(np.int64), seed_rsu
+
+
+def restart_plan(
+    segment_id: np.ndarray, cfg: RestartConfig, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """S17 (D81 section 2): (restarted mask, failing mask), the failing set a subset of the restarted one.
+
+    The restarted set is `select_degraded` with the restart's own rho; the failing subset is
+    the first `degraded_count(|R|, fail_fraction)` members of a seeded permutation of it.
+    """
+    n = int(segment_id.shape[0])
+    restarted, _ = select_degraded(segment_id, degraded_count(n, cfg.fraction), cfg.rho, rng)
+    members = rng.permutation(np.flatnonzero(restarted))
+    failing = np.zeros(n, dtype=bool)
+    failing[members[: degraded_count(members.size, cfg.fail_fraction)]] = True
+    return restarted, failing
+
+
 def inject(
     segment_id: np.ndarray,
     cfg_degradation: dict | None,
     cfg_collusion: dict | None,
     cfg_cold_start: dict | None,
     rngs: dict[str, np.random.Generator],
+    cfg_restart: dict | None = None,
+    rsu_edges: np.ndarray | None = None,
 ) -> GroundTruth:
-    """Build the injection plan. `rngs` needs 'degradation', 'collusion', 'cold_start'."""
+    """Build the injection plan. `rngs` needs 'degradation', 'collusion', 'cold_start'
+    (and 'onset', 'spread', 'restart' when those options are on). `rsu_edges` is needed
+    only for `degradation.spread_lag_steps`."""
     deg = _build(DegradationConfig, cfg_degradation, "degradation")
     col = _build(CollusionConfig, cfg_collusion, "collusion")
     cold = _build(ColdStartConfig, cfg_cold_start, "cold_start")
+    restart = _build(RestartConfig, cfg_restart, "restart")
 
     segment_id = np.asarray(segment_id, dtype=np.int64)
     n = int(segment_id.shape[0])
 
     k = degraded_count(n, deg.fraction)
     degraded, correlated = select_degraded(segment_id, k, deg.rho, rngs["degradation"])
+
+    # S17 (D81 section 2): a restart is a separate scenario from the shared-fraction degradation.
+    restart_steps = None
+    restart_onsets = None
+    if restart.fraction > 0:
+        if deg.fraction > 0 or deg.spread_lag_steps is not None or deg.onset_spread_steps > 0:
+            raise ValueError(
+                "restart is a separate scenario: degradation.fraction must be 0 and no onset option set (D81)"
+            )
+        if cold.num_nodes > 0:
+            raise ValueError("restart and cold_start.num_nodes are separate scenarios (D81)")
+        restarted, failing = restart_plan(segment_id, restart, rngs["restart"])
+        restart_steps = np.where(restarted, restart.step, -1).astype(np.int64)
+        degraded = failing
+        restart_onsets = np.where(
+            failing, restart.step + restart.fail_delay_steps, deg.onset_step
+        ).astype(np.int64)
 
     # Colluders are drawn from the RSUs left healthy, in a fixed permutation order, so
     # a node is never both degraded and colluding and the two failure modes stay
@@ -262,6 +386,17 @@ def inject(
         offsets = rngs["onset"].integers(0, deg.onset_spread_steps + 1, size=n)
         onset_steps = np.where(degraded, deg.onset_step + offsets, deg.onset_step).astype(np.int64)
 
+    # S17 (D81 section 1): the spreading fault. Same degraded set, onsets delayed per hop.
+    spread_hop = None
+    if deg.spread_lag_steps is not None:
+        if rsu_edges is None:
+            raise ValueError("degradation.spread_lag_steps needs the topology's rsu_edges")
+        onset_steps, spread_hop, _ = spread_onsets(
+            degraded, rsu_edges, deg.onset_step, deg.spread_lag_steps, rngs["spread"]
+        )
+    if restart_onsets is not None:
+        onset_steps = restart_onsets
+
     behavior_class = np.full(n, RELIABLE, dtype=np.int64)
     behavior_class[degraded] = DEGRADED
     behavior_class[collusion_group >= 0] = COMPROMISED
@@ -280,4 +415,6 @@ def inject(
         under_report=col.under_report,
         join_step=join_step,
         onset_steps=onset_steps,
+        restart_steps=restart_steps,
+        spread_hop=spread_hop,
     )
