@@ -184,7 +184,7 @@ def fig_architecture() -> None:
                                                   "edge flag same_segment", "(shared backhaul segment)"], face="#eef2f6")
     box(ax, xs[1], y, w, h, "2  Trust GNN", ["2-layer GINEConv: message", "passing over G_t", "output: one scalar trust_v", "in [0,1] per RSU",
                                               "self-supervised target:", "meets its next deadline?"], face="#fbeee4", edge=COL["D"])
-    box(ax, xs[2], y, w, h, "3  Offloading rule", ["fixed, not learned (L1)", "score = a*trust - b*latency", "- g*load, argmax over in-range,", "dwell-feasible RSUs",
+    box(ax, xs[2], y, w, h, "3  Offloading rule", ["fixed, not learned", "score = a*trust - b*latency", "- g*load, argmax over in-range,", "dwell-feasible RSUs",
                                                    "trust is a weighted term,", "not a gate;  a = 0 is Variant A"], face="#eef2f6")
     box(ax, xs[3], y, w, h, "4  Task and outcome", ["task runs at the chosen RSU", "vehicle compares observed with", "advertised load and latency;", "the discrepancy updates",
                                                      "success_ewma, latency_dev", "of that RSU"], face="#eef2f6")
@@ -201,9 +201,9 @@ def fig_architecture() -> None:
     arrow(ax, (xs[1] + w / 2, y - 0.04), (9.6, 2.56))
     ax.text(7.0, 3.1, "trust head", ha="center", fontsize=11, color=INK)
     box(ax, 0.2, 0.0, 7.6, 2.5, "Sealed ground truth (evaluation only)",
-        ["injected behaviour class and segment faults", "used only to score trust and dispatch", "never a feature, a label, or importable", "by training code (L4); no arrow enters the pipeline"],
+        ["injected behaviour class and segment faults", "used only to score trust and dispatch", "never a feature, a label, or importable", "by training code; no arrow enters the pipeline"],
         face="#f5f5f5", edge=MUTED, dashed=True, tcolor=MUTED, size=10.5)
-    ax.text(8.1, -0.55, "Ablation: A no trust  |  B certificate only  |  C node-local MLP trust  |  D GNN trust  |  E = D + explanation.   Same rule in all five (L1, L2).",
+    ax.text(8.1, -0.55, "Variants: A no trust | B certificate only | B-oracle upper bound | C node-local MLP | D GNN | E = D + explanation | Gate-C, M extra baselines.  Same rule in all.",
             ha="center", fontsize=11.5)
     save(fig, "fig1_architecture")
 
@@ -286,7 +286,7 @@ def fig_success_vs_fraction(T, P, GT, HH) -> None:
     fig, ax = plt.subplots(1, 2, figsize=(14, 5.4), gridspec_kw={"wspace": 0.22})
     a = ax[0]
     order = [("A", "A = B  (identical decisions)", "o"), ("B_oracle", NAME["B_oracle"], "s"), ("C", NAME["C"], "^"),
-             ("Gate_C", "Gate-C  (extra baseline)", "v"), ("H", "H  heuristic: own success_ewma (extra baseline)", "P"),
+             ("Gate_C", "Gate-C  (extra baseline)", "v"), ("H", "M  monitor: own success_ewma (extra baseline)", "P"),
              ("D", "D = E  (same dispatch)", "D")]
     off = {"A": -1.5, "B_oracle": -0.9, "C": -0.3, "Gate_C": 0.3, "H": 0.9, "D": 1.5}
     for v, lab, mk in order:
@@ -306,7 +306,7 @@ def fig_success_vs_fraction(T, P, GT, HH) -> None:
             m = np.array([P[(1.0, f, v, "A")]["h3_mean"] for f in fr]); lo = np.array([P[(1.0, f, v, "A")]["h3_lo"] for f in fr])
             hi = np.array([P[(1.0, f, v, "A")]["h3_hi"] for f in fr])
         b.errorbar(np.array(fr) * 100 + off_, m, yerr=[m - lo, hi - m], color=COL[v], marker={"Gate_C": "v", "H": "P"}.get(v, "o"), ms=8, capsize=4,
-                   label=("Gate-C minus A  (extra baseline)" if v == "Gate_C" else "H minus A  (extra baseline)" if v == "H" else f"{v} minus A"))
+                   label=("Gate-C minus A  (extra baseline)" if v == "Gate_C" else "M minus A  (extra baseline)" if v == "H" else f"{v} minus A"))
     b.axhline(0, color=MUTED, lw=1.2); b.axhline(0.01, color=MUTED, lw=1.2, ls=":")
     b.text(30.8, 0.0115, "pre-registered floor 0.01", ha="right", fontsize=10.5, color=MUTED)
     b.set_xticks([5, 10, 20, 30]); b.set_xlabel("degraded fraction of RSUs (%)  at rho = 1.0"); b.set_ylabel("paired gain in success rate")
@@ -319,7 +319,7 @@ def fig_ablation(T, P, GT, HH) -> None:
     S = T[SHARED]
     variants = ["A", "B", "C", "D", "E", "Gate_C", "H"]
     src = {"E": "D"}
-    label = {"Gate_C": "Gate-C", "H": "H"}
+    label = {"Gate_C": "Gate-C", "H": "M"}
     panels = [("success_post_onset", "task success rate after onset\n(axis starts at 0.80)", (0.80, 0.96), "{:.3f}", "h3", "{:+.3f}"),
               ("n_av", "tasks sent to degraded RSUs,\nonset to avoidance", (0, 760), "{:.0f}", "h1", "{:+.3f}"),
               ("n_win", "tasks sent to degraded RSUs,\nfixed window [400, 1200)", (0, 1050), "{:.0f}", None, None)]
@@ -345,14 +345,14 @@ def fig_ablation(T, P, GT, HH) -> None:
                 e = GT["paired"][SHARED]
                 lab += f"\nC minus Gate-C: {e.mean:+.4f}  [{e.lo:+.4f}, {e.hi:+.4f}]"
                 hm, hlo, hhi, _ = HH["paired"][SHARED]
-                lab += f"\nC minus H: {hm:+.4f}  [{hlo:+.4f}, {hhi:+.4f}]"
+                lab += f"\nC minus M: {hm:+.4f}  [{hlo:+.4f}, {hhi:+.4f}]"
             a.set_xlabel(lab, fontsize=11.5)
         else:
             a.set_xlabel("(rule-free count, a guard on the middle panel)", fontsize=11, color=MUTED)
     fig.suptitle("Ablation at the shared operating point (rho 1.0, 20% degraded). Bars: mean over 5 seeds, whiskers: sd.\n"
                  "B equals A and E equals D (identical decisions, asserted). Dashed green: B-oracle, an upper bound.\n"
-                 f"Gate-C: an extra baseline (frozen C head, candidates with trust below {GT['tau']:g} removed first, D59), run at the fraction-sweep points only.\n"
-                 "H: an extra baseline, trust = the RSU's own success_ewma (no learning, same rule, no gate; S13), run at the fraction-sweep points only.",
+                 f"Gate-C: an extra baseline (frozen C head, candidates with trust below {GT['tau']:g} removed first), run at the fraction-sweep points only.\n"
+                 "M: an extra baseline, trust = the RSU's own success_ewma (no learning, same rule, no gate), run at the fraction-sweep points only.",
                  x=0.125, ha="left", fontsize=13.5, fontweight="bold", y=1.12)
     save(fig, "fig4_ablation")
 
@@ -384,8 +384,8 @@ def fig_s4_gap() -> None:
         b.text(c_, 0.02, f"n = {n_}", transform=b.get_xaxis_transform(), ha="center", fontsize=10.5, color=MUTED)
     b.axhline(0, color=MUTED, lw=1.2); b.axhline(0.02, color=COL["C"], lw=1.6, ls="--")
     b.set_xlim(-0.1, 1.1); b.set_xlabel("realised pair concentration c  (all draws pooled)"); b.set_title("(b) Gap vs realised correlation")
-    fig.suptitle("The graph model does not beat the node-local one, and the gap does not widen with correlation\n"
-                 "S4 diagnostic AUC, pre-registered rule: NEGATIVE.  n = number of draws pooled in each bin.",
+    fig.suptitle("The graph model is worse than the node-local one, and the gap does not close with correlation\n"
+                 "Shared-onset diagnostic AUC, pre-registered rule: NEGATIVE.  n = number of draws pooled in each bin.",
                  x=0.125, ha="left", fontsize=14, fontweight="bold", y=1.04)
     save(fig, "fig5_s4_gap_vs_correlation")
 
@@ -568,6 +568,7 @@ S14 = REPO_ROOT / "results" / "s14"
 S15 = REPO_ROOT / "results" / "s15"
 S16 = REPO_ROOT / "results" / "s16"
 # CLAIMS.md (D78): the caveat carried by every detection latency the paper reports
+LATENCY_CAVEAT_SHORT = "Latency: the shared-rule caveat of Sec. VI applies."
 LATENCY_CAVEAT = ("Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32–0.44 of healthy RSUs "
                   "where measured (S16) and was not measured elsewhere.")
 _NUM = r"([+-]?\d+\.\d+)"
@@ -701,14 +702,14 @@ def paper_tables(T, GT, HH) -> None:
     g = GT["T"][SHARED]
     rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["n_av"], 0), pm(g["n_win"], 0), pm(g["never_avoided"], 2), "not reported", "not reported"])
     h = HH["T"][SHARED]
-    rows.append(["H (extra baseline)", pm(h["success_post_onset"]), pm(h["n_av"], 0), pm(h["n_win"], 0), pm(h["never_avoided"], 2), pm(h["latency"], 0),
+    rows.append(["M (extra baseline)", pm(h["success_post_onset"]), pm(h["n_av"], 0), pm(h["n_win"], 0), pm(h["never_avoided"], 2), pm(h["latency"], 0),
                  pm(h["detected_fraction"], 2)])
     write_table("paper_ablation_shared_point",
                 ["Variant", "Success after onset", "n_av", "n_win", "Never avoided", "Detection latency (steps)", "Degraded RSUs detected"], rows,
                 "Closed-loop dispatch at the shared point (rho 1.0, 20% degraded), in this simulation: mean ± sd across 5 seeds",
                 "n_av: dispatches to degraded RSUs from onset to the run's own avoidance step; n_win: the same over the fixed window [400, 1200); never avoided: fraction of runs "
-                "that never reach the avoidance rule (the three are always read together). Detection latency is descriptive and censored at 399 steps; A and B cannot detect by construction. " + LATENCY_CAVEAT + " "
-                "Source: results/s10/tables/ablation_shared_point (F26, F29, F33).", wide=True)
+                "that never reach the avoidance rule (the three are always read together). Detection latency is descriptive and censored at 399 steps; A and B cannot detect by construction. " + LATENCY_CAVEAT_SHORT,
+                wide=True)
 
     # (2) effects against the references at the four fraction-sweep points
     verdict = json.loads((S9 / "summary-verdict.json").read_text(encoding="utf-8"))["verdicts"]
@@ -717,12 +718,12 @@ def paper_tables(T, GT, HH) -> None:
     rows = [[f"{x} minus {ref}".replace("B_oracle", "B-oracle")] + [eff(verdict[f"1.00/{f:.2f}"][f"{x}_vs_{ref}"]["H3"]) for f in fr]
             for x, ref in (("C", "A"), ("D", "A"), ("C", "B_oracle"), ("D", "B_oracle"), ("D", "C"))]
     rows.append(["C minus Gate-C (extra baseline)"] + [f"{e.mean:+.4f}\n[{e.lo:+.4f}, {e.hi:+.4f}] {e.label}" for e in (GT["paired"][(1.0, round(f, 2))] for f in fr)])
-    rows.append(["C minus H (extra baseline)"] + [f"{m_:+.4f}\n[{lo:+.4f}, {hi:+.4f}] {lab}" for m_, lo, hi, lab in (HH["paired"][(1.0, round(f, 2))] for f in fr)])
-    rows.append(["H minus A (descriptive)"] + [f"{e.mean:+.4f}\n[{e.lo:+.4f}, {e.hi:+.4f}]" for e in (HH["vs_a"][(1.0, round(f, 2))] for f in fr)])
+    rows.append(["C minus M (extra baseline)"] + [f"{m_:+.4f}\n[{lo:+.4f}, {hi:+.4f}] {lab}" for m_, lo, hi, lab in (HH["paired"][(1.0, round(f, 2))] for f in fr)])
+    rows.append(["M minus A (descriptive)"] + [f"{e.mean:+.4f}\n[{e.lo:+.4f}, {e.hi:+.4f}]" for e in (HH["vs_a"][(1.0, round(f, 2))] for f in fr)])
     write_table("paper_fraction_effects", ["Paired difference in post-onset success"] + [f"{int(f * 100)}% degraded" for f in fr], rows,
                 "Paired differences in post-onset deadline success at rho 1.0, in this simulation: mean [95% t-interval over 5 seeds] and the pre-registered label",
-                "Labels from the rules fixed in D56 (rows 1-5), D59 (Gate-C) and D65 (H); floor 0.01. D minus C is the closed-loop secondary check of H2 and is never gating. "
-                "H minus A is descriptive (no pre-registered label). Source: results/s10/tables/paired_effects_shared_point and results/s9, results/s9b, results/s13/h (F26, F27, F29, F33).", wide=True)
+                "Labels from the pre-registered rules (Table III); floor 0.01. D minus C is the closed-loop secondary check of H2 and is never gating. "
+                "M minus A is descriptive (no pre-registered label).", wide=True)
 
     # (2b) the rho sweep at 20% degraded: success only (Gate-C and H were not run at these points, D59 and D65)
     rows = []
@@ -731,8 +732,7 @@ def paper_tables(T, GT, HH) -> None:
         rows.append([f"{rho:g}"] + [pm(s_[v]["success_post_onset"]) for v in ("A", "B_oracle", "C", "D")])
     write_table("paper_rho_sweep", ["rho", "A", "B-oracle (upper bound)", "C", "D"], rows,
                 "Post-onset deadline success along the correlation sweep (20% degraded), in this simulation: mean ± sd across 5 seeds",
-                "Gate-C and H were run at the four fraction-sweep points only (D59, D65) and are not part of this sweep. B = A and E = D. "
-                "Source: results/s10/tables/ablation_all_points (F26).")
+                "Gate-C and M were run at the four fraction-sweep points only and are not part of this sweep. B = A and E = D.")
 
     # (3) every graph-versus-node-local test, in the order it was run
     S4j = json.loads((S4 / "summary-5seeds.json").read_text(encoding="utf-8"))["sweep"]
@@ -747,30 +747,29 @@ def paper_tables(T, GT, HH) -> None:
     L15 = _labelled(S15 / "report-eval-verdict-5seeds.txt", r"PRIMARY\s+D2-h - C-h latency")
     C15 = _closed_diff(S15 / "report-closed-raw.txt", "D2_h - C_h")
     rows = [
-        ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "1.0", d43("1.00"), "NEGATIVE (D43)"],
-        ["S4", "shared", "D minus C", "diagnostic AUC [450, 650)", "0", d43("0.00"), "no separate label (D43 judges rho 1.0)"],
-        ["S9", "shared", "D minus C", "closed-loop post-onset success", "1.0", f"{sh['mean']:+.4f} [{sh['lo']:+.4f}, {sh['hi']:+.4f}]", f"{sh['label']} (D56, secondary)"],
-        ["S9", "shared", "D minus C", "closed-loop post-onset success", "0", f"{sh0['mean']:+.4f} [{sh0['lo']:+.4f}, {sh0['hi']:+.4f}]", f"{sh0['label']} (D56, secondary)"],
-        ["S13", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "1.0", L13["1"]["diff"], f"{L13['1']['label']} (D65)"],
-        ["S13", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "0", L13["0"]["diff"], f"{L13['0']['label']} (D65)"],
-        ["S13", "staggered", "D minus C", "closed-loop post-onset success", "1.0", C13["1"], "descriptive"],
-        ["S13", "staggered", "D minus C", "closed-loop post-onset success", "0", C13["0"], "descriptive"],
-        ["S14", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "1.0", L14["1"]["diff"], f"{L14['1']['label']} (D68, primary)"],
-        ["S14", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "0", L14["0"]["diff"], f"{L14['0']['label']} (D68)"],
-        ["S14", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "1.0", A14["1"][0], f"{A14['1'][1]} (D68)"],
-        ["S14", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "0", A14["0"][0], f"{A14['0'][1]} (D68)"],
-        ["S14", "shared", "D2 minus C", "closed-loop post-onset success", "1.0", C14["shared"]["diff"], f"{C14['shared']['label']} (D68)"],
-        ["S14", "staggered", "D2 minus C", "closed-loop post-onset success", "1.0", C14["stag"]["diff"], f"{C14['stag']['label']} (D68)"],
-        ["S15", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (D72, primary)"],
-        ["S15", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (D72)"],
-        ["S15", "staggered", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
+        ["Shared onset", "shared", "D minus C", "diagnostic AUC [450, 650)", "1.0", d43("1.00"), "NEGATIVE (primary)"],
+        ["Shared onset", "shared", "D minus C", "diagnostic AUC [450, 650)", "0", d43("0.00"), "no separate label (judged at rho 1.0)"],
+        ["Closed-loop sweep", "shared", "D minus C", "closed-loop post-onset success", "1.0", f"{sh['mean']:+.4f} [{sh['lo']:+.4f}, {sh['hi']:+.4f}]", f"{sh['label']} (secondary)"],
+        ["Closed-loop sweep", "shared", "D minus C", "closed-loop post-onset success", "0", f"{sh0['mean']:+.4f} [{sh0['lo']:+.4f}, {sh0['hi']:+.4f}]", f"{sh0['label']} (secondary)"],
+        ["Staggered onset", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "1.0", L13["1"]["diff"], f"{L13['1']['label']} (primary)"],
+        ["Staggered onset", "staggered", "D minus C", "latency, late-onset RSUs (steps)", "0", L13["0"]["diff"], f"{L13['0']['label']} (control)"],
+        ["Staggered onset", "staggered", "D minus C", "closed-loop post-onset success", "1.0", C13["1"], "descriptive"],
+        ["Staggered onset", "staggered", "D minus C", "closed-loop post-onset success", "0", C13["0"], "descriptive"],
+        ["Contained head", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "1.0", L14["1"]["diff"], f"{L14['1']['label']} (primary)"],
+        ["Contained head", "staggered", "D2 minus C", "latency, late-onset RSUs (steps)", "0", L14["0"]["diff"], f"{L14['0']['label']} (control)"],
+        ["Contained head", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "1.0", A14["1"][0], f"{A14['1'][1]} (secondary)"],
+        ["Contained head", "shared", "D2 minus C", "diagnostic AUC [450, 650)", "0", A14["0"][0], f"{A14['0'][1]} (secondary)"],
+        ["Contained head", "shared", "D2 minus C", "closed-loop post-onset success", "1.0", C14["shared"]["diff"], f"{C14['shared']['label']} (secondary)"],
+        ["Contained head", "staggered", "D2 minus C", "closed-loop post-onset success", "1.0", C14["stag"]["diff"], f"{C14['stag']['label']} (secondary)"],
+        ["Horizon objective", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (primary)"],
+        ["Horizon objective", "staggered", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (control)"],
+        ["Horizon objective", "staggered", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
     ]
-    write_table("paper_graph_tests", ["Session", "Onset", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
+    write_table("paper_graph_tests", ["Experiment", "Onset", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
                 "Every test of a graph head against the node-local head C, in this simulation (5 seeds; 95% t-interval over seeds)",
-                "Negative latency means the first-named model detects earlier. The S4, S9, S13, S14 and S15 rules were fixed in D43, D56, D65, D68 and D72 before their numbers. "
-                "The staggered-regime heads of S13-S15 were trained on the staggered regime; the S4 and S9 heads on the shared-onset regime. C-h and D2-h were trained on the "
-                "forward-looking (horizon) objective of D72, every other head on the next-task objective. " + LATENCY_CAVEAT + " Sources: F17, F26/F27, F37/F38, F40, F44/F45, F48/F49 "
-                "(results/s4/summary-5seeds.json, results/s9/summary-verdict.json, and the stored S13-S15 report files).", wide=True)
+                "Negative latency means the first-named model detects earlier. Every rule was fixed before its numbers (Table III). "
+                "Heads in the staggered-onset rows were trained on the staggered regime, the others on the shared-onset regime. C-h and D2-h were trained on the "
+                "forward-looking (horizon) objective, every other head on the next-task objective. " + LATENCY_CAVEAT_SHORT, wide=True)
 
     # (3b) the training objective (A29, A30): the S15 primary and the S16 confirmatory test, side by side
     E16 = S16 / "report-eval-verdict-5seeds.txt"
@@ -779,24 +778,24 @@ def paper_tables(T, GT, HH) -> None:
     O16 = _s16_overall(E16)
     C16 = _closed_diff(S16 / "report-closed-raw.txt", "C_h - C")
     rows = [
-        ["S15", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (D72, primary)"],
-        ["S15", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (D72, control)"],
-        ["S15", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
-        ["S16", "C-h minus C", "latency, all degraded RSUs (steps)", "1.0", L16["1"][0], f"{L16['1'][1]} (D76, co-primary 1)"],
-        ["S16", "C-h minus C", "false-alarm rate, healthy RSUs", "1.0", F16["1"][0], f"{F16['1'][1]} (D76, co-primary 2)"],
-        ["S16", "C-h minus C", "overall verdict", "1.0", "", f"{O16['1']} (D76)"],
-        ["S16", "C-h minus C", "latency, all degraded RSUs (steps)", "0", L16["0"][0], f"{L16['0'][1]} (D76, control)"],
-        ["S16", "C-h minus C", "false-alarm rate, healthy RSUs", "0", F16["0"][0], f"{F16['0'][1]} (D76, control)"],
-        ["S16", "C-h minus C", "overall verdict", "0", "", f"{O16['0']} (D76, control)"],
-        ["S16", "C-h minus C", "closed-loop post-onset success", "1.0", C16, "descriptive"],
+        ["Horizon objective", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "1.0", L15["1"][0], f"{L15['1'][1]} (primary)"],
+        ["Horizon objective", "D2-h minus C-h", "latency, late-onset RSUs (steps)", "0", L15["0"][0], f"{L15['0'][1]} (control)"],
+        ["Horizon objective", "D2-h minus C-h", "closed-loop post-onset success", "1.0", C15, "descriptive"],
+        ["Confirmatory test", "C-h minus C", "latency, all degraded RSUs (steps)", "1.0", L16["1"][0], f"{L16['1'][1]} (co-primary 1)"],
+        ["Confirmatory test", "C-h minus C", "false-alarm rate, healthy RSUs", "1.0", F16["1"][0], f"{F16['1'][1]} (co-primary 2)"],
+        ["Confirmatory test", "C-h minus C", "overall verdict", "1.0", "", f"{O16['1']}"],
+        ["Confirmatory test", "C-h minus C", "latency, all degraded RSUs (steps)", "0", L16["0"][0], f"{L16['0'][1]} (control)"],
+        ["Confirmatory test", "C-h minus C", "false-alarm rate, healthy RSUs", "0", F16["0"][0], f"{F16['0'][1]} (control)"],
+        ["Confirmatory test", "C-h minus C", "overall verdict", "0", "", f"{O16['0']} (control)"],
+        ["Confirmatory test", "C-h minus C", "closed-loop post-onset success", "1.0", C16, "descriptive"],
     ]
-    write_table("paper_objective", ["Session", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
+    write_table("paper_objective", ["Experiment", "Comparison", "Quantity", "rho", "Difference [95% CI]", "Pre-registered label"], rows,
                 "The training objective, in this simulation: staggered onset (S = 300), 20% degraded, 5 seeds, 95% t-interval over seeds",
-                "C-h and D2-h are C's and D2's architectures trained on the forward-looking objective of D72 (label 1 if fewer than 0.75 of an RSU's tasks in the next 150 steps meet "
-                "their deadline; windows with fewer than 5 tasks excluded); C is the staggered-regime head trained on the next-task objective. S15: draws 300-349, late-onset RSUs, rule "
-                "fixed in D72. S16: fresh draws 350-399, all degraded RSUs, a confirmatory test fixed in D76, whose verdict is OBJECTIVE HELPS only if the latency label is EARLIER and the "
+                "C-h and D2-h are C's and D2's architectures trained on the forward-looking objective (label 1 if fewer than 0.75 of an RSU's tasks in the next 150 steps meet "
+                "their deadline; windows with fewer than 5 tasks excluded); C is the staggered-regime head trained on the next-task objective. Horizon objective: draws 300-349, "
+                "late-onset RSUs. Confirmatory test: fresh draws 350-399, all degraded RSUs; its verdict is OBJECTIVE HELPS only if the latency label is EARLIER and the "
                 "false-alarm label ACCEPTABLE (upper end of the interval at most 0.05). A negative difference means the first-named model detects earlier or raises fewer false alarms. "
-                + LATENCY_CAVEAT + " Sources: F48/F49, F50/F51 (the stored S15 and S16 report files).", wide=True)
+                + LATENCY_CAVEAT_SHORT, wide=True)
 
     # (4) H1 triplet for D2 in both regimes (A28)
     rows = []
@@ -805,8 +804,8 @@ def paper_tables(T, GT, HH) -> None:
             n_av, n_win, nv = C14[reg][v]
             rows.append([name, v, n_av, n_win, nv])
     write_table("paper_d2_dispatch", ["Regime", "Variant", "n_av", "n_win", "Never avoided"], rows,
-                "Dispatches to degraded RSUs at the shared point, draws 250-299, in this simulation (mean over 5 seeds of per-seed means; n_av, n_win and the never-avoided rate together)",
-                "D2 is the contained graph head of D68; D was not run on draws 250-299. A is identical in both regimes. Source: results/s14/report-closed-verdict.txt (F44, F45).")
+                "Dispatches to degraded RSUs at rho 1.0, 20% degraded, draws 250-299, in this simulation (mean over 5 seeds of per-seed means; n_av, n_win and the never-avoided rate together)",
+                "D2 is the contained graph head; D was not run on draws 250-299. A is identical in both regimes.")
 
     # (5) per-decision time by component (A14), medians only
     o = json.loads((S9 / "overhead.json").read_text(encoding="utf-8"))["timing"]
@@ -817,7 +816,7 @@ def paper_tables(T, GT, HH) -> None:
         rows.append([lab, f(o["threads1"][c]["median"]), f(o["threads10"][c]["median"])])
     write_table("paper_latency", ["Component", "Median, 1 thread (ms)", "Median, 10 threads (ms)"], rows,
                 "Per-decision time by component, median over 200 decisions at the shared point, in this simulation",
-                "13th Gen Intel i5-13450HX, CPU only, one decision at a time. Layer 2 is judged against a stated 100 ms assumption: asynchronous only. Source: results/s10/tables/latency_breakdown (F24, F26).")
+                "13th Gen Intel i5-13450HX, CPU only, one decision at a time. Layer 2 is judged against a stated 100 ms assumption: asynchronous only.")
 
 
 def main() -> int:
