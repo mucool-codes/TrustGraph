@@ -7,11 +7,11 @@
 \item \textbf{Simulation only}, no testbed.
 \item The \textbf{injection model is synthetic} and is the most attackable assumption of this work; no public dataset pairs vehicular mobility with fog-node trust ground truth.
 \item \textbf{Single-hop} offloading only.
-\item \textbf{No adaptive adversary} (L10): degraded nodes do not game the trust score.
+\item \textbf{No adaptive adversary}: degraded nodes do not game the trust score.
 \item \textbf{Hand-tuned weights}, tuned on one seed.
-\item \textbf{Scale} is capped at 15--30 RSUs and 50--100 vehicles (L9); we use 20 and 60.
+\item \textbf{Scale} is capped at 15--30 RSUs and 50--100 vehicles; we use 20 and 60.
 \item \textbf{One topology per seed, 5 seeds.}
-\item \textbf{Onset is shared} by all degraded RSUs in the main scenario (D31).
+\item \textbf{Onset is shared} by all degraded RSUs in the main scenario.
 \item The trust heads were \textbf{trained on Baseline-A (open-loop) dispatch} and are evaluated in the closed loop, a distribution shift.
 \item The collusion models \textbf{never saw colluders} in training.
 \item \textbf{B-oracle reads sealed truth.}
@@ -20,10 +20,10 @@
 \item Layer 2 uses \textbf{one explainer run per explanation} and a 200-decision sample.
 \item Training and evaluation \textbf{share a seed's traffic} and differ only in injection draws.
 \item \textbf{Staggered onset} was tested at $S=300$ only, with independent uniform onsets, one scenario per seed and heads trained on open-loop dispatch.
-\item \textbf{H's weights} were tuned on one seed.
+\item \textbf{M's weights} were tuned on one seed.
 \item \textbf{D2} was tested once, with one neighbour construction, $S=300$ and open-loop-trained heads; its weights were tuned on one seed.
-\item The \textbf{horizon objective} was tested once ($H=150$ steps, threshold $0.75$, minimum 5 tasks), under staggered onset $S=300$, with one D2 construction and weights tuned on one seed.
-\item The detection rule's \textbf{false-alarm rate} was measured once (S16, C and C-h only): 0.32--0.44 of healthy RSUs cross it at some step in 1100 steps; it was not measured for D, D2, D2-h or H.
+\item The \textbf{horizon objective} was tested once (a 150-step horizon, threshold $0.75$, minimum 5 tasks), under staggered onset $S=300$, with one D2 construction and weights tuned on one seed.
+\item The detection rule's \textbf{false-alarm rate} was measured once (the confirmatory test, C and C-h only): 0.32--0.44 of healthy RSUs cross it at some step in 1100 steps; it was not measured for D, D2, D2-h or M.
 \end{itemize}
 
 \paragraph*{Conclusion}
@@ -31,5 +31,5 @@
 In this simulation, we studied task offloading with a behavioural trust layer that drives a fixed weighted selection rule.
 The layer, validated in the closed loop against a tuned no-trust baseline and a perfect-knowledge oracle upper bound, is strongest with the node-local head; the selection has an exactly decomposable explanation; and the four pre-registered tests of graph structure---under shared onset, under staggered onset, with a contained graph head, and with that head under a forward-looking training objective---returned negative and null results, with a measured boundary condition for the shared-onset scenario.
 A confirmatory test of the forward-looking objective for the node-local head returned NOT CONFIRMED: detection was earlier (EARLIER), but more false alarms were not ruled out (NOT ACCEPTABLE).
-Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32--0.44 of healthy RSUs where measured (S16) and was not measured elsewhere.
+\latcaveat
 Whether graph structure helps in other regimes, objectives or architectures remains open; the hypotheses the record leaves open are stated in Sec.~\ref{sec:discussion}, and none of them was tested here beyond the single contained-head construction and the single horizon objective.

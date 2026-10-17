@@ -4,20 +4,21 @@
 \paragraph*{What the results mean}
 In this simulation, a behavioural signal that enters the offloading decision as a weighted term raises deadline success over the same rule without trust at every degraded fraction tested, and the node-local head comes within $0.001$--$0.003$ of an oracle that reads the sealed fault state (Sec.~\ref{sec:behav}).
 % src: A5, A6
-Most of that gain is already available from the node's own evidence: a non-learned monitor, H, which uses only the RSU's own \texttt{success\_ewma}, recovers most of the trust-aware gain, and the pre-registered rule did not separate it from the learned head (Sec.~\ref{sec:learning}).
+Most of that gain is already available from the node's own evidence: a non-learned monitor, M, which uses only the RSU's own \texttt{success\_ewma}, recovers most of the trust-aware gain, and the pre-registered rule did not separate it from the learned head (Sec.~\ref{sec:learning}).
 % src: A27, A23 (X18: we do not say that learning adds nothing; the label is NULL under a 0.01 floor with signed differences 0.003-0.005)
 We read this as a statement about the floor we fixed in advance and about this scenario, not as a statement that the learned head is unnecessary.
 % src: X18
 
 On graph structure, the load-bearing hypothesis was tested four times and is not supported.
-The graph head did not beat the node-local head on the pre-registered diagnostic (NEGATIVE), in the closed loop, under staggered onset where a neighbour lead exists (NEGATIVE), or as a contained head that starts as C (NULL), including when both heads were trained on a forward-looking objective (NULL); and we measured why the first test could not have succeeded in the shared-onset scenario, as a boundary condition of that scenario (Secs.~\ref{sec:graph} and~\ref{sec:objective}).
+The graph head was worse than the node-local head on the pre-registered diagnostic (NEGATIVE) and under staggered onset, where a neighbour lead exists (NEGATIVE); it was not better at any closed-loop point (NEGATIVE at 20\% and 30\% degraded); and a contained graph head that starts as C was not distinguishable from it (NULL), including when both heads were trained on a forward-looking objective (NULL).
+For the shared-onset scenario we also measured a boundary condition: own-node evidence is never later than neighbour evidence there, so a lead-time advantage for message passing is not available by construction (Secs.~\ref{sec:graph} and~\ref{sec:objective}).
 % src: A9, A10, A11, A25, A28, A29; X1, X2, X17, X21, X23 (no generalisation: one injection model, S = 300, one scenario per seed, open-loop-trained heads, one D2 construction, one horizon objective)
 These results are for one injection model, one stagger size, one scenario per seed, heads trained on open-loop dispatch, one contained-head construction and one forward-looking objective; we make no claim about other regimes, objectives or architectures.
 % src: X17, X21, X23
 
 On the training objective, the confirmatory test returned NOT CONFIRMED: in this simulation the forward-looking objective made the node-local head detect degraded RSUs earlier than the next-task objective (EARLIER), but more false alarms were not ruled out (NOT ACCEPTABLE), and closed-loop success did not differ ($-0.0008$, descriptive) (Sec.~\ref{sec:objective}).
 % src: A30; X24 (EARLIER only beside NOT ACCEPTABLE and NOT CONFIRMED; no claim that the objective improves dispatch); X23 (no mechanism)
-Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32--0.44 of healthy RSUs where measured (S16) and was not measured elsewhere.
+\latcaveat
 % src: A30 (D78 shared-rule caveat, verbatim); A19
 
 The weighted rule and a gate on the same head performed equivalently on task success (Sec.~\ref{sec:gate}).

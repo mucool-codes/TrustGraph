@@ -21,6 +21,15 @@ The trust head is trained self-supervised to predict whether an RSU meets its ne
 We compare a node-local head (C) with a graph neural network head (D) that aggregates evidence over the network graph, under the same rule, the same features and the same training objective.
 The question the comparison is built to answer is whether message passing over the graph adds anything beyond the node's own evidence.
 
+\paragraph*{Hypotheses}
+% src: PROJECT_SPEC 4.1 (H1-H5, fixed at project start); H1 is stated against A because B = A in this scenario (A4, X4).
+The evaluation tests five hypotheses, fixed at the start of the project.
+\emph{H1 (avoidance)}: behavioural trust sends fewer tasks to degrading RSUs than dispatch without a behavioural signal (Baseline A; the certificate-only Baseline B makes the same decisions in this scenario, Sec.~\ref{sec:variants}).
+\emph{H2 (structure)}: a graph head that passes messages between RSUs beats a node-local head, increasingly so as failures become more correlated.
+\emph{H3 (success)}: behavioural trust raises deadline success under degradation.
+\emph{H4 (fidelity)}: the attribution on the trust head (Layer 2) is faithful: perturbing a top-attributed input changes trust or the decision more often than perturbing a low-attributed one.
+\emph{H5 (overhead)}: trust scoring and explanation fit a fog-layer time budget, measured per component.
+
 The evaluation was designed so that a null or negative answer could be reported at full strength.
 Each comparison has a rule (metric, floor, window, verdict labels) that was written to the repository, and committed, before the numbers it judges (Sec.~\ref{sec:protocol}).
 All results are for one simulated scenario with injected degradation, and the text says so throughout.
