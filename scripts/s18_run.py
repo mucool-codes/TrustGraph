@@ -615,7 +615,7 @@ def cmd_eval(arm: str, seeds, verdict: bool) -> int:
 
 def load_closed(arm, seeds):
     out = {}
-    for v in CL_NAMES[arm]:
+    for v in CL_NAMES[arm] + (CL_NAMES["primary"][2:4] if arm == "secondary" else ()):  # the secondary report also compares with the primary C and D
         for c in CONDS:
             out[(v, c)] = {k: np.array([[json.loads(cl_path(v, c, s, d).read_text())[k] for d in EVAL_DRAWS] for s in seeds], float)
                            for k in ("success_400_500", "success_500_1200", "success_400_1200", "n_av", "n_win", "never_avoided",
