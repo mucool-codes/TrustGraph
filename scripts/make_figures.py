@@ -412,9 +412,11 @@ def fig_s18_gap() -> None:
             a.axhline(0.05, color=COL["C"], lw=1.6, ls="--"); a.text(1, 0.06, "tolerance +0.05", color=COL["C"], fontsize=11, va="bottom")
         a.set_xticks(Ls); a.set_xlabel("lag L per hop (steps); L = 0 is the control"); a.set_ylabel(ylab); a.set_title(ttl)
     ax[0].legend(frameon=False, loc="upper left", bbox_to_anchor=(0, -0.2), fontsize=11)
-    fig.suptitle("The graph head detects later than the node-local head at every lag, including the L = 0 control\n"
-                 "Spreading fault, draws 400-449, 5 seeds, 95% intervals; shared-rule latency (not a time-to-alarm), false alarms beside it. Sa NOT SUPPORTED.",
-                 x=0.125, ha="left", fontsize=14, fontweight="bold", y=1.06)
+    fig.suptitle("The graph head detects later than the node-local head at every lag,\n"
+                 "including the L = 0 control. Spreading fault, draws 400-449, 5 seeds,\n"
+                 "95% intervals; shared-rule latency (not a time-to-alarm), false alarms\n"
+                 "beside it. Sa NOT SUPPORTED.",
+                 x=0.125, ha="left", fontsize=14, fontweight="bold", y=1.14)
     save(fig, "fig7_s18_gap_vs_lag")
 
 
