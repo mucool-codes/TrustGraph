@@ -23,13 +23,26 @@
 \item \textbf{M's weights} were tuned on one seed.
 \item \textbf{D2} was tested once, with one neighbour construction, $S=300$ and open-loop-trained heads; its weights were tuned on one seed.
 \item The \textbf{horizon objective} was tested once (a 150-step horizon, threshold $0.75$, minimum 5 tasks), under staggered onset $S=300$, with one D2 construction and weights tuned on one seed.
-\item The detection rule's \textbf{false-alarm rate} was measured once (the confirmatory test, C and C-h only): 0.32--0.44 of healthy RSUs cross it at some step in 1100 steps; it was not measured for D, D2, D2-h or M.
+\item The detection rule's \textbf{false-alarm rate} was measured once (the confirmatory test, C and C-h only): 0.32--0.44 of healthy RSUs cross it at some step in 1100 steps; it was not measured for D, D2, D2-h or M, except that the spreading-fault test reports it for C and D.
+\item The \textbf{spreading-fault and cold-start tests} used frozen heads trained on simultaneous onset (out of distribution by design), one scenario of each kind, lags $L\in\{0,20,40,80\}$, restart fractions $\{0.10,0.20,0.40\}$ and a 100-step ramp; the \textbf{propagation graph was chosen from the structure of the evaluation draws} (degraded sets only, no outcome).
+% src: A31 (D83 item 2), A32, A33, X25, X26
+\item The \textbf{retrained-head arm} is one training-set composition, one architecture and one budget.
+% src: A33, X26
+\item \textbf{Route planning was not tested.} In this simulator hand-off is inert (the relay-or-lost rule fired on 0 of 6880 and 2 of 6873 decisions), switching RSU between tasks costs nothing, the dwell filter bound in 0.8\% of decisions, and vehicles follow no planned path; no planner was built and no comparison was run. We make no claim that planning does or does not help.
+% src: A34 (F55, D86); X27
 \end{itemize}
+
+\paragraph*{Future work}
+% src: A34, D86 (simulators with a justified switching cost and planned routes); the forged-report scenario is named by the S23 brief only, deferred, not run, no claim
+Route planning needs a simulator with a justified migration cost and planned routes; the one used here charges nothing for switching RSU, so it cannot test it.
+The forged-report scenario was deferred and not run.
 
 \paragraph*{Conclusion}
 % src: A21 (contribution statement) and A9-A11, A15, A23, A25, A28, A29, A30, A20; no wording implies that the graph helped (X1, X2) or that the horizon objective helped (X23, X24)
 In this simulation, we studied task offloading with a behavioural trust layer that drives a fixed weighted selection rule.
 The layer, validated in the closed loop against a tuned no-trust baseline and a perfect-knowledge oracle upper bound, is strongest with the node-local head; the selection has an exactly decomposable explanation; and the four pre-registered tests of graph structure---under shared onset, under staggered onset, with a contained graph head, and with that head under a forward-looking training objective---returned negative and null results, with a measured boundary condition for the shared-onset scenario.
+Two further scenarios designed to favour graph structure, a spreading fault and a cold start, did not favour the graph head either: the graph head detected later than the node-local head under the shared rule, at a lower false-alarm rate, the control was violated, and cold-start dispatch success was not separated.
+% src: A31, A32 (Sa NOT SUPPORTED, Sc VIOLATED, Sb NOT SEPARATED); X25 (no mechanism, no advantage)
 A confirmatory test of the forward-looking objective for the node-local head returned NOT CONFIRMED: detection was earlier (EARLIER), but more false alarms were not ruled out (NOT ACCEPTABLE).
 \latcaveat
 Whether graph structure helps in other regimes, objectives or architectures remains open; the hypotheses the record leaves open are stated in Sec.~\ref{sec:discussion}, and none of them was tested here beyond the single contained-head construction and the single horizon objective.

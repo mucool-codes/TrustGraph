@@ -13,7 +13,7 @@ REPO = Path(__file__).resolve().parent.parent
 PAPER = REPO / "paper"
 TECTONIC = REPO / "tools" / ("tectonic.exe" if sys.platform == "win32" else "tectonic")
 NEED = [REPO / "figures" / "s10" / f"{n}.pdf" for n in ("fig1_architecture", "fig2_trust_timeline", "fig3_success_vs_fraction",
-                                                         "fig4_ablation", "fig5_s4_gap_vs_correlation", "fig6_explanation")]
+                                                         "fig4_ablation", "fig5_s4_gap_vs_correlation", "fig6_explanation", "fig7_s18_gap_vs_lag")]
 NEED += [REPO / "results" / "s10" / "tables" / f"{n}.tex" for n in ("paper_ablation_shared_point", "paper_fraction_effects", "paper_rho_sweep",
                                                                     "paper_graph_tests", "paper_d2_dispatch", "paper_latency",
                                                                     "paper_objective")]

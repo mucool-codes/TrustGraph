@@ -1,0 +1,86 @@
+\subsection{Scenarios designed to favour graph structure}
+\label{sec:favour}
+% src: A31, A32, A33, A34; F53a-F53d, F54, F55; D81, D83, D84, D86; X25, X26 (no graph-benefit wording; no mechanism; D83 item 2 provenance stated; the secondary arm does not soften a primary verdict)
+
+The main scenario came first, and in it the graph head did not help (Sec.~\ref{sec:graph}).
+The two scenarios here were then designed to favour graph structure and their rule was registered before they were run (D81, amended by D83; Table~\ref{tab:prereg}).
+In this simulation, both use frozen heads C and D (trained once on simultaneous onset and not retrained, as in the sweeps), fresh injection draws 400--449 and 5 seeds, with the same shared detection rule as elsewhere.
+\latcaveat
+
+\paragraph*{Spreading fault}
+A fault starts at one RSU and reaches each other degraded RSU after $L$ steps per hop over the RSU--RSU edges ($L=0/20/40/80$; $\rho=1.0$, 20\% degraded), so that neighbour evidence leads by construction.
+% src: A31 (D81 section 1)
+The primary test (Sa) is on the degraded RSUs other than the seed RSU, at $L=40$ and $L=80$, and holds only if D detects earlier by at least 20 steps (WIN) with an acceptable false-alarm rate (upper end of the interval at most $0.05$) at both.
+The control ($L=0$, simultaneous onset; Sc) holds if D and C are not separated there.
+% src: A31 (D81 sections 7 and 8)
+Sa is NOT SUPPORTED, and Sc is VIOLATED (Table~\ref{tab:favour_spread}, Fig.~\ref{fig:lag}).
+In this simulation, D detected later than C: D minus C is $+80.0$ steps [$+55.2$, $+104.8$] at $L=40$ and $+83.4$ [$+55.2$, $+111.5$] at $L=80$ (NEGATIVE at both).
+The healthy-RSU false-alarm rate was lower for D ($-0.331$ [$-0.494$, $-0.169$] and $-0.336$ [$-0.491$, $-0.180$], ACCEPTABLE), so the latency label alone fails Sa.
+The control was not NULL: at $L=0$ D was also later ($+77.8$ [$+43.8$, $+111.8$], NEGATIVE), and the gap did not grow with the lag (change from $L=0$: $+1.6$ [$-6.1$, $+9.3$] at $L=20$, $+2.2$ [$-16.8$, $+21.2$] at $L=40$, $+5.6$ [$-25.4$, $+36.6$] at $L=80$).
+% src: A31 (F54; F53a); the L = 20 row of the table is descriptive (D81 section 7)
+In words: D detected the degraded RSUs later under the shared rule, at a lower false-alarm rate.
+The raw latencies are $130.6$--$136.9$ steps for C and $210.0$--$214.7$ for D (D detected $0.968$--$0.980$ of the RSUs, C all), and the false-alarm rates are $0.473$ for C and $0.137$--$0.142$ for D.
+Both come from the same per-model threshold, so D's later latency and its lower false-alarm rate are not separated here.
+% src: A31 (raw latencies, detected fractions, false-alarm rates; D78 caveat)
+The threshold-free trust AUC over the first 100 steps after a degraded RSU's own onset (descriptive) points the same way: at $L=40$ it is $0.632$ for C and $0.599$ for D, D minus C $-0.0339$ [$-0.0599$, $-0.0080$], with the same sign at $L=0$, $20$ and $80$ (the $L=80$ interval contains $0$).
+So D's later latency is not only a threshold effect.
+% src: A34 (F55, F53a)
+Descriptively, closed-loop success over steps $[400,1200)$ was lower for D than for C by $0.0168$, $0.0164$, $0.0158$ and $0.0147$ at $L=0$, $20$, $40$ and $80$, with every interval below $0$ (no label was registered).
+We offer no mechanism.
+% src: A31 (closed loop, "No mechanism")
+
+\begin{table*}[t]
+\centering
+\caption{Spreading fault, D minus C, frozen heads, draws 400--449, 5 seeds, mean [95\% interval over seeds] with the label of the registered rule (D81). Negative latency would mean D earlier. $L=20$ is descriptive and not part of the verdict. Latency is a comparison under one shared rule (Sec.~\ref{sec:protocol}).}
+\label{tab:favour_spread}
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Point & Latency (steps) & Latency label & False-alarm rate & False-alarm label \\
+\midrule
+% src: F54 (primary-arm verdict table); A31
+$L=0$ (control, Sc) & $+77.8$ [$+43.8$, $+111.8$] & NEGATIVE & $-0.3345$ [$-0.4972$, $-0.1718$] & ACCEPTABLE \\
+$L=20$ (descriptive) & $+79.4$ [$+45.9$, $+112.9$] & NEGATIVE & $-0.3340$ [$-0.4966$, $-0.1714$] & ACCEPTABLE \\
+$L=40$ (Sa) & $+80.0$ [$+55.2$, $+104.8$] & NEGATIVE & $-0.3310$ [$-0.4935$, $-0.1685$] & ACCEPTABLE \\
+$L=80$ (Sa) & $+83.4$ [$+55.2$, $+111.5$] & NEGATIVE & $-0.3357$ [$-0.4914$, $-0.1801$] & ACCEPTABLE \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{\figdir/fig7_s18_gap_vs_lag.pdf}
+\caption{D minus C detection latency (a) and healthy false-alarm rate (b) against the lag $L$ per hop, with 95\% intervals over 5 seeds. Filled: frozen heads (primary, decides Sa and Sc); open: retrained heads (secondary, descriptive). Dashed: the 20-step WIN floor and the $+0.05$ false-alarm tolerance. In this simulation the graph head was later at every lag including the $L=0$ control. Latency is a shared-rule comparison, not a time-to-alarm.}
+\label{fig:lag}
+% src: Figure 7 (fig7_s18_gap_vs_lag, scripts/make_figures.py from results/s18 summaries); F54
+\end{figure}
+
+\paragraph*{Cold start}
+A fraction $f$ of RSUs ($0.10$, $0.20$, $0.40$) restarts at step 400 with its history reset, and half of them (rounded up) then fail from step 420 with a 100-step ramp; the metric is the closed-loop success of dispatched tasks over steps $[400,500)$.
+% src: A32 (D81 section 2 and 9)
+In this simulation, D minus C is $-0.0051$ [$-0.0102$, $+0.0000$] at $f=0.10$, $-0.0057$ [$-0.0105$, $-0.0009$] at $f=0.20$ and $-0.0072$ [$-0.0116$, $-0.0028$] at $f=0.40$.
+All three labels are NULL under the registered rule (neither WIN nor NEGATIVE, upper bound below $0.025$), so Sb is NOT SEPARATED.
+% src: A32 (F53b, F54)
+NULL is the label of the rule as written: all three point estimates are below zero and below the $0.01$ floor, and it is not a statement that D and C are equal.
+Descriptively, after the window ($[500,1200)$) D minus C is $-0.0053$, $-0.0117$ and $-0.0220$ (intervals below $0$).
+Under the shared rule, the failing RSUs were detected after $68.6$--$71.9$ steps by C and $122.6$--$129.0$ by D (D minus C $+60.5$ [$+20.0$, $+100.9$], $+58.5$ [$+22.2$, $+94.8$], $+50.7$ [$+26.9$, $+74.5$]), at lower false-alarm rates for D (restarted-but-healthy RSUs $0.176$, $0.260$, $0.340$; other healthy RSUs $0.109$, $0.115$, $0.138$; C $0.386$--$0.444$ and $0.478$--$0.484$).
+The trust AUC over the first 100 steps is lower for D than for C: D minus C is $-0.165$ [$-0.241$, $-0.089$], $-0.136$ [$-0.220$, $-0.051$] and $-0.140$ [$-0.210$, $-0.071$] at $f=0.10$, $0.20$, $0.40$ (failing against all non-failing RSUs; descriptive).
+% src: A32 (F53a for the AUC intervals; F54). Latency numbers carry the A31 shared-rule caveat. AUC intervals are F53a: -0.1653 [-0.2412, -0.0894], -0.1356 [-0.2200, -0.0511], -0.1403 [-0.2095, -0.0710]
+We offer no mechanism.
+
+\paragraph*{Retrained heads}
+A secondary arm retrained both heads per seed on spreading-fault and restart draws (600--603 of each of the 7 conditions; same objective, settings and parameter counts) and gave the same signs.
+D$_r$ minus C$_r$ latency is $+72.1$ to $+79.5$ steps across $L=0$--$80$ and $+41.1$ to $+53.4$ in the cold-start conditions, and closed-loop success is $-0.0152$ to $-0.0136$ (spreading) and $-0.0042$, $-0.0048$, $-0.0069$ (cold start; the printed labels are NULL at all three, as description).
+The false-alarm difference is $-0.14$ to $-0.22$ with intervals reaching $+0.14$ to $+0.20$, which is not ACCEPTABLE by the printed rule.
+Retraining moved the closed-loop success of either head by at most $0.0017$ (intervals containing $0$).
+% src: A33 (F53c, F53d, F54; D83, D84)
+This arm is descriptive and cannot change a primary verdict; it is one training-set composition, one architecture and one budget, and does not show that no training regime would help.
+% src: A33, X26
+
+\paragraph*{Provenance of the propagation graph}
+The propagation graph (the RSU--RSU edges) was chosen from hop counts over the structure of the evaluation draws 400--449, using the degraded sets only and no outcome, trust value or model (D83 item 2).
+Those draws were therefore not blind to the graph choice, only to every outcome.
+% src: A31 (last sentences), D83 item 2; X26
+The conclusions are limited to the lags $L\in\{0,20,40,80\}$, the restart fractions above, the 100-step ramp and this propagation graph.
+% src: X25 (scope)
+In neither scenario did the graph head help: Sa is not supported, the control is violated with D later, and Sb is not separated.

@@ -2,18 +2,18 @@
 % Every claim here is an ALLOWED entry of CLAIMS.md; sources in comments. At most 250 words (checked by the S12b build notes).
 A certificate says who a roadside fog node is, not whether it is working correctly now.
 We study task offloading from vehicles to roadside fog nodes (RSUs) with a behavioural trust layer:
-a trust head, trained self-supervised from observed task outcomes, scores each RSU,
+a trust head, trained self-supervised on observed outcomes, scores each RSU,
 and a fixed weighted rule over trust, latency and load selects the target; each selection has an exactly decomposable explanation. % src: A1, A2, A12
-Each primary comparison's evaluation rule was committed before the numbers it judges. % src: A16 (commit order)
+Each primary rule was committed before the numbers it judges. % src: A16 (commit order)
 In this simulation (synthetic road grid, 20 RSUs, 60 vehicles, injected per-segment degradation, 5 seeds), % src: A3
 a node-local head (C) and a graph neural network head (D) both raise post-onset deadline success over a tuned no-trust baseline at all four degraded fractions % src: A5
 (C by 0.021--0.054, D by 0.016--0.039), % src: A5; F26
 and C comes within 0.001--0.003 of a perfect-knowledge oracle. % src: A6; F27
-The graph head D was worse than C on the pre-registered diagnostic and under staggered onset, and not better in the closed loop; a contained graph head was not distinguishable from the node-local head under either of two training objectives. % src: A9, A10, A25, A28, A29 (all four graph tests: S4, S13, S14, S15)
+The graph head D was worse than C on the pre-registered diagnostic and under staggered onset, and not better in the closed loop; a contained graph head was not distinguishable from it, and two further scenarios designed to favour graph structure (a spreading fault and a cold start) did not favour D. % src: A9, A10, A25, A28, A29 (S4, S13, S14, S15); A31, A32 (Sa NOT SUPPORTED, Sc VIOLATED, Sb NOT SEPARATED); no latency value quoted, the D78 caveat is carried in Sec. VII
 A forward-looking training objective for C failed its pre-registered confirmatory test: more false alarms were not ruled out. % src: A30 (NOT CONFIRMED; false alarms NOT ACCEPTABLE); X24. No latency value is quoted here, so the D78 caveat is carried in Sec. VII, not in the abstract.
-A non-learned behavioural monitor, using each RSU's own success EWMA, recovers most of the trust-aware gain and comes within 0.003--0.005 of C (pre-registered verdict: not separated). % src: A27, A23
+A non-learned monitor of each RSU's own success EWMA recovers most of the trust-aware gain and comes within 0.003--0.005 of C (not separated). % src: A27, A23
 Removing candidates below a trust threshold performed equivalently to the weighted rule on task success. % src: A15
-The attribution layer on the trust head is weakly faithful, unstable across runs, and asynchronous only. % src: A13 (310 ms per decision: A14, in Sec. VII)
+The trust head's attribution layer is weakly faithful, unstable and asynchronous only. % src: A13 (310 ms per decision: A14, in Sec. VII)
 \end{abstract}
 
 \begin{IEEEkeywords}

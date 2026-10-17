@@ -13,6 +13,8 @@ On graph structure, the load-bearing hypothesis was tested four times and is not
 The graph head was worse than the node-local head on the pre-registered diagnostic (NEGATIVE) and under staggered onset, where a neighbour lead exists (NEGATIVE); it was not better at any closed-loop point (NEGATIVE at 20\% and 30\% degraded); and a contained graph head that starts as C was not distinguishable from it (NULL), including when both heads were trained on a forward-looking objective (NULL).
 For the shared-onset scenario we also measured a boundary condition: own-node evidence is never later than neighbour evidence there, so a lead-time advantage for message passing is not available by construction (Secs.~\ref{sec:graph} and~\ref{sec:objective}).
 % src: A9, A10, A11, A25, A28, A29; X1, X2, X17, X21, X23 (no generalisation: one injection model, S = 300, one scenario per seed, open-loop-trained heads, one D2 construction, one horizon objective)
+Two further scenarios designed to favour graph structure, a fault spreading at a known lag and a cold start, also did not favour it: Sa was NOT SUPPORTED, the control was VIOLATED with D later, and Sb was NOT SEPARATED (Sec.~\ref{sec:favour}).
+% src: A31, A32; X25 (no mechanism; D's lower false-alarm rate is not offered as an advantage)
 These results are for one injection model, one stagger size, one scenario per seed, heads trained on open-loop dispatch, one contained-head construction and one forward-looking objective; we make no claim about other regimes, objectives or architectures.
 % src: X17, X21, X23
 
@@ -38,7 +40,7 @@ They are the open questions that the record leaves, stated as hypotheses.
 \item Training the trust heads on closed-loop dispatch, and the shift between the open-loop training dispatch and the closed-loop evaluation dispatch as a possible cause of D trailing C.
 \item The next-task objective was departed from once (Sec.~\ref{sec:objective}): a forward-looking objective did not let the one contained graph construction (D2-h) detect earlier than C-h; other horizons, thresholds, regression targets and architectures are untested.
 \item Dilution of D's own-node signal by its aggregation over many neighbours: this was tested for one contained construction (D2, Sec.~\ref{sec:graph}), while dilution in general is untested.
-\item Cold-start and collusion conditions where a graph model might help.
+\item Collusion conditions where a graph model might help. (Cold start, which an earlier version of this list included, was tested in one scenario: Sec.~\ref{sec:favour}.)
 \item Gating a different head.
 \end{itemize}
 None of these, other than the single D2 construction and the single horizon objective, was run, and none is reported as a finding.

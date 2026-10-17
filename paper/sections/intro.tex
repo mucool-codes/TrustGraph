@@ -30,6 +30,10 @@ The evaluation tests five hypotheses, fixed at the start of the project.
 \emph{H4 (fidelity)}: the attribution on the trust head (Layer 2) is faithful: perturbing a top-attributed input changes trust or the decision more often than perturbing a low-attributed one.
 \emph{H5 (overhead)}: trust scoring and explanation fit a fog-layer time budget, measured per component.
 
+H2 was first tested in the main scenario, where the graph head did not help; it was then tested in two further scenarios designed to favour graph structure (a fault spreading from RSU to RSU, and a cold start), with their rule registered before they were run.
+None of the scenarios favoured the graph head (Secs.~\ref{sec:graph} and~\ref{sec:favour}).
+% src: A9, A10, A31, A32 (X1, X2, X25: tested and not supported; no wording that the graph helped)
+
 The evaluation was designed so that a null or negative answer could be reported at full strength.
 Each comparison has a rule (metric, floor, window, verdict labels) that was written to the repository, and committed, before the numbers it judges (Sec.~\ref{sec:protocol}).
 All results are for one simulated scenario with injected degradation, and the text says so throughout.

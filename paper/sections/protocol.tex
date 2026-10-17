@@ -4,8 +4,8 @@
 \paragraph*{Pre-registration}
 Each comparison in this paper has a rule that was written down, with its metric, windows, floor, bound and verdict labels, in the project's decision log (\texttt{DECISIONS.md}) and committed to the repository \emph{before} the numbers it judges were committed.
 % src: A16, R6
-Table~\ref{tab:prereg} lists the eight pre-registrations, what each fixed, and the commits that establish the order.
-The order is evidenced by commit hashes and commit-log times only (all times $+0530$, 2026-10-13 to 2026-10-15).
+Table~\ref{tab:prereg} lists the pre-registrations, what each fixed, and the commits that establish the order.
+The order is evidenced by commit hashes and commit-log times only (all times $+0530$, 2026-10-13 to 2026-10-17).
 % src: A16 as amended by the S12 addendum: commit hashes and commit-log times only; file-timestamp and script-log times are not used.
 
 \begin{table*}[t]
@@ -17,7 +17,7 @@ The order is evidenced by commit hashes and commit-log times only (all times $+0
 \toprule
 Entry & What it fixed & Rule (commit, time) & Numbers (commit, time) \\
 \midrule
-% src: git log (commit hashes and commit-log times), DECISIONS.md D43, D54, D56, D57, D59, D65, D68, D72, D76; A16
+% src: git log (commit hashes and commit-log times), DECISIONS.md D43, D54, D56, D57, D59, D65, D68, D72, D76, D81-D86; A16; R6; F53, F54
 D43 & H2 conditions, the diagnostic-AUC metric over steps $[450,650)$, the verdict rule (WIN needs, among further conditions, a paired gain $\ge 0.02$ at $\rho=1$; NEGATIVE needs $\le -0.02$; NULL rules out $0.05$), seeds 1--5, draws 100--149 & 291a764, 10-13 10:57:40 (before any training) & 09cc126 (F16), 10-14 00:02:28 \\
 D54 & Layer-2 attribution protocol: units, perturbation size $0.3$, floors $0.20$ and $0.05$, stability threshold $0.80$, the neighbour-clause rule, a $100$\,ms timing assumption & aa97280, 10-14 15:57:15 & 3487836 (F24), 10-14 16:15:56 \\
 D56 + D57 & the sweeps, the H1 and H3 metrics, the comparisons and the WIN/NULL/NOISY rule; D57 only re-normalised the H1 effect by A's count, because the oracle's count is zero by construction, and the entry records that it was written before any evaluation draw produced a result & 26e6e79 (D56), 10-14 16:53:33; 9f2a8f9 (D57), 10-14 17:05:45 & 0b6585e (F26), 10-14 17:59:53 \\
@@ -26,6 +26,8 @@ D65 & monitor M (weights by the D52 procedure; verdict rule), staggered onset ($
 D68 & the contained head D2 (architecture, parameter counts), draws 250--299, the primary latency rule ($\pm 20$ steps), no further architecture experiment & ac72b82, 10-15 13:34:48 & fd167d5 (F43, tuning grids), 14:37:34; e74a1a0 (F44, results), 17:22:46 \\
 D72 & the forward-looking objective (a 150-step horizon, threshold $0.75$, minimum 5 tasks), C-h and D2-h with no architecture change, draws 300--349, the primary latency rule ($\pm 20$ steps), the last graph experiment & e7c7d54, 10-15 18:51:15 & 6890d59 (F47, tuning grids), 19:03:03; da1b039 (F48, results), 19:08:09 \\
 D76 & the confirmatory test of C-h against C: fresh draws 350--399, all degraded RSUs, co-primary latency ($\pm 20$ steps) and false-alarm rate (bound $0.05$), the joint verdict, no training or tuning & 96246a8, 10-15 22:24:12 & f2eb79d (F50, results), 22:42:31 \\
+D81--D84 & spreading fault (lag $L$ per hop) and cold start, frozen C and D, draws 400--449, the latency rule ($\pm 20$ steps) with a false-alarm tolerance ($0.05$), labels Sa, Sb, Sc; D82 and D84 record implementation choices; D83 adds a secondary retrained arm and the propagation-graph provenance & 474230b (D81), 10-17 13:13:44; d486abc (D82), 13:20:58; 19dd46e (D83), 13:26:09; 1f2f37f (D84), 13:37:23 & d7d1cb0 (F53), 15:58:00 \\
+D85, D86 & not pre-registrations: D85 re-issues the claims ledger; D86 records that route planning was not built & 641921a (D85), 16:01:09; 808b625 (D86), 16:46:23 & none (no number judged; no run) \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -36,8 +38,8 @@ The pre-registrations of the staggered-onset, contained-head and horizon-objecti
 % src: D65 section 2.5, D68 section 4, D72 section 4, D76 section 6; A25 (extension not triggered), F45, F49
 
 \paragraph*{Seeds, draws, labels}
-Seeds 1--5 with frozen checkpoints; evaluation draws 100--149 (the sweeps), 200--249 (staggered onset), 250--299 (D2), 300--349 (horizon objective) and 350--399 (the confirmatory test); training draws are below 100; the tuning seed (100) and the demo draw (seed 100, draw 7) are excluded from every evaluation.
-% src: A16, A25, A28, A29, A30
+Seeds 1--5 with frozen checkpoints; evaluation draws 100--149 (the sweeps), 200--249 (staggered onset), 250--299 (D2), 300--349 (horizon objective), 350--399 (the confirmatory test) and 400--449 (spreading fault and cold start; the secondary arm trained on draws 600--603 of each condition); training draws are below 100; the tuning seed (100) and the demo draw (seed 100, draw 7) are excluded from every evaluation.
+% src: A16, A25, A28, A29, A30, A31, A33
 The unit of analysis is the seed: per-seed means of per-draw paired differences, with 95\% Student-$t$ intervals over 5 seeds (4 degrees of freedom).
 We use no $p$-values and no multiplicity correction; ``the interval excludes $0$'' and ``lies above the floor'' are the only inferential statements.
 % src: A16, X11
@@ -64,6 +66,8 @@ The run of the contained-head experiment was interrupted once after the closed-l
 Every detection latency in this paper is compared under one shared rule, not at a detection operating point.
 The rule's false-alarm rate was 0.32--0.44 of healthy RSUs where it was measured (the confirmatory test, heads C and C-h only) and was not measured elsewhere.
 A latency difference is therefore a comparison under this rule, not the delay of a detector run at a chosen false-alarm rate; wherever a latency appears below, this caveat applies.
+The spreading-fault and cold-start tests (Sec.~\ref{sec:favour}) report the false-alarm rate of each head beside every latency; there, a head's latency and its false-alarm rate come from the same per-model threshold and are not separated.
+% src: A31, A32 (D78 caveat)
 
 \paragraph*{Code, data and decision log}
 % src: A17 (reproducible from config and seed; figures and tables regenerate from one command, byte-identical on re-run); A16 (commit order)
