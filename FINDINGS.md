@@ -2578,3 +2578,30 @@ D42 counts: every open-loop point 250 attempted / 0 failed / 250 aggregated, 100
 Closed loop, n_av / n_win / never-avoided together (F50): A 589.5 / 907.1 / 0.440, C 245.4 / 576.5 / 0.024, C-h 237.2 / 565.0 / 0.024; D57-normalised (n_C - n_C-h)/n_A +0.018 [-0.023, +0.058] on n_av and +0.013 [+0.001, +0.025] on n_win (descriptive, no label). C - A +0.0374 [+0.0324, +0.0424], C-h - A +0.0366 [+0.0305, +0.0427] (descriptive).
 Descriptive facts that bear on reading the rule (no label): (i) under the D65/D76 rule (per-model pre-onset 1st percentile, 10-step hold) a large share of healthy RSUs cross at some step in [100, 1200): C 0.443 and C-h 0.316 at rho 1.0, of which about 0.11 for both models first cross before step 400. This is the first time the rule's false-alarm rate has been measured; it was not measured for D, D2, D2-h or H. (ii) Within a seed, both models' trust over steps 100-399 is identical across the 50 draws and both rho (checked after F50 on seeds 1 and 5, three draws per rho), so tau is a per-seed constant (equal to the F48 values) and the same healthy RSUs account for pre-onset crossings in every draw where they are healthy; the per-draw false-alarm rates within a seed are therefore strongly dependent, and the seed, as pre-registered, is the unit of analysis.
 Interpretation (one line): on fresh draws and over all degraded RSUs, the horizon-trained node-local head again detected degradation earlier than the next-task head by a margin like A30's (38 steps at rho 1.0, 36 at rho 0, EARLIER at both), but the pre-registered condition that this comes without more false alarms is not met at 5 seeds (the false-alarm difference is between -0.46 and +0.21), so the confirmatory verdict is NOT CONFIRMED; the closed-loop success of the two heads did not differ. No mechanism is tested, and this does not revise F17, F26, F37, F45, F49 or any earlier verdict.
+
+### F52 - S17 smoke run: the fault timeline of the spreading-fault and cold-start generators (harness draw 900, one seed; no variant, no trust, no comparison)
+Date: 2026-10-17 | Commit: 508e8ca (code and D81 at 474230b) | Command: `python scripts/s17_smoke.py` (defaults: seed 1, draw 900, `configs/spread_L80.yaml` and `configs/restart_f20.yaml`, generated in memory, nothing written) | Draw 900 is a harness draw (D81 section 5): these numbers are not results and no S17 comparison number exists yet.
+
+Spreading fault, L = 80, rho 1.0, fraction 0.20 (all four degraded RSUs on segment 0). `first_nonzero` is the first step at which the sealed fault level is above zero; `first_dropped_task` is the first task silently dropped on that RSU (realised, from the sealed file).
+
+| rsu | hop | configured onset | first_nonzero | full severity | first dropped task | lag from seed (first_nonzero) |
+|---|---|---|---|---|---|---|
+| 7 (seed) | 0 | 400 | 401 | 700 | 459 | +0 |
+| 5 | 1 | 480 | 481 | 780 | 621 | +80 |
+| 10 | 1 | 480 | 481 | 780 | 620 | +80 |
+| 19 | 1 | 480 | 481 | 780 | 629 | +80 |
+
+Checks printed by the script: configured onset = onset_step + L x hop and the fault turns on one step later, for every RSU: True; healthy RSUs never faulted: True. The three downstream RSUs are each one hop from the seed, so this draw has two onset waves (400 and 480), not three.
+
+Cold start, f = 0.20, restart step 400, 4 RSUs restarted (all on segment 3), 2 failing (RSUs 6 and 15, onset 420, ramp 100: first nonzero 421, full severity 520). `success_ewma` is the observable feature.
+
+| rsu | failing | success_ewma at 399 | at 400 | at 401 | in service throughout |
+|---|---|---|---|---|---|
+| 0 | no | 1.0000 | 1.0000 | 1.0000 | True |
+| 6 | yes | 1.0000 | 1.0000 | 1.0000 | True |
+| 14 | no | 0.9831 | 1.0000 | 1.0000 | True |
+| 15 | yes | 0.8956 | 1.0000 | 1.0000 | True |
+
+RSUs not restarted: success_ewma at step 400 untouched (min 0.9408, max 1.0000).
+Interpretation (one line): the spreading fault reaches each RSU at 400 + L x hop (the seed at 400, downstream RSUs 80 steps later at L = 80), and a restart resets a node's observable history at step 400 while keeping it in service; the generators do what D81 registers. Nothing here says anything about C, D or any detection or success rate.
+
