@@ -2,7 +2,7 @@
 \label{sec:limits}
 
 \paragraph*{Limitations}
-% src: A19 in full (PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18). Results are not moved here: they are in Sec. VII.
+% src: A19 in full, as re-issued in S16b (D78) (PROJECT_SPEC 4.6; L9, L10; D31, D47, D50, D56; F21, F18; A29, F51). Results are not moved here: they are in Sec. VII.
 \begin{itemize}
 \item \textbf{Simulation only}, no testbed.
 \item The \textbf{injection model is synthetic} and is the most attackable assumption of this work; no public dataset pairs vehicular mobility with fog-node trust ground truth.
@@ -22,10 +22,14 @@
 \item \textbf{Staggered onset} was tested at $S=300$ only, with independent uniform onsets, one scenario per seed and heads trained on open-loop dispatch.
 \item \textbf{H's weights} were tuned on one seed.
 \item \textbf{D2} was tested once, with one neighbour construction, $S=300$ and open-loop-trained heads; its weights were tuned on one seed.
+\item The \textbf{horizon objective} was tested once ($H=150$ steps, threshold $0.75$, minimum 5 tasks), under staggered onset $S=300$, with one D2 construction and weights tuned on one seed.
+\item The detection rule's \textbf{false-alarm rate} was measured once (S16, C and C-h only): 0.32--0.44 of healthy RSUs cross it at some step in 1100 steps; it was not measured for D, D2, D2-h or H.
 \end{itemize}
 
 \paragraph*{Conclusion}
-% src: A21 (contribution statement) and A9-A11, A15, A23; no wording implies that the graph helped (X1, X2)
+% src: A21 (contribution statement) and A9-A11, A15, A23, A25, A28, A29, A30, A20; no wording implies that the graph helped (X1, X2) or that the horizon objective helped (X23, X24)
 In this simulation, we studied task offloading with a behavioural trust layer that drives a fixed weighted selection rule.
-The layer, validated in the closed loop against a tuned no-trust baseline and a perfect-knowledge oracle upper bound, is strongest with the node-local head; the selection has an exactly decomposable explanation; and the pre-registered tests of graph structure returned negative and null results, with a measured boundary condition for this scenario.
-Whether graph structure helps in other regimes or architectures remains open; the hypotheses the record leaves open are stated in Sec.~\ref{sec:discussion}, and none was tested here.
+The layer, validated in the closed loop against a tuned no-trust baseline and a perfect-knowledge oracle upper bound, is strongest with the node-local head; the selection has an exactly decomposable explanation; and the four pre-registered tests of graph structure---under shared onset, under staggered onset, with a contained graph head, and with that head under a forward-looking training objective---returned negative and null results, with a measured boundary condition for the shared-onset scenario.
+A confirmatory test of the forward-looking objective for the node-local head returned NOT CONFIRMED: detection was earlier (EARLIER), but more false alarms were not ruled out (NOT ACCEPTABLE).
+Latency is compared under one shared rule, not at a detection operating point; the rule's false-alarm rate was 0.32--0.44 of healthy RSUs where measured (S16) and was not measured elsewhere.
+Whether graph structure helps in other regimes, objectives or architectures remains open; the hypotheses the record leaves open are stated in Sec.~\ref{sec:discussion}, and none of them was tested here beyond the single contained-head construction and the single horizon objective.
