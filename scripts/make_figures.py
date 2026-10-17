@@ -696,13 +696,13 @@ def paper_tables(T, GT, HH) -> None:
     rows = []
     for v, src in (("A", "A"), ("B", "B"), ("B_oracle", "B_oracle"), ("C", "C"), ("D", "D"), ("E", "D")):
         s = S[src]
-        rows.append([{"B_oracle": "B-oracle (upper bound)", "E": "E (= D)", "B": "B (= A here)"}.get(v, v), pm(s["success_post_onset"]), pm(s["n_av"], 0),
-                     pm(s["n_win"], 0), pm(s["never_avoided"], 2), "never" if s["detected_fraction"][0] == 0 else pm(s["latency"], 0),
+        rows.append([{"B_oracle": "B-oracle (upper bound)", "E": "E (= D)", "B": "B (= A here)"}.get(v, v), pm(s["success_post_onset"]), pm(s["n_av"], 1),
+                     pm(s["n_win"], 1), pm(s["never_avoided"], 2), "never" if s["detected_fraction"][0] == 0 else pm(s["latency"], 0),
                      pm(s["detected_fraction"], 2)])
     g = GT["T"][SHARED]
-    rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["n_av"], 0), pm(g["n_win"], 0), pm(g["never_avoided"], 2), "not reported", "not reported"])
+    rows.append(["Gate-C (extra baseline)", pm(g["success_post_onset"]), pm(g["n_av"], 1), pm(g["n_win"], 1), pm(g["never_avoided"], 2), "not reported", "not reported"])
     h = HH["T"][SHARED]
-    rows.append(["M (extra baseline)", pm(h["success_post_onset"]), pm(h["n_av"], 0), pm(h["n_win"], 0), pm(h["never_avoided"], 2), pm(h["latency"], 0),
+    rows.append(["M (extra baseline)", pm(h["success_post_onset"]), pm(h["n_av"], 1), pm(h["n_win"], 1), pm(h["never_avoided"], 2), pm(h["latency"], 0),
                  pm(h["detected_fraction"], 2)])
     write_table("paper_ablation_shared_point",
                 ["Variant", "Success after onset", "n_av", "n_win", "Never avoided", "Detection latency (steps)", "Degraded RSUs detected"], rows,

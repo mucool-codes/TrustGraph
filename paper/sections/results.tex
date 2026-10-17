@@ -45,7 +45,7 @@ B-oracle reads the sealed ground truth, so it is an upper bound on what any beha
 \paragraph*{Dispatches to degraded RSUs (H1)}
 In this simulation, we always state the three dispatch quantities together: \nav, the dispatches to degraded RSUs from onset to the run's own effective-avoidance step; \nwin, the dispatches over the fixed window $[400,1200)$, which does not depend on the avoidance rule; and the never-avoided rate, the fraction of runs that never reach the avoidance rule.
 % src: A7, R2, X9
-At the shared point these are, for A, $627.5\pm100.4$ / $912\pm21$ / $0.47\pm0.12$; for C, $153\pm48$ / $506\pm75$ / $0.03\pm0.04$; for D, $210.6\pm84.5$ / $610\pm84$ / $0.03\pm0.04$; and for B-oracle, $24\pm26$ / $395\pm90$ / $0.01\pm0.03$.
+At the shared point these are, for A, $627.5\pm100.4$ / $912.4\pm20.6$ / $0.47\pm0.12$; for C, $152.7\pm47.9$ / $506.3\pm74.6$ / $0.03\pm0.04$; for D, $210.6\pm84.5$ / $610.1\pm84.2$ / $0.03\pm0.04$; and for B-oracle, $24.4\pm25.6$ / $394.7\pm89.9$ / $0.01\pm0.03$.
 % src: A7 (A n_av 627.5 +/- 100.4, n_win 912 +/- 21, never 0.47 +/- 0.12; C 153 +/- 48, 506 +/- 75, 0.03 +/- 0.04; D 210.6 +/- 84.5, 610 +/- 84, 0.03 +/- 0.04; B-oracle 24 +/- 26, 395 +/- 90, 0.01 +/- 0.03); F26; Table ablation_shared_point
 Relative to A, in units of A's count, the \nav\ reduction is $+0.756$ [$+0.676$, $+0.836$] for C and $+0.664$ [$+0.523$, $+0.806$] for D (WIN for both), and the fixed-window reduction is smaller, $+0.446$ [$+0.351$, $+0.541$] and $+0.331$ [$+0.221$, $+0.442$].
 % src: A7 (D57 normalisation); F27 item 3
