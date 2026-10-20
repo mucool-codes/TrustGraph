@@ -179,6 +179,16 @@ def test_restart_configs_differ_from_demo_only_as_registered(pct, frac):
     assert cfg == demo
 
 
+@pytest.mark.parametrize("tag,rate", [("r10", 0.10), ("r04", 0.04), ("r02", 0.02)])
+def test_sparse_configs_differ_from_demo_only_as_registered(tag, rate):
+    """D89 section 1: 30 RSUs, 50 vehicles and the task rate; nothing else."""
+    demo, cfg = _load("demo"), _load(f"sparse_{tag}")
+    assert cfg["topology"].pop("num_rsus") == 30 and cfg["mobility"].pop("num_vehicles") == 50
+    assert cfg["tasks"].pop("rate_per_vehicle_hz") == rate
+    del demo["topology"]["num_rsus"], demo["mobility"]["num_vehicles"], demo["tasks"]["rate_per_vehicle_hz"]
+    assert cfg == demo
+
+
 # ------------------------------------------------------------------ scenario level (operating config)
 
 

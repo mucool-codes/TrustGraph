@@ -62,6 +62,7 @@ GROUND_TRUTH_SCRIPTS = frozenset(
         "s16_confirm.py",  # S16 confirmatory C-h vs C: latency, false alarms, closed loop (D76)
         "s17_smoke.py",  # S17 smoke run: sealed fault timeline of the new scenario modes (D81)
         "s18_run.py",  # S18 spreading-fault and cold-start run: scenarios, open-loop and closed-loop evaluation, secondary arm (D81, D83)
+        "s24_gate.py",  # S24 phase-1 mechanism gate: picks the degraded RSUs from the sealed class (D89)
         "s10_data.py",  # figure inputs that need closed-loop runs (timeline, worked example)
         "s9_overhead.py",  # H4/H5 serial stage (D56 section 7)
     }
