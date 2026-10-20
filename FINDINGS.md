@@ -3193,3 +3193,29 @@ seed 5  D2  params 1570  best epoch  15  stopped  23 (patience)  val BCE 0.6367 
 ```
 Harness check (`python scripts/s24_run.py check`, seed 1, draw 900, not a result): regenerated scenario equals stored True; open-loop trust (C, D, D2, M) repeats exactly True; closed-loop D run repeats exactly True.
 Note (one line, no evaluation): every head stopped by patience; D's best validation BCE is above C's on every seed (0.138-0.182 vs 0.110-0.147), D2's within 0.003 of C's. Validation BCE is the next-task objective, not P1 or P2.
+
+
+### F58 - S24 raw open-loop results: in-regime C, D, D2 and M on sparse_r02, draws 710-759, seeds 1-5 (RAW - no labels, no verdict recorded here)
+Date: 2026-10-20 | Session: S24 | Commit: 4495e34 (harness; D90 committed ccbf2f8 before training) | first trust number 2026-10-20T05:02:37Z
+Config: `configs/sparse_r02.yaml`, rho 1.0, fraction 0.20, draws 710-759, seeds 1-5, open loop (Baseline A dispatch), stride 1, steps 100-1199. Checkpoints `checkpoints/s24/` (F57). Cloud container (D89 section 7).
+Commands: `python scripts/s24_run.py trust --workers 2` ; `python scripts/s24_run.py eval`
+```
+====================================================================================================================
+S24 OPEN LOOP: in-regime C, D, D2 and M (success_ewma), configs/sparse_r02.yaml, rho 1.0, fraction 0.2, draws 710-759, seeds [1, 2, 3, 4, 5]
+====================================================================================================================
+per model, mean over seeds of per-seed means (95% t over seeds):
+  C   AUC[450,650) 0.9046 [0.8562, 0.9529]   latency  196.3 [ 181.7,  211.0]   detected 0.986   healthy false-alarm rate 0.199 [0.084, 0.313]
+  D   AUC[450,650) 0.8062 [0.6719, 0.9405]   latency  229.8 [ 192.4,  267.2]   detected 0.963   healthy false-alarm rate 0.455 [0.179, 0.731]
+  D2  AUC[450,650) 0.9168 [0.8909, 0.9427]   latency  192.5 [ 167.9,  217.1]   detected 0.987   healthy false-alarm rate 0.290 [0.123, 0.457]
+  M   AUC[450,650) 0.7353 [0.6930, 0.7777]   latency  282.1 [ 265.8,  298.4]   detected 0.839   healthy false-alarm rate 0.060 [0.014, 0.105]
+  tau per seed: s1 C 0.9559 D 0.9488 D2 0.9491 M 0.9000; s2 C 0.9460 D 0.9215 D2 0.9406 M 0.8534; s3 C 0.8324 D 0.7864 D2 0.8557 M 0.8570; s4 C 0.8934 D 0.8621 D2 0.8926 M 0.9000; s5 C 0.8983 D 0.8009 D2 0.8779 M 0.8659
+paired differences (per draw, per-seed mean, 95% t over seeds):
+  D - C: auc -0.0983 [-0.2633, +0.0666]   lat  +33.4 [  -6.9,  +73.8]   fa +0.2562 [-0.0032, +0.5155]
+      per-seed auc +0.0219 -0.3051 -0.0843 -0.1347 +0.0106   lat +4.9 +48.1 +61.0 -7.6 +60.8
+  D2 - C: auc +0.0122 [-0.0239, +0.0484]   lat   -3.9 [ -20.4,  +12.6]   fa +0.0915 [+0.0044, +0.1786]
+      per-seed auc +0.0633 +0.0075 -0.0039 +0.0017 -0.0074   lat -25.3 -6.9 -1.0 +6.7 +7.0
+  M - C: auc -0.1692 [-0.2064, -0.1321]   lat  +85.8 [ +57.6, +113.9]   fa -0.1390 [-0.2764, -0.0016]
+      per-seed auc -0.1386 -0.1924 -0.1543 -0.1519 -0.2090   lat +98.6 +97.0 +78.3 +49.4 +105.5
+  D - D2: auc -0.1106 [-0.2673, +0.0461]   lat  +37.3 [  -1.5,  +76.1]   fa +0.1647 [-0.1137, +0.4431]
+      per-seed auc -0.0414 -0.3126 -0.0804 -0.1364 +0.0179   lat +30.2 +55.0 +62.0 -14.3 +53.7
+```
