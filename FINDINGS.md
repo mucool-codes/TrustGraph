@@ -3168,3 +3168,28 @@ D89 gate at sparse_r02: mean lead +69.0 (needs >= 20), lower bound +50.3 (needs 
 ```
 n(v) = degraded RSUs with at least one same-segment RSU neighbour, pooled over seeds and draws (6 degraded of 30 in the sparse configs, 4 of 20 in demo, all of them have such a neighbour).
 Interpretation (one line, written after the raw table): under sparse evidence the mean of a degraded RSU's same-segment neighbours' `success_ewma` moves 35-69 steps before the RSU's own, the lead growing as tasks per RSU fall, while in the dense main-study regime the lead is +1.5 [-21.2, +24.2] (consistent with F18/F19); the information a graph could use exists in this regime. This says nothing yet about whether a trust head uses it (D89 section 4).
+
+
+### F57 - S24 training: C, D, D2 trained in-regime on sparse_r02 (RAW diagnostics; no S24 evaluation number exists yet)
+Date: 2026-10-20 | Session: S24 | Commit: ccbf2f8 (harness `scripts/s24_run.py`; protocol D90 committed before training)
+Config: `configs/sparse_r02.yaml`, seeds 1-5, the S3 composition (9000 training graphs, 2700 validation graphs per seed, stride 4), D45 settings (`TrainSettings()` defaults), cloud container (D89 section 7), 2 seeds in parallel, 1 torch thread each.
+Command: `python scripts/s24_run.py train --workers 2 --threads 1`
+```
+seed 1  C   params 1313  best epoch   8  stopped  16 (patience)  val BCE 0.6841 -> 0.1103  26s
+seed 1  D   params 1614  best epoch  30  stopped  38 (patience)  val BCE 1.0962 -> 0.1384  267s
+seed 1  D2  params 1570  best epoch  39  stopped  47 (patience)  val BCE 0.6841 -> 0.1076  120s
+seed 2  C   params 1313  best epoch  32  stopped  40 (patience)  val BCE 0.7595 -> 0.1246  66s
+seed 2  D   params 1614  best epoch   7  stopped  15 (patience)  val BCE 6.2206 -> 0.1795  106s
+seed 2  D2  params 1570  best epoch  23  stopped  31 (patience)  val BCE 0.7595 -> 0.1246  77s
+seed 3  C   params 1313  best epoch  37  stopped  41 (patience)  val BCE 0.8055 -> 0.1188  67s
+seed 3  D   params 1614  best epoch  36  stopped  44 (patience)  val BCE 4.6656 -> 0.1590  299s
+seed 3  D2  params 1570  best epoch  37  stopped  37 (patience)  val BCE 0.8055 -> 0.1173  91s
+seed 4  C   params 1313  best epoch  18  stopped  26 (patience)  val BCE 0.6652 -> 0.1466  41s
+seed 4  D   params 1614  best epoch  44  stopped  52 (patience)  val BCE 0.4171 -> 0.1815  295s
+seed 4  D2  params 1570  best epoch  18  stopped  26 (patience)  val BCE 0.6652 -> 0.1456  66s
+seed 5  C   params 1313  best epoch  33  stopped  35 (patience)  val BCE 0.6367 -> 0.1251  54s
+seed 5  D   params 1614  best epoch  58  stopped  66 (patience)  val BCE 0.5166 -> 0.1432  467s
+seed 5  D2  params 1570  best epoch  15  stopped  23 (patience)  val BCE 0.6367 -> 0.1250  61s
+```
+Harness check (`python scripts/s24_run.py check`, seed 1, draw 900, not a result): regenerated scenario equals stored True; open-loop trust (C, D, D2, M) repeats exactly True; closed-loop D run repeats exactly True.
+Note (one line, no evaluation): every head stopped by patience; D's best validation BCE is above C's on every seed (0.138-0.182 vs 0.110-0.147), D2's within 0.003 of C's. Validation BCE is the next-task objective, not P1 or P2.
