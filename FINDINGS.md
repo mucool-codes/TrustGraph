@@ -3219,3 +3219,14 @@ paired differences (per draw, per-seed mean, 95% t over seeds):
   D - D2: auc -0.1106 [-0.2673, +0.0461]   lat  +37.3 [  -1.5,  +76.1]   fa +0.1647 [-0.1137, +0.4431]
       per-seed auc -0.0414 -0.3126 -0.0804 -0.1364 +0.0179   lat +30.2 +55.0 +62.0 -14.3 +53.7
 ```
+
+
+### F59 - S24 verdict against D90 and interpretation (written after F58 was committed in 28d56da)
+Date: 2026-10-20 | Session: S24 | Command: `python scripts/s24_run.py eval --verdict` (report: results/s24/report-open-verdict.txt)
+```
+VERDICT (D90 sections 3-5): primary P1 = D - C trust AUC; P2 = D - C latency with the false-alarm condition
+  D vs C [PRIMARY]: P1 AUC NOISY; P2 latency NOISY, false alarms NOT ACCEPTABLE  ->  INCONCLUSIVE
+  D2 vs C [secondary (labels printed as description)]: P1 AUC NULL; P2 latency NOISY, false alarms NOT ACCEPTABLE  ->  NOT SEPARATED
+```
+D minus C (primary): P1 trust AUC -0.0983 [-0.2633, +0.0666] (NOISY: not a WIN, and an advantage for D of up to 0.067 is not ruled out); P2 latency +33.4 [-6.9, +73.8] steps (NOISY), false alarms +0.256 [-0.003, +0.516] (NOT ACCEPTABLE). **H-sparse: INCONCLUSIVE.**
+Interpretation: F56 showed that in this regime the information a graph could use exists (pooled same-segment evidence leads own evidence by about 69 steps), yet neither graph head turned it into better separation of degraded RSUs. D was below C on average and unstable across seeds (per-seed AUC +0.022, -0.305, -0.084, -0.135, +0.011; best validation BCE above C's on every seed, F57), so the primary is NOISY, not a win. The contained head D2, which adds exactly the same-segment mean the gate measured, was not separated from C (AUC +0.012 [-0.024, +0.048], NULL: an advantage of 0.05 is ruled out) and raised more false alarms. The registered prediction (D and D2 better than C) is not borne out. Descriptive, not part of the verdict: in this regime the learned node-local head C separated far better than the raw monitor M (M minus C AUC -0.169 [-0.206, -0.132], latency +85.8 steps), unlike the dense regime where M came within 0.003-0.005 of C in success (F34). No mechanism is claimed for why the heads do not use the pooled signal; candidates (the next-task objective rewards the node's own outcome, F49/F51; D aggregates vehicle nodes too) are hypotheses, not findings. D90 section 7 applies: no retraining, no new rate, no new weights in response.
