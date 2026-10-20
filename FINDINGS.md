@@ -3230,3 +3230,27 @@ VERDICT (D90 sections 3-5): primary P1 = D - C trust AUC; P2 = D - C latency wit
 ```
 D minus C (primary): P1 trust AUC -0.0983 [-0.2633, +0.0666] (NOISY: not a WIN, and an advantage for D of up to 0.067 is not ruled out); P2 latency +33.4 [-6.9, +73.8] steps (NOISY), false alarms +0.256 [-0.003, +0.516] (NOT ACCEPTABLE). **H-sparse: INCONCLUSIVE.**
 Interpretation: F56 showed that in this regime the information a graph could use exists (pooled same-segment evidence leads own evidence by about 69 steps), yet neither graph head turned it into better separation of degraded RSUs. D was below C on average and unstable across seeds (per-seed AUC +0.022, -0.305, -0.084, -0.135, +0.011; best validation BCE above C's on every seed, F57), so the primary is NOISY, not a win. The contained head D2, which adds exactly the same-segment mean the gate measured, was not separated from C (AUC +0.012 [-0.024, +0.048], NULL: an advantage of 0.05 is ruled out) and raised more false alarms. The registered prediction (D and D2 better than C) is not borne out. Descriptive, not part of the verdict: in this regime the learned node-local head C separated far better than the raw monitor M (M minus C AUC -0.169 [-0.206, -0.132], latency +85.8 steps), unlike the dense regime where M came within 0.003-0.005 of C in success (F34). No mechanism is claimed for why the heads do not use the pooled signal; candidates (the next-task objective rewards the node's own outcome, F49/F51; D aggregates vehicle nodes too) are hypotheses, not findings. D90 section 7 applies: no retraining, no new rate, no new weights in response.
+
+
+### F60 - S24 closed loop on sparse_r02: A, M, C, D, D2, B_oracle, draws 710-759, seeds 1-5 (RAW, descriptive per D90 section 6; no label)
+Date: 2026-10-20 | Session: S24 | Commit: 96a7ba5 | first closed-loop result 2026-10-20T05:07:40Z
+Config: `configs/sparse_r02.yaml`, rho 1.0, fraction 0.20, closed loop (D51, dwell filter and handoff on), selection weights the existing tuned files, not re-tuned in this regime. Checkpoints `checkpoints/s24/` (F57). Cloud container (D89 section 7).
+Commands: `python scripts/s24_run.py closed --workers 2` ; `python scripts/s24_run.py report`
+```
+====================================================================================================
+S24 CLOSED LOOP (descriptive, D90 section 6): configs/sparse_r02.yaml, draws 710-759, seeds [1, 2, 3, 4, 5]
+weights: the existing tuned files, unchanged (no tuning in this regime)
+====================================================================================================
+  A         post-onset success 0.9106 [0.9033, 0.9179]   n_av    73.6  n_win   159.7  never-avoided 0.256
+  M         post-onset success 0.9505 [0.9430, 0.9580]   n_av    39.9  n_win    96.7  never-avoided 0.000
+  C         post-onset success 0.9615 [0.9534, 0.9696]   n_av    31.6  n_win    77.3  never-avoided 0.000
+  D         post-onset success 0.9372 [0.9275, 0.9470]   n_av    41.2  n_win   112.9  never-avoided 0.016
+  D2        post-onset success 0.9617 [0.9539, 0.9694]   n_av    26.9  n_win    72.6  never-avoided 0.000
+  B_oracle  post-onset success 0.9683 [0.9602, 0.9764]   n_av     0.6  n_win    42.0  never-avoided 0.000
+  D - C post-onset success -0.0242 [-0.0324, -0.0161]
+  D2 - C post-onset success +0.0002 [-0.0013, +0.0017]
+  M - C post-onset success -0.0109 [-0.0137, -0.0082]
+  C - A post-onset success +0.0509 [+0.0444, +0.0574]
+  D - A post-onset success +0.0267 [+0.0221, +0.0312]
+```
+Note (descriptive, one line): the trust-aware gain over A holds in this regime for C (+0.051) and D2, D is below C (-0.024 [-0.032, -0.016]) and D2 equals C (+0.0002), consistent with F59; the weights were tuned for the dense regime, so these numbers carry no verdict.
