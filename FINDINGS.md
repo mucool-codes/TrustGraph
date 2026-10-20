@@ -3148,3 +3148,23 @@ Date: 2026-10-17 | Session: S19 | Code commit: 62002e1 (main at the start of S19
 4. **Scale of the quantities a planner would see:** task completions <= 1 s (`deadline_cap_s` 1.0), step 1 s, coverage radius 400 m, speeds 5-22 m/s; light-task deadlines about 0.09-0.13 s.
 5. **Spreading-fault trust AUC (quoted from F53a, spreading fault L=40, primary arm, draws 400-449, seeds 1-5, trust AUC over the first 100 steps after each degraded RSU's own onset, hop >= 1 RSUs against healthy RSUs):** C 0.6324 +/- 0.0271, D 0.5985 +/- 0.0318, **D minus C -0.0339 (sd 0.0209), 95% [-0.0599, -0.0080]** (descriptive). Other lags in F53a: L=0 -0.0454 [-0.0864, -0.0045], L=20 -0.0505 [-0.0782, -0.0228], L=80 -0.0103 [-0.0454, +0.0248].
 Interpretation (one line): the simulator has no cost for the sequence of RSU choices, so a route planner with held-constant trust equals greedy and there is nothing to test (D86); separately, D's trust separates spreading-fault RSUs from healthy ones slightly worse than C's at L=40, so its later detection latency (F53a, F54) is not only a threshold effect.
+
+
+### F56 - S24 phase-1 mechanism gate: pooled same-segment evidence vs own evidence under evidence sparsity (RAW; the D89 gate line is the rule applied as written)
+Date: 2026-10-20 | Session: S24 | Commit: ae54484 (script `scripts/s24_gate.py`; rule D89 committed 46b45c5 at 04:25:41 UTC, before any S24 number)
+Config: `configs/sparse_r{02,04,10}.yaml` and `configs/demo.yaml` (dense reference), rho 1.0, fraction 0.20, injection draws 700-709, seeds 1-5, open loop (Baseline A dispatch). No model, no trust head.
+Environment: Linux cloud container, Python 3.13, CPU torch 2.6.0 (D89 section 7); not the F1 laptop environment.
+Commands: `python scripts/s24_gate.py generate` ; `python scripts/s24_gate.py gate`
+```
+S24 gate (D89), first number written 2026-10-20T04:31:41+00:00
+lead = t_own - t_pool, steps (positive = pooled same-segment neighbours move first); 95% t over 5 seeds
+config               tasks/RSU/s   n(v)   own t-onset   pool t-onset   lead mean [95% CI]          per-seed lead                          censored own / pool
+sparse_r02               0.0332     300       227.7         158.7        +69.0 [  +50.3,   +87.7]    +62.5  +67.6  +48.0  +81.8  +85.1   0.050 / 0.000
+sparse_r04               0.0656     300       179.1         134.9        +44.2 [  +16.2,   +72.3]    +71.6  +50.8  +16.8  +25.6  +56.4   0.017 / 0.000
+sparse_r10               0.1586     300       140.8         105.4        +35.4 [  +18.9,   +52.0]    +44.6  +20.1  +48.1  +22.0  +42.4   0.000 / 0.000
+demo                     0.2842     200       104.1         102.6         +1.5 [  -21.2,   +24.2]    +13.8   +9.5  -29.2  +14.7   -1.2   0.000 / 0.020
+
+D89 gate at sparse_r02: mean lead +69.0 (needs >= 20), lower bound +50.3 (needs > 0) -> PASS
+```
+n(v) = degraded RSUs with at least one same-segment RSU neighbour, pooled over seeds and draws (6 degraded of 30 in the sparse configs, 4 of 20 in demo, all of them have such a neighbour).
+Interpretation (one line, written after the raw table): under sparse evidence the mean of a degraded RSU's same-segment neighbours' `success_ewma` moves 35-69 steps before the RSU's own, the lead growing as tasks per RSU fall, while in the dense main-study regime the lead is +1.5 [-21.2, +24.2] (consistent with F18/F19); the information a graph could use exists in this regime. This says nothing yet about whether a trust head uses it (D89 section 4).
