@@ -1,6 +1,6 @@
 """Build demo/data.js for the TrustGraph demo front end (demo/index.html).
 
-    python demo/export_demo_data.py            (Run_Demo.bat calls this the first time)
+    python demo/export_demo_data.py            (demo/Rebuild_Data.bat calls this; the result is committed, D90)
 
 READ-ONLY with respect to the project: it reads saved outputs and writes ONE file, demo/data.js.
 It does not need PyTorch, does not train or run any model, and never edits code, configs or results.
