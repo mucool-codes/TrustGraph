@@ -1,6 +1,6 @@
 """Build demo/data.js for the TrustGraph demo front end (demo/index.html).
 
-    python demo/export_demo_data.py            (Run_Demo.bat calls this the first time)
+    python demo/export_demo_data.py            (demo/Rebuild_Data.bat calls this; the result is committed, D90)
 
 READ-ONLY with respect to the project: it reads saved outputs and writes ONE file, demo/data.js.
 It does not need PyTorch, does not train or run any model, and never edits code, configs or results.
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -129,6 +130,48 @@ def windowed(values, steps, num_steps):
         sel = (steps >= edges[i]) & (steps < edges[i + 1])
         out.append(r(values[sel].mean()) if sel.any() else None)
     return out
+
+
+# data.js is opened from file:// (fetch is blocked there), so it cannot be compressed. Instead the decision log is
+# stored losslessly in a compact form and expanded by a few lines at the end of data.js, before index.html runs:
+# every "why" sentence becomes (template id; its numbers), and each decision becomes a positional array.
+_NUM = re.compile(r"\d+(?:\.\d+)?")
+
+DECODER = """
+(function (D) {
+  const T = D.why_templates, TN = D.task_names;
+  const why = c => { if (!c) return ""; const i = c.indexOf(";"), nums = c.slice(i + 1).split(",");
+    let k = 0; return T[+c.slice(0, i)].replace(/#/g, () => nums[k++]); };
+  for (const v in D.runs) {
+    const run = D.runs[v];
+    run.decisions = run.decisions.map(a => ({ id: a[0], t: a[1], veh: a[2], type: TN[a[3]], dl: a[4], sel: a[5], ru: a[6],
+      met: a[7] === 1, obs: a[8], adv: a[9], c: a[10], why: why(a[11]) }));
+  }
+  delete D.why_templates; delete D.task_names;
+})(window.DEMO_DATA);
+"""
+
+
+def pack_decisions(runs: dict) -> tuple[dict, list[str]]:
+    """Return a copy of runs with decisions packed, and the shared list of 'why' templates."""
+    templates: list[str] = []
+    index: dict[str, int] = {}
+    packed = {}
+    for v, run in runs.items():
+        rows = []
+        for d in run["decisions"]:
+            code = ""
+            if d["why"]:
+                assert "#" not in d["why"]
+                tpl = _NUM.sub("#", d["why"])
+                if tpl not in index:
+                    index[tpl] = len(templates)
+                    templates.append(tpl)
+                code = f"{index[tpl]};" + ",".join(_NUM.findall(d["why"]))
+            rows.append([d["id"], d["t"], d["veh"], TASK_NAMES.index(d["type"]), d["dl"], d["sel"], d["ru"],
+                         1 if d["met"] else 0, d["obs"], d["adv"], d["c"], code])
+        packed[v] = {**run, "decisions": rows}
+    return packed, templates
 
 
 def main() -> int:
@@ -319,7 +362,10 @@ def main() -> int:
     }
 
     out = DEMO_DIR / "data.js"
-    out.write_text("window.DEMO_DATA = " + json.dumps(data, separators=(",", ":")) + ";\n", encoding="utf-8")
+    data["runs"], data["why_templates"] = pack_decisions(runs)
+    data["task_names"] = list(TASK_NAMES)
+    out.write_text("window.DEMO_DATA = " + json.dumps(data, separators=(",", ":")) + ";\n" + DECODER,
+                   encoding="utf-8")
     print(f"wrote {out} ({out.stat().st_size / 1e6:.1f} MB)")
     for v in REPLAY_VARIANTS:
         print(f"  {v}: {runs[v]['summary']}")

@@ -1,9 +1,19 @@
 @echo off
 REM TrustGraph demo launcher: double-click to open the demo in your browser.
-REM Builds demo\data.js from saved outputs on first use. Never changes project code.
+REM demo\data.js is committed, so a fresh clone opens straight away. Never changes project code.
 cd /d "%~dp0"
 if exist "demo\data.js" goto open
-echo Building demo data - first run only, about a minute...
+if exist "scenarios\s6" goto build
+echo.
+echo The demo data file demo\data.js is missing, and the saved outputs needed to rebuild it
+echo are not in this folder either. To restore the file from git, run:
+echo.
+echo     git checkout -- demo/data.js
+echo.
+pause
+exit /b 1
+:build
+echo Building demo data from the saved outputs - about a minute...
 set "PY=python"
 if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
 "%PY%" demo\export_demo_data.py

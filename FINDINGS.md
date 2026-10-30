@@ -3148,3 +3148,13 @@ Date: 2026-10-17 | Session: S19 | Code commit: 62002e1 (main at the start of S19
 4. **Scale of the quantities a planner would see:** task completions <= 1 s (`deadline_cap_s` 1.0), step 1 s, coverage radius 400 m, speeds 5-22 m/s; light-task deadlines about 0.09-0.13 s.
 5. **Spreading-fault trust AUC (quoted from F53a, spreading fault L=40, primary arm, draws 400-449, seeds 1-5, trust AUC over the first 100 steps after each degraded RSU's own onset, hop >= 1 RSUs against healthy RSUs):** C 0.6324 +/- 0.0271, D 0.5985 +/- 0.0318, **D minus C -0.0339 (sd 0.0209), 95% [-0.0599, -0.0080]** (descriptive). Other lags in F53a: L=0 -0.0454 [-0.0864, -0.0045], L=20 -0.0505 [-0.0782, -0.0228], L=80 -0.0103 [-0.0454, +0.0248].
 Interpretation (one line): the simulator has no cost for the sequence of RSU choices, so a route planner with held-constant trust equals greedy and there is nothing to test (D86); separately, D's trust separates spreading-fault RSUs from healthy ones slightly worse than C's at L=40, so its later detection latency (F53a, F54) is not only a threshold effect.
+
+### F56 - demo/data.js exporter run (seed 100, draw 7): demo summaries match results/s6/demo.txt, C trust exact (no new measurement)
+Date: 2026-10-30 | Session: demo-ship | Code commit: 65ea74f (exporter) | Config/seed: configs/demo.yaml, seed 100, rho 1.0, fraction 0.2, draw 7; no model trained, no scenario re-run. The exporter only reads saved outputs.
+- **C trust: exact.** "re-ran the frozen head, matches the log (max diff 0.0e+00)". D trust is the saved S10 timeline (`results/s10/timeline.npz`). The laptop's earlier copy had C trust as logged values held between decisions; the rebuilt file differs from it only there.
+- **Summaries printed by the exporter (identical before and after the compact encoding, and to every printed digit of results/s6/demo.txt):**
+  - A: tasks 6873, success_all 0.898, success_post 0.8593, post_tasks 4597, post_to_deg 1094, post_share_deg 0.238
+  - C: tasks 6873, success_all 0.9259, success_post 0.9012, post_tasks 4597, post_to_deg 715, post_share_deg 0.1555
+  - D: tasks 6873, success_all 0.9185, success_post 0.8908, post_tasks 4597, post_to_deg 767, post_share_deg 0.1668
+- **Size:** 11,278,100 bytes in the first rebuild; 5,823,669 bytes (5.8 MB) with the compact encoding of D90. Decoded in Node, the new file is deep-equal to the full-size file (6873 decisions in each of A, C, D).
+Interpretation (one line): the demo data reproduces the S6 demo numbers exactly, with C trust recomputed rather than approximated, and shrinks by about half without changing a displayed value.
