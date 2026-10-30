@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TrustGraph Demo</title>
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --surface-2:#f3f2ee; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10); --road:#d6d4cc; --road-edge:#c3c2b7;
+  --s-A:#898781; --s-C:#2a78d6; --s-D:#eb6834; --s-Bo:#1baf7a; --s-G:#6250d6; --s-H:#e87ba4; --s-D2:#008300;
+  --seg0:#1baf7a; --seg1:#eda100; --seg2:#e87ba4; --seg3:#6250d6;
+  --good:#0ca30c; --good-text:#006300; --critical:#d03b3b; --warning:#fab219;
+  --trust-lo:#e34948; --trust-mid:#c9c7bd; --trust-hi:#2a78d6;
+  --accent:#2a78d6; --accent-soft:rgba(42,120,214,.10); --band:rgba(235,104,52,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --road:#33332f; --road-edge:#3d3d39;
+    --s-A:#898781; --s-C:#3987e5; --s-D:#d95926; --s-Bo:#199e70; --s-G:#9085e9; --s-H:#d55181; --s-D2:#008300;
+    --seg0:#199e70; --seg1:#c98500; --seg2:#d55181; --seg3:#9085e9;
+    --good-text:#0ca30c; --trust-lo:#e66767; --trust-mid:#55554f; --trust-hi:#3987e5;
+    --accent:#3987e5; --accent-soft:rgba(57,135,229,.16); --band:rgba(217,89,38,.12);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --surface-2:#232321; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --road:#33332f; --road-edge:#3d3d39;
+  --s-A:#898781; --s-C:#3987e5; --s-D:#d95926; --s-Bo:#199e70; --s-G:#9085e9; --s-H:#d55181; --s-D2:#008300;
+  --seg0:#199e70; --seg1:#c98500; --seg2:#d55181; --seg3:#9085e9;
+  --good-text:#0ca30c; --trust-lo:#e66767; --trust-mid:#55554f; --trust-hi:#3987e5;
+  --accent:#3987e5; --accent-soft:rgba(57,135,229,.16); --band:rgba(217,89,38,.12);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--accent)}
+code,.mono{font-family:"Cascadia Mono",Consolas,"SFMono-Regular",Menlo,monospace;font-size:12.5px}
+button,select,input{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.bar{display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;line-height:1.2;margin-right:auto}
+.brand b{font-size:17px;letter-spacing:.2px}
+.brand span{color:var(--ink-2);font-size:12.5px}
+.pipesel{display:flex;align-items:center;gap:8px}
+.pipesel label{color:var(--ink-2);font-size:12.5px}
+select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;min-width:260px}
+.iconbtn{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer}
+nav.tabs{display:flex;gap:2px;padding:0 20px;overflow-x:auto}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;color:var(--ink-2);white-space:nowrap}
+nav.tabs button.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+main{padding:18px 20px 40px;max-width:1500px;margin:0 auto}
+.tab{display:none}.tab.on{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px}
+.grid-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
+h2{font-size:16px;margin:0 0 4px}
+h3{font-size:14px;margin:0 0 8px}
+.sub{color:var(--ink-2);font-size:12.5px;margin:0 0 12px}
+.muted{color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--surface-2)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.banner{border:1px solid var(--border);border-left:4px solid var(--warning);background:var(--surface);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px}
+.banner.info{border-left-color:var(--accent)}
+/* network */
+.netwrap{position:relative}
+#net{width:100%;aspect-ratio:1/1;max-height:calc(100vh - 300px);display:block;border-radius:10px;background:var(--surface);cursor:crosshair}
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.controls input[type=range]{flex:1;min-width:200px;accent-color:var(--accent)}
+.toggles{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--ink-2)}
+.toggles label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.playbtn{min-width:84px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.stat .k{font-size:11.5px;color:var(--ink-2)}
+.stat .v{font-size:20px;font-weight:600}
+.phase{font-weight:600}
+.declist{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
+.declist li{padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12.5px;border-bottom:1px solid var(--border)}
+.declist li:hover{background:var(--accent-soft)}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 18px rgba(0,0,0,.18);z-index:5;display:none;max-width:260px}
+.legendrow{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:8px;align-items:center}
+.gradient{width:120px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--trust-lo),var(--trust-mid),var(--trust-hi))}
+/* pipeline */
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:6px 0 4px}
+.stage{flex:1 1 150px;min-width:150px;max-width:220px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;position:relative}
+.stage:hover{border-color:var(--accent)}
+.stage.on{outline:2px solid var(--accent);background:var(--accent-soft)}
+.stage .n{font-size:11px;color:var(--muted)}
+.stage .t{font-weight:600;font-size:13px;margin:2px 0}
+.stage .d{font-size:12px;color:var(--ink-2)}
+.stage.variant{border-color:var(--accent)}
+.stage.sealed{border-style:dashed}
+.arrow{align-self:center;color:var(--muted);font-size:18px}
+.loopnote{font-size:12px;color:var(--ink-2);margin:6px 0 14px}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13px}
+.kv div:nth-child(odd){color:var(--ink-2)}
+.formula{font-family:"Cascadia Mono",Consolas,monospace;background:var(--surface-2);border-radius:8px;padding:8px 10px;display:inline-block}
+ul.files{margin:6px 0 0;padding-left:18px}
+ul.files li{margin:2px 0}
+.refchip{display:inline-block;margin:3px 6px 3px 0;padding:2px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2);font-size:12px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.refchip:hover{border-color:var(--accent)}
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--ink-2);font-weight:600}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.hl td{background:var(--accent-soft);font-weight:600}
+.scroll{overflow-x:auto}
+/* charts */
+.chart{position:relative}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart .tip{display:none}
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:16px}
+.finding{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.finding .lab{font-size:11.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2)}
+.finding .big{font-size:22px;font-weight:650;margin:4px 0}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:1px 8px;border-radius:6px;border:1px solid var(--border)}
+.badge.win{color:var(--good-text)} .badge.neg{color:var(--critical)} .badge.null{color:var(--ink-2)}
+/* explain */
+.why{font-size:14px;background:var(--surface-2);border-left:3px solid var(--accent);padding:10px 12px;border-radius:8px;margin:10px 0}
+pre.raw{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:12px;font-size:12px;overflow:auto;max-height:420px}
+.contrib{display:grid;grid-template-columns:90px 1fr 70px;gap:6px 10px;align-items:center;font-size:12.5px}
+.cbar{height:14px;position:relative;background:transparent}
+.cbar span{position:absolute;top:0;height:14px;border-radius:4px}
+.cbar .zero{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--axis)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=number]{width:100px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 8px}
+.refs li{margin:0 0 10px}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--page);z-index:50;flex-direction:column;gap:8px}
+@media (max-width:1000px){.grid2{grid-template-columns:1fr}.grid-charts{grid-template-columns:1fr}select{min-width:0;width:100%}}
+@media (max-width:600px){main{padding:12px 16px}.bar{padding:10px 16px}nav.tabs{padding:0 16px}.kv{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="loading"><b>Loading TrustGraph demo…</b><span class="muted">reading demo/data.js</span></div>
+
+<header>
+  <div class="bar">
+    <div class="brand"><b>TrustGraph</b><span>Trust-aware, explainable task offloading for vehicular fog networks: simulation demo</span></div>
+    <div class="pipesel">
+      <label for="pipe">Pipeline</label>
+      <select id="pipe"></select>
+    </div>
+    <button class="iconbtn" id="theme" title="Toggle light / dark">Light / dark</button>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="network" class="on">Network</button>
+    <button data-tab="pipeline">Pipeline details</button>
+    <button data-tab="results">Results</button>
+    <button data-tab="explain">Explain a decision</button>
+    <button data-tab="refs">References</button>
+  </nav>
+</header>
+
+<main>
+  <!-- NETWORK -->
+  <section class="tab on" id="tab-network">
+    <div id="netBanner"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="netwrap">
+          <canvas id="net"></canvas>
+          <div class="tip" id="netTip"></div>
+        </div>
+        <div class="controls">
+          <button class="iconbtn playbtn" id="play">▶ Play</button>
+          <input type="range" id="step" min="0" max="1199" value="0">
+          <span class="mono" id="stepLbl">step 0</span>
+          <select id="speed" style="min-width:0">
+            <option value="10">10 steps/s</option>
+            <option value="30" selected>30 steps/s</option>
+            <option value="60">60 steps/s</option>
+          </select>
+          <button class="iconbtn" id="jumpOnset">Jump to onset</button>
+        </div>
+        <div class="toggles">
+          <label><input type="checkbox" id="tCov"> coverage (400 m)</label>
+          <label><input type="checkbox" id="tLinks" checked> RSU–RSU links</label>
+          <label><input type="checkbox" id="tDisp" checked> task dispatches</label>
+          <label><input type="checkbox" id="tTruth"> reveal sealed truth (degraded RSUs)</label>
+        </div>
+        <div class="legendrow" id="netLegend"></div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <h3 id="sideTitle">Live run</h3>
+          <div class="stats">
+            <div class="stat"><div class="k">Time</div><div class="v" id="sTime">0 s</div></div>
+            <div class="stat"><div class="k">Phase</div><div class="v phase" id="sPhase">–</div></div>
+            <div class="stat"><div class="k">Deadline success so far</div><div class="v" id="sSucc">–</div></div>
+            <div class="stat"><div class="k">Tasks to degraded RSUs since onset</div><div class="v" id="sDeg">–</div></div>
+          </div>
+          <div id="rsuPanel" class="sub">Click an RSU on the map to inspect its trust and behaviour.</div>
+        </div>
+        <div class="card">
+          <h3>Recent decisions <span class="muted" style="font-weight:400">(click to explain)</span></h3>
+          <ul class="declist" id="decList"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PIPELINE -->
+  <section class="tab" id="tab-pipeline">
+    <div class="card" style="margin-bottom:16px" id="pipeHead"></div>
+    <div class="card" style="margin-bottom:16px">
+      <h2>Stages</h2>
+      <p class="sub">Click a stage for its inputs, outputs, files and settings. Highlighted stages are where this pipeline differs from the others; dashed stages hold sealed ground truth.</p>
+      <div class="flow" id="flow"></div>
+      <div class="loopnote">↺ Closed loop: each outcome updates the tracker (<code>success_ewma</code>, <code>latency_dev</code>), which feeds the next step's graph.</div>
+      <div id="stageDetail"></div>
+    </div>
+    <div class="card" id="pipeRefs"></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="tab" id="tab-results">
+    <div class="findings" id="findings"></div>
+    <div class="card" style="margin-bottom:16px">
+      <h2>Multi-seed evaluation</h2>
+      <p class="sub">5 seeds × 50 evaluation draws each, in this simulation. Mean ± sd across seeds. Source: <code>results/s10/tables/</code>. The selected pipeline is highlighted.</p>
+      <div class="grid-charts">
+        <div><h3>Post-onset deadline success at the shared point (ρ 1.0, 20% degraded)</h3><div class="chart" id="chBars"></div></div>
+        <div><h3>Post-onset success vs fraction of degraded RSUs (ρ 1.0)</h3><div class="chart" id="chFrac"></div></div>
+        <div><h3>Post-onset success vs failure correlation ρ (20% degraded)</h3><div class="chart" id="chRho"></div></div>
+        <div><h3>5-seed average: Variant D trust, degraded vs healthy RSUs</h3><div class="chart" id="chAggTrust"></div></div>
+      </div>
+      <h3 style="margin-top:18px">Ablation table at the shared point</h3>
+      <div class="scroll" id="tblShared"></div>
+      <h3 style="margin-top:18px">Every test of a graph head against the node-local head C (H2)</h3>
+      <div class="scroll" id="tblGraph"></div>
+    </div>
+    <div class="card">
+      <h2>Demo scenario: one run, A vs C vs D</h2>
+      <p class="sub">Seed 100, ρ 1.0, 20% degraded, injection draw 7, closed loop. This is the tuning seed, so it's an <b>illustration, not an evaluation</b>. Shaded area: degradation ramp (steps 400–700).</p>
+      <div class="grid-charts">
+        <div><h3>Mean trust of degraded vs healthy RSUs</h3><div class="chart" id="chTrust"></div></div>
+        <div><h3>Share of tasks sent to degraded RSUs (per 25 steps)</h3><div class="chart" id="chShare"></div></div>
+        <div><h3>Deadline success (per 25 steps)</h3><div class="chart" id="chSucc"></div></div>
+      </div>
+      <h3 style="margin-top:18px">By phase</h3><div class="scroll" id="tblPhase"></div>
+    </div>
+  </section>
+
+  <!-- EXPLAIN -->
+  <section class="tab" id="tab-explain">
+    <div id="exBanner"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="row">
+          <label class="muted">Decision</label>
+          <input type="number" id="exId" min="0" value="3993">
+          <button class="iconbtn" id="exPrev">◀</button>
+          <button class="iconbtn" id="exNext">▶</button>
+          <select id="exFilter" style="min-width:0">
+            <option value="">step through: any decision</option>
+            <option value="trust">…runner-up lost on trust</option>
+            <option value="latency">…lost on latency</option>
+            <option value="advertised load">…lost on advertised load</option>
+            <option value="No single term">…no single term decided</option>
+          </select>
+        </div>
+        <div id="exBody"></div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <h3>Curated examples</h3>
+          <p class="sub">Picked with the fixed rules in <code>scripts/s7_examples.py</code> (the first plateau decision of each kind), not for how they read.</p>
+          <div id="curated"></div>
+        </div>
+        <div class="card">
+          <h3>Run it yourself</h3>
+          <p class="sub">The same explanation from the project's command line:</p>
+          <pre class="raw" id="exCmd"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REFERENCES -->
+  <section class="tab" id="tab-refs">
+    <div class="card">
+      <h2>References</h2>
+      <p class="sub">From <code>RELATED_WORK.md</code> (verified 2026-09-02 and 2026-10-15). What may be said about each work is limited to its abstract. No performance comparison with any of these works was run (CLAIMS X8).</p>
+      <div id="refList"></div>
+    </div>
+  </section>
+</main>
+
+<script src="data.js"></script>
+<script>
+"use strict";
+const DD = window.DEMO_DATA;
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+if(!DD){
+  $("#loading").innerHTML = "<b>demo/data.js is missing.</b><span class='muted'>Double-click <code>Run_Demo.bat</code> in the project folder. It builds the data and reopens this page.</span>";
+  throw new Error("no data");
+}
+
+/* ------------------------------------------------------------------ references */
+const REFS = {
+  r1:{t:"Spatiotemporal Trust Evaluation for Collaborator Selection via Customized GNN-Mamba", a:"B. Zhu, X. Wang", v:"arXiv 2605.07658 (IEEE ICC 2026 per arXiv comment)", u:"https://www.alphaxiv.org/abs/2605.07658", g:"Prior art", say:"Learned, structure-aware trust with GNNs, for collaborator selection; not vehicular offloading, no explanation."},
+  r2:{t:"Task-Specific Trust Evaluation for Multi-Hop Collaborator Selection via GNN-Aided Distributed Agentic AI", a:"B. Zhu, X. Wang, D. Niyato", v:"IEEE JSAC 2026, doi 10.1109/JSAC.2025.3642235", u:"https://www.alphaxiv.org/abs/2512.05788", g:"Prior art", say:"Same research line as ref 1. We adopt the learned structural-trust formulation and integrate it into the offloading objective."},
+  r3:{t:"Optimizing Age of Information in Vehicular Edge Computing with Federated GNN Multi-Agent RL", a:"W. Wang, Q. Wu, P. Fan, N. Cheng, W. Chen, J. Wang, K. B. Letaief", v:"arXiv 2407.02342 (preprint)", u:"https://www.alphaxiv.org/abs/2407.02342", g:"Prior art", say:"Structure-aware vehicular edge computing; no learned trust, no explanation."},
+  r4:{t:"Joint Computing Resource Allocation and Task Offloading in Vehicular Fog Computing Under Asymmetric Information", a:"G. Sun, S. Chen, Z. Sun, L. He, J. Wang, D. Niyato, Z. Han, D. I. Kim", v:"arXiv 2510.26256 (preprint)", u:"https://www.alphaxiv.org/abs/2510.26256", g:"Prior art", say:"Vehicular fog offloading; trust only in an economic sense."},
+  r5:{t:"Deep Reinforcement Learning for Delay-Optimized Task Offloading in Vehicular Fog Computing", a:"M. P. Toopchinezhad, M. Ahmadi", v:"arXiv 2410.03472 (preprint)", u:"https://www.alphaxiv.org/abs/2410.03472", g:"Prior art", say:"Vehicular fog offloading without a trust model."},
+  r6:{t:"Scalable Explainability-as-a-Service (XaaS) for Edge AI Systems", a:"S. K. Singh, J. Roy", v:"IEEE SoutheastCon 2026, doi 10.1109/SoutheastCon63549.2026.11476268", u:"https://www.alphaxiv.org/abs/2602.04120", g:"Prior art", say:"Explainability for edge AI; not trust, not offloading."},
+  r7:{t:"Enhancing AI Transparency: XRL-Based Resource Management and RAN Slicing for 6G ORAN", a:"S. Mhatre, F. Adelantado, K. Ramantas, C. Verikoukis", v:"arXiv 2501.10292 (preprint)", u:"https://www.alphaxiv.org/abs/2501.10292", g:"Prior art", say:"Explainable RL for resource management."},
+  r8:{t:"Self-Explaining Reinforcement Learning for Mobile Network Resource Allocation", a:"K. Nowosadko, F. Ruggeri, A. Terra", v:"arXiv 2509.14925 (preprint)", u:"https://www.alphaxiv.org/abs/2509.14925", g:"Prior art", say:"Self-explaining RL for resource allocation."},
+  r9:{t:"eXplainable AI for RL-based Networking Solutions", a:"Y. S. Murcia, O. M. Caicedo, D. M. Casas, N. L. S. da Fonseca", v:"arXiv 2509.21649 (preprint)", u:"https://www.alphaxiv.org/abs/2509.21649", g:"Prior art", say:"XAI for RL networking."},
+  r10:{t:"Explainable Fraud Detection with GNNExplainer and Shapley Values", a:"N. H. Dao", v:"arXiv 2509.12262 (B.Comp dissertation)", u:"https://www.alphaxiv.org/abs/2509.12262", g:"Prior art", say:"Applies GNNExplainer to a classification; ours explains an allocation contrastively (why the runner-up lost)."},
+  r11:{t:"SGA-SAC: Fusing Bayesian Stackelberg games to DRL with graph attention for explainable task offloading in vehicular edge computing", a:"X. Cheng, B. Xu, H. Yin, S. Shen, Z. Liu, T. Wang, R. Li", v:"Information Fusion 136, 104506, 2026, doi 10.1016/j.inffus.2026.104506", u:"https://doi.org/10.1016/j.inffus.2026.104506", g:"Prior art", say:"Closest explainable vehicular-offloading work (Grad-CAM over a graph-attention policy). The difference is our exactly decomposable score plus a trust head under injected degradation. This is not a performance claim."},
+  r12:{t:"A Trust-Based Malicious RSU Detection Mechanism in Edge-Enabled Vehicular Ad Hoc Networks", a:"F. Siddiqua, M. Jahan", v:"arXiv 2208.05680; J. Asiatic Soc. Bangladesh, Science, 2025", u:"https://arxiv.org/abs/2208.05680", g:"Prior art", say:"Prior art for behavioural (not certificate-only) trust of RSUs using RSU–RSU interaction."},
+  r13:{t:"Trust-Aware Routing for Distributed Generative AI Inference at the Edge (G-TRAC)", a:"C. Nguyen, E. Elmroth", v:"DCOSS-IoT 2026, doi 10.1109/DCOSS-IoT69657.2026.00036; arXiv 2603.28622", u:"https://arxiv.org/abs/2603.28622", g:"Prior art", say:"A trust floor that prunes candidates before selection: the same structural idea as Gate-C (our own construction; G-TRAC was not implemented)."},
+  gine:{t:"Strategies for Pre-training Graph Neural Networks (GINEConv)", a:"W. Hu, B. Liu, J. Gomes, M. Zitnik, P. Liang, V. Pande, J. Leskovec", v:"ICLR 2020; arXiv 1905.12265", u:"https://arxiv.org/abs/1905.12265", g:"Methods and tools", say:"The edge-aware GIN layer used by Variant D, so the same_segment edge feature reaches the aggregation."},
+  gnnx:{t:"GNNExplainer: Generating Explanations for Graph Neural Networks", a:"R. Ying, D. Bourgeois, J. You, M. Zitnik, J. Leskovec", v:"NeurIPS 32 (2019); arXiv 1903.03894", u:"https://arxiv.org/abs/1903.03894", g:"Methods and tools", say:"Layer 2 attribution on the trust head (Variant E)."},
+  pyg:{t:"Fast Graph Representation Learning with PyTorch Geometric", a:"M. Fey, J. E. Lenssen", v:"ICLR 2019 RLGM Workshop; arXiv 1903.02428", u:"https://arxiv.org/abs/1903.02428", g:"Methods and tools", say:"Graph library for the graph snapshots and the GNN heads (torch-geometric 2.8)."},
+  spec:{t:"PROJECT_SPEC.md: locked decisions L1–L12, variants, evaluation plan", a:"this project", v:"repository root", u:"../PROJECT_SPEC.md", g:"Project documents"},
+  dec:{t:"DECISIONS.md: every design choice and why (D1–D78)", a:"this project", v:"repository root", u:"../DECISIONS.md", g:"Project documents"},
+  find:{t:"FINDINGS.md: every measured result (F1–F51)", a:"this project", v:"repository root", u:"../FINDINGS.md", g:"Project documents"},
+  claims:{t:"CLAIMS.md: what the paper may and may not say", a:"this project", v:"repository root", u:"../CLAIMS.md", g:"Project documents"},
+  rw:{t:"RELATED_WORK.md: verification record for every citation", a:"this project", v:"repository root", u:"../RELATED_WORK.md", g:"Project documents"},
+};
+
+/* ------------------------------------------------------------------ pipelines */
+const W = DD.weights.file || {};
+const wOf = k => W[k] || null;
+const PIPES = {
+  A:{name:"A: No trust (load/latency only)", role:"Baseline", color:"--s-A", replay:"A", row:"A",
+     summary:"The selection rule with the trust term switched off (α = 0). The vehicle offloads to the in-range RSU with the best mix of link latency and advertised load. It can't notice a node that's quietly failing.",
+     trust:{title:"Trust source: none", d:"α = 0, so trust never enters the score (L2). Every other stage is identical to the trust-aware pipelines, which makes A the paired reference.", files:["src/trustgraph/offload.py: TRUST_SOURCE['A'] = 'none'"], decisions:"L2, D33"},
+     weights:wOf("A"), refs:["r4","r5","spec","dec"]},
+  B:{name:"B: Certificate-only trust (SCMS-style)", role:"Baseline", color:"--s-A", replay:"A", replayNote:"B makes exactly the same decisions as A in this scenario (asserted on all 2000 paired draws, F26), so the A replay is shown.", row:"B",
+     summary:"Trust is the binary certificate-validity flag, the way deployed V2X security works today. A degraded node still has a valid certificate, so trust never moves.",
+     trust:{title:"Trust source: cert_valid feature", d:"Trust = the RSU's cert_valid feature (0/1). No revocation is modelled in a 20-minute scenario (CRL propagation takes hours to days), so it stays 1 for every RSU and B decides identically to A.", files:["src/trustgraph/offload.py: 'cert_valid_feature'","src/trustgraph/tracking.py: PLACEHOLDER_CERT_VALID = 1.0"], decisions:"D44, D50, F8, F26"},
+     weights:wOf("A"), refs:["r12","spec","dec"]},
+  B_oracle:{name:"B-oracle: Perfect knowledge (upper bound)", role:"Upper bound, not a method", color:"--s-Bo", replay:null, row:"B-oracle",
+     summary:"Trust is read directly from the sealed ground truth with zero delay: a degraded RSU is known to be degraded the instant it starts degrading. No deployable system can do this. It shows how much room there is.",
+     trust:{title:"Trust source: sealed fault state (oracle)", d:"cert_valid_oracle: the simulator passes the true fault state of each RSU into the engine. This is the only variant that touches sealed data, and it does so on the world side (D50).", files:["src/trustgraph/offload.py: 'cert_valid_oracle'","src/trustgraph/sealed/ground_truth.py"], decisions:"D50"},
+     weights:wOf("B_oracle"), refs:["spec","dec","claims"]},
+  C:{name:"C: Node-local MLP trust", role:"Method (node-local)", color:"--s-C", replay:"C", row:"C",
+     summary:"A small MLP scores each RSU only from its own behaviour record (6 features, no neighbours). It's the capacity-matched control for the GNN: same width, depth and head, no message passing.",
+     trust:{title:"Trust source: MLP over the RSU's own 6 features", d:"Input x[:, RSU_BLOCK] = load, queue_depth, cert_valid, success_ewma, latency_dev, uptime_stability. Linear(6→32), ReLU, Linear(32→32), ReLU, Linear(32→1), sigmoid. Edges and vehicle rows are never read.", files:["src/trustgraph/model.py: NodeLocalTrustHead","checkpoints/s3-seed<n>-C.pt"], decisions:"D44, L3, L12"},
+     learned:true, weights:wOf("C"), refs:["pyg","spec","dec","find"]},
+  D:{name:"D: GNN trust (2-layer GINEConv)", role:"Method (graph)", color:"--s-D", replay:"D", row:"D",
+     summary:"A graph neural network scores each RSU from its own record plus messages from nodes up to two hops away, including the other RSUs on its backhaul segment. This is the structural hypothesis H2.",
+     trust:{title:"Trust source: 2-layer GINEConv over the whole graph", d:"Input: all 9 node columns, edge_index and 4 edge features (link_latency, signal_strength, link_age, same_segment). GINEConv(9→32), ReLU, GINEConv(32→32), ReLU, Linear(32→1), sigmoid. GINE adds a learned projection of each edge's features to the neighbour's message, so same_segment reaches the aggregation.", files:["src/trustgraph/model.py: TrustHead","checkpoints/s3-seed<n>-D.pt"], decisions:"D44, L1, L6"},
+     learned:true, weights:wOf("D"), refs:["r1","r2","gine","pyg","spec","dec"]},
+  E:{name:"E: GNN trust + explanation (full proposed system)", role:"Method (graph + explanation)", color:"--s-D", replay:"D", replayNote:"E selects exactly as D (asserted), so the D replay is shown. E adds the explanation layers.", row:"E (= D)",
+     summary:"D plus explanations for every decision. Layer 1 is an exact breakdown of the linear score: why the winner won and why the runner-up lost. Layer 2 uses GNNExplainer on the trust head: why a node's trust has its value.",
+     trust:{title:"Trust source: same as D", d:"Identical frozen GINEConv head and identical decisions. The difference is the explanation stage.", files:["src/trustgraph/model.py: TrustHead"], decisions:"D50, D53, D54"},
+     learned:true, explain2:true, weights:wOf("D"), refs:["gnnx","r10","r11","r6","r1","r2","gine","claims"]},
+  Gate_C:{name:"Gate-C: Trust floor + node-local trust", role:"Extra baseline", color:"--s-G", replay:null, row:"Gate-C (extra baseline)",
+     summary:"Uses C's frozen trust head, but first removes every candidate whose trust is below τ, then applies C's weighted rule to the survivors. This tests 'trust as an admission gate' against 'trust as a weighted term'.",
+     trust:{title:"Trust source: C's frozen head", d:"Same NodeLocalTrustHead and checkpoint as C.", files:["src/trustgraph/offload.py: 'model_C' + trust_gate_tau","configs/gate.yaml"], decisions:"D59"},
+     gate:true, learned:true, weights:wOf("C"), refs:["r13","spec","dec"]},
+  H:{name:"H: Heuristic trust (success EWMA, no learning)", role:"Extra baseline", color:"--s-H", replay:null, row:"H (heuristic baseline)",
+     summary:"Trust is simply the RSU's own promise-kept average (success_ewma): no model, no training, no neighbours. It checks how much the learned heads add over the raw behavioural signal.",
+     trust:{title:"Trust source: success_ewma feature", d:"Trust = rsu_features[t, :, success_ewma], the observable EWMA itself.", files:["src/trustgraph/offload.py: 'success_ewma_feature'","configs/h.yaml","configs/weights_h.yaml","scripts/s13_h.py"], decisions:"D65"},
+     weights:DD.weights.H, refs:["r12","spec","dec"]},
+  D2:{name:"D2: Contained graph head (C + same-segment neighbours)", role:"Extra graph variant (S14)", color:"--s-D2", replay:null, row:null,
+     summary:"C's own branch plus a separate branch that averages the encoded records of the RSU's same-segment neighbours. The neighbour weights start at zero, so D2 begins as exactly C and only uses neighbours if training finds them useful.",
+     trust:{title:"Trust source: C branch + mean of same-segment neighbours", d:"Own branch: identical to C. Neighbour branch: mean over RSU neighbours joined by a same_segment = 1 edge of Linear(6→32)+ReLU, plus a has-neighbours flag. Head over the concatenation, neighbour weights initialised to zero.", files:["src/trustgraph/model.py: ContainedGraphHead","configs/weights_d2.yaml","scripts/s14_d2.py"], decisions:"D68"},
+     learned:true, weights:DD.weights.D2, refs:["r1","r2","pyg","spec","dec"]},
+};
+
+/* ------------------------------------------------------------------ helpers */
+const fmt = (x,d=3) => x==null||isNaN(x) ? "–" : (+x).toFixed(d);
+const pct = x => x==null ? "–" : (100*x).toFixed(1)+"%";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pm = s => { if(!s) return null; const m = String(s).match(/^\s*([-+0-9.]+)\s*±\s*([0-9.]+)/); return m ? {m:+m[1], sd:+m[2]} : null; };
+function mix(a,b,t){ const pa=hex(a), pb=hex(b); return `rgb(${pa.map((v,i)=>Math.round(v+(pb[i]-v)*t)).join(",")})`; }
+function hex(h){ h=h.replace("#",""); if(h.startsWith("rgb")) return [0,0,0]; return [0,2,4].map(i=>parseInt(h.substr(i,2),16)); }
+function trustColor(t){ const lo=css("--trust-lo"), mid=css("--trust-mid"), hi=css("--trust-hi"); const p=0.7; return t<p ? mix(lo,mid,t/p) : mix(mid,hi,(t-p)/(1-p)); }
+const SEG = i => css(`--seg${i}`);
+
+const state = { pipe:"D", step:0, playing:false, selRsu:null, stage:"trust", exVariant:"D", exIdx:0 };
+const T = DD.steps, N = DD.world.rsu_pos.length, ONSET = DD.sealed.onset, RAMP = DD.sealed.ramp;
+const DEG = new Set(DD.sealed.degraded);
+
+/* per replay variant indexes */
+const IDX = {};
+for(const v of Object.keys(DD.runs)){
+  const decs = DD.runs[v].decisions, byStep = Array.from({length:T},()=>[]);
+  decs.forEach((d,i)=>byStep[d.t].push(i));
+  const cumN = new Int32Array(T+1), cumMet = new Int32Array(T+1), cumPost = new Int32Array(T+1), cumPostDeg = new Int32Array(T+1);
+  for(let t=0;t<T;t++){
+    let n=0,m=0,p=0,pd=0;
+    for(const i of byStep[t]){ const d=decs[i]; n++; if(d.met) m++; if(t>=ONSET && d.sel!=null){ p++; if(DEG.has(d.sel)) pd++; } }
+    cumN[t+1]=cumN[t]+n; cumMet[t+1]=cumMet[t]+m; cumPost[t+1]=cumPost[t]+p; cumPostDeg[t+1]=cumPostDeg[t]+pd;
+  }
+  const idById = new Map(decs.map((d,i)=>[d.id,i]));
+  IDX[v] = {byStep, cumN, cumMet, cumPost, cumPostDeg, idById};
+}
+const replayOf = p => PIPES[p].replay;
+
+/* ------------------------------------------------------------------ header */
+const sel = $("#pipe");
+for(const [k,p] of Object.entries(PIPES)){ const o=document.createElement("option"); o.value=k; o.textContent=p.name; sel.appendChild(o); }
+sel.value = state.pipe;
+sel.onchange = () => { state.pipe = sel.value; const r = replayOf(state.pipe); if(r) state.exVariant = r; renderAll(); };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t){
+  document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
+  document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("on", s.id==="tab-"+t));
+  if(t==="results") renderResults();
+  if(t==="network") resizeNet();
+}
+$("#theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = cur==="dark" ? "light" : "dark";
+  try{ localStorage.setItem("tg-theme", document.documentElement.dataset.theme); }catch(e){}
+  renderAll();
+};
+try{ const th = localStorage.getItem("tg-theme"); if(th) document.documentElement.dataset.theme = th; }catch(e){}
+
+/* ------------------------------------------------------------------ network */
+const cv = $("#net"), ctx = cv.getContext("2d");
+let VIEW = {s:1, ox:0, oy:0, w:0, h:0};
+function resizeNet(){
+  const r = cv.getBoundingClientRect(); if(!r.width) return;
+  const dpr = window.devicePixelRatio||1;
+  cv.width = r.width*dpr; cv.height = r.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const pad = 34, ext = DD.world.extent;
+  const s = Math.min((r.width-2*pad)/ext, (r.height-2*pad)/ext);
+  VIEW = {s, ox:(r.width-ext*s)/2, oy:(r.height-ext*s)/2, w:r.width, h:r.height};
+  drawNet();
+}
+const P = (x,y) => [VIEW.ox + x*VIEW.s, VIEW.oy + (DD.world.extent - y)*VIEW.s];
+function vehPos(t,v){ const a = DD.veh_pos[t]; return [a[2*v], a[2*v+1]]; }
+
+function drawNet(){
+  const t = state.step, w = DD.world, rv = replayOf(state.pipe), run = rv ? DD.runs[rv] : null;
+  ctx.clearRect(0,0,VIEW.w,VIEW.h);
+  // roads
+  ctx.lineCap = "round";
+  for(const [a,b] of w.roads){
+    const [x1,y1]=P(...w.intersections[a]), [x2,y2]=P(...w.intersections[b]);
+    ctx.strokeStyle = css("--road"); ctx.lineWidth = Math.max(9, 22*VIEW.s); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  }
+  // coverage
+  if($("#tCov").checked){
+    for(let i=0;i<N;i++){ const [x,y]=P(...w.rsu_pos[i]); ctx.beginPath(); ctx.arc(x,y,w.coverage_m*VIEW.s,0,7); ctx.fillStyle = css("--accent-soft"); ctx.globalAlpha=.35; ctx.fill(); ctx.globalAlpha=1; }
+  }
+  // rsu-rsu links
+  if($("#tLinks").checked){
+    for(const [a,b] of w.rsu_edges){
+      const same = w.rsu_seg[a]===w.rsu_seg[b];
+      const [x1,y1]=P(...w.rsu_pos[a]), [x2,y2]=P(...w.rsu_pos[b]);
+      ctx.setLineDash(same?[]:[3,5]); ctx.lineWidth = same?2:1; ctx.strokeStyle = same ? SEG(w.rsu_seg[a]) : css("--axis");
+      ctx.globalAlpha = same ? .35 : .8; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+  // dispatches in the last 3 steps
+  if(run && $("#tDisp").checked){
+    const ix = IDX[rv];
+    for(let k=2;k>=0;k--){
+      const tt=t-k; if(tt<0) continue;
+      for(const i of ix.byStep[tt]){
+        const d = run.decisions[i]; if(d.sel==null) continue;
+        const [vx,vy] = P(...vehPos(tt,d.veh)), [rx,ry] = P(...w.rsu_pos[d.sel]);
+        ctx.strokeStyle = d.met ? css("--ink") : css("--critical"); ctx.globalAlpha = 1 - k*0.3; ctx.lineWidth = d.met ? 1.6 : 2.6;
+        if(!d.met) ctx.setLineDash([6,3]);
+        ctx.beginPath(); ctx.moveTo(vx,vy); ctx.lineTo(rx,ry); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    ctx.globalAlpha=1;
+  }
+  // vehicles
+  const active = new Set(); if(run) for(const i of IDX[rv].byStep[t]) active.add(run.decisions[i].veh);
+  for(let v=0; v<DD.num_vehicles; v++){
+    const [x,y] = P(...vehPos(t,v));
+    ctx.beginPath(); ctx.arc(x,y, active.has(v)?5.5:3.2, 0, 7);
+    ctx.fillStyle = active.has(v) ? css("--ink") : css("--muted"); ctx.fill();
+  }
+  // RSUs
+  const reveal = $("#tTruth").checked;
+  for(let i=0;i<N;i++){
+    const [x,y] = P(...w.rsu_pos[i]);
+    const tr = run && rv!=="A" ? run.trust[t][i] : null;
+    if(reveal && DEG.has(i)){
+      ctx.beginPath(); ctx.arc(x,y,19,0,7); ctx.setLineDash([3,3]); ctx.strokeStyle = css("--critical"); ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.beginPath(); ctx.arc(x,y,12,0,7);
+    ctx.fillStyle = tr==null ? css("--surface-2") : trustColor(tr); ctx.fill();
+    ctx.lineWidth = state.selRsu===i ? 5 : 3.5; ctx.strokeStyle = SEG(w.rsu_seg[i]); ctx.stroke();
+    if(state.selRsu===i){ ctx.beginPath(); ctx.arc(x,y,17,0,7); ctx.lineWidth=1.5; ctx.strokeStyle=css("--ink"); ctx.stroke(); }
+    ctx.fillStyle = tr!=null && (tr<0.35 || tr>0.9) ? "#ffffff" : css("--ink");
+    ctx.font = "600 11px system-ui,Segoe UI,sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(String(i), x, y+0.5);
+  }
+}
+function updateSide(){
+  const t = state.step, rv = replayOf(state.pipe);
+  $("#step").value = t; $("#stepLbl").textContent = `step ${t}`;
+  $("#sTime").textContent = `${t} s`;
+  const ph = t<ONSET ? "pre-onset" : t<ONSET+RAMP ? "ramp" : "plateau";
+  $("#sPhase").textContent = ph;
+  if(rv){
+    const ix = IDX[rv];
+    const n = ix.cumN[t+1];
+    $("#sSucc").textContent = n ? pct(ix.cumMet[t+1]/n) : "–";
+    const p = ix.cumPost[t+1];
+    $("#sDeg").textContent = t<ONSET ? "–" : `${pct(ix.cumPostDeg[t+1]/Math.max(p,1))}`;
+    const run = DD.runs[rv];
+    const items = [];
+    for(let tt=t; tt>=0 && items.length<10; tt--) for(const i of ix.byStep[tt].slice().reverse()){ if(items.length>=10) break; items.push(run.decisions[i]); }
+    $("#decList").innerHTML = items.map(d => {
+      const why = d.why ? esc(d.why.split(":")[0]) : "single eligible RSU";
+      return `<li data-id="${d.id}"><b>#${d.id}</b> · step ${d.t} · vehicle ${d.veh} → <b>RSU-${d.sel??"–"}</b> <span style="color:${d.met?css("--good-text"):css("--critical")}">${d.met?"✓ met":"✗ missed"}</span><br><span class="muted">${why}</span></li>`;
+    }).join("") || `<li class="muted">No decisions yet.</li>`;
+    document.querySelectorAll("#decList li[data-id]").forEach(li => li.onclick = () => { state.exVariant = rv; openDecision(+li.dataset.id); });
+  } else {
+    $("#sSucc").textContent = "–"; $("#sDeg").textContent = "–";
+    $("#decList").innerHTML = `<li class="muted">No closed-loop replay of the demo scenario was recorded for this pipeline. See Results for its multi-seed numbers.</li>`;
+  }
+  renderRsuPanel();
+}
+function renderRsuPanel(){
+  const i = state.selRsu, el = $("#rsuPanel");
+  if(i==null){ el.className="sub"; el.innerHTML = "Click an RSU on the map to inspect its trust and behaviour."; return; }
+  const rv = replayOf(state.pipe), t = state.step, run = rv ? DD.runs[rv] : null;
+  el.className = "";
+  const seg = DD.world.rsu_seg[i];
+  let html = `<div class="row" style="justify-content:space-between"><b>RSU-${i}</b><span class="pill"><span class="dot" style="background:${SEG(seg)}"></span>backhaul segment ${seg}</span></div>`;
+  if($("#tTruth").checked) html += `<div style="margin:4px 0;font-size:12.5px">${DEG.has(i) ? `<span style="color:${css("--critical")}">⚠ sealed truth: degraded from step ${ONSET}</span>` : `<span class="muted">sealed truth: healthy</span>`}</div>`;
+  if(run){
+    const f = run.feat;
+    html += `<div class="kv" style="grid-template-columns:130px 1fr;margin-top:8px">
+      <div>Trust (${rv==="A"?"unused":rv})</div><div><b>${rv==="A"?"–":fmt(run.trust[t][i])}</b></div>
+      <div>Promises kept</div><div>${fmt(f.success_ewma[t][i])} <span class="muted">success_ewma</span></div>
+      <div>Latency deviation</div><div>${fmt(f.latency_dev[t][i])} <span class="muted">latency_dev</span></div>
+      <div>Advertised load</div><div>${fmt(f.load[t][i])}</div>
+      <div>Queue depth</div><div>${fmt(f.queue_depth[t][i])}</div></div>`;
+    if(rv!=="A"){
+      const series = run.trust.map(r=>r[i]);
+      html += `<div style="margin-top:10px;font-size:12px" class="muted">Trust over the run (cursor = now)</div><div id="spark"></div><div class="muted" style="font-size:11.5px">${esc(run.trust_note)}</div>`;
+      el.innerHTML = html;
+      sparkline($("#spark"), series, t);
+      return;
+    }
+  }
+  el.innerHTML = html;
+}
+function sparkline(el, vals, cur){
+  const w = 320, h = 64, n = vals.length;
+  const x = i => i/(n-1)*w, y = v => h-4 - v*(h-8);
+  let d = vals.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:${h}px">
+    <rect x="${x(ONSET)}" y="0" width="${x(ONSET+RAMP)-x(ONSET)}" height="${h}" fill="${css("--band")}"/>
+    <path d="${d}" fill="none" stroke="${css("--accent")}" stroke-width="2"/>
+    <line x1="${x(cur)}" x2="${x(cur)}" y1="0" y2="${h}" stroke="${css("--ink")}" stroke-width="1"/>
+    <circle cx="${x(cur)}" cy="${y(vals[cur])}" r="4" fill="${css("--accent")}" stroke="${css("--surface")}" stroke-width="2"/></svg>`;
+}
+function netBanner(){
+  const p = PIPES[state.pipe], rv = p.replay;
+  let msg = "";
+  if(!rv) msg = `<div class="banner"><b>${esc(p.name)}</b>: no closed-loop replay of the demo scenario was recorded for this pipeline, so the map shows the network and traffic only. Its multi-seed results are on the <a href="#" data-goto="results">Results</a> tab and its stages on <a href="#" data-goto="pipeline">Pipeline details</a>.</div>`;
+  else if(p.replayNote) msg = `<div class="banner info">${esc(p.replayNote)}</div>`;
+  else msg = `<div class="banner info">Demo scenario: seed 100, 20% of RSUs degrade on a backhaul segment from step ${ONSET} (ramp ${RAMP} steps). RSU fill is the pipeline's trust score${rv==="A"?" (Variant A does not use trust)":""}; the ring colour is its backhaul segment. Lines are task dispatches from vehicles: solid dark = deadline met, dashed red = missed.</div>`;
+  $("#netBanner").innerHTML = msg;
+  document.querySelectorAll("[data-goto]").forEach(a => a.onclick = e => { e.preventDefault(); showTab(a.dataset.goto); });
+  $("#netLegend").innerHTML = `<span>trust</span><span>0</span><span class="gradient"></span><span>1</span>
+    ${[0,1,2,3].map(s=>`<span class="pill"><span class="dot" style="background:${SEG(s)}"></span>segment ${s}</span>`).join("")}
+    <span>faint coloured line: same-segment RSU link · grey dashed: cross-segment</span><span>● vehicle (large = offloading now)</span><span>── met · <span style="color:${css("--critical")}">- - missed</span></span>`;
+}
+cv.addEventListener("click", e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  let best=null, bd=22;
+  for(let i=0;i<N;i++){ const [x,y]=P(...DD.world.rsu_pos[i]); const d=Math.hypot(x-mx,y-my); if(d<bd){bd=d;best=i;} }
+  state.selRsu = best; drawNet(); renderRsuPanel();
+});
+cv.addEventListener("mousemove", e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top, tip = $("#netTip");
+  let best=null, bd=18;
+  for(let i=0;i<N;i++){ const [x,y]=P(...DD.world.rsu_pos[i]); const d=Math.hypot(x-mx,y-my); if(d<bd){bd=d;best=i;} }
+  if(best==null){ tip.style.display="none"; return; }
+  const rv = replayOf(state.pipe), run = rv ? DD.runs[rv] : null, t = state.step;
+  tip.innerHTML = `<b>RSU-${best}</b> · segment ${DD.world.rsu_seg[best]}<br>` +
+    (run && rv!=="A" ? `trust ${fmt(run.trust[t][best])}<br>` : "") +
+    (run ? `promises kept ${fmt(run.feat.success_ewma[t][best])} · latency dev ${fmt(run.feat.latency_dev[t][best])}<br>load ${fmt(run.feat.load[t][best])}` : "");
+  tip.style.display="block"; tip.style.left = Math.min(mx+14, r.width-200)+"px"; tip.style.top = (my+14)+"px";
+});
+cv.addEventListener("mouseleave", ()=> $("#netTip").style.display="none");
+$("#step").oninput = e => { state.step = +e.target.value; drawNet(); updateSide(); };
+["#tCov","#tLinks","#tDisp","#tTruth"].forEach(s => $(s).onchange = () => { drawNet(); renderRsuPanel(); });
+$("#jumpOnset").onclick = () => { state.step = ONSET; drawNet(); updateSide(); };
+let last = 0, acc = 0;
+$("#play").onclick = () => { state.playing = !state.playing; $("#play").textContent = state.playing ? "❚❚ Pause" : "▶ Play"; if(state.playing){ if(state.step>=T-1) state.step=0; last=performance.now(); requestAnimationFrame(tick);} };
+function tick(now){
+  if(!state.playing) return;
+  acc += (now-last)/1000 * (+$("#speed").value); last = now;
+  if(acc>=1){ state.step = Math.min(T-1, state.step + Math.floor(acc)); acc -= Math.floor(acc); drawNet(); updateSide(); }
+  if(state.step>=T-1){ state.playing=false; $("#play").textContent="▶ Play"; return; }
+  requestAnimationFrame(tick);
+}
+window.addEventListener("resize", resizeNet);
+
+/* ------------------------------------------------------------------ pipeline */
+function stagesFor(k){
+  const p = PIPES[k], cfgW = p.weights;
+  const S = [];
+  S.push({id:"trace", n:"1", t:"Mobility trace", d:"60 vehicles · 1200 s on a 4×4 road grid",
+    body:`<p>Vehicles drive a synthetic Manhattan grid (4 vertical × 4 horizontal roads, 1600 m square, 533 m blocks), about 50 km/h with stops at intersections. One trace per seed is shared by every pipeline, so all variants see identical traffic.</p>`,
+    kv:[["Vehicles","60"],["Steps","1200 × 1 s"],["Source","synthetic_road (SUMO off the critical path, L7)"]],
+    files:["scripts/generate_trace.py","src/trustgraph/mobility.py","src/trustgraph/roads.py","traces/demo-seed<n>.npz"], dec:"L7, L9, D17"});
+  S.push({id:"world", n:"2", t:"Fog network (RSUs)", d:"20 RSUs · 4 backhaul segments",
+    body:`<p>20 roadside fog nodes placed by greedy coverage with a redundant second layer, so most vehicles have more than one candidate. RSUs are grouped into 4 backhaul segments, and about 15% are homed to a segment other than their geographic one, so the segment can't be recovered from position alone.</p>`,
+    kv:[["RSUs","20"],["Backhaul segments","4"],["Coverage radius","400 m"],["RSU–RSU link radius","650 m"]],
+    files:["src/trustgraph/topology.py","configs/demo.yaml: topology"], dec:"L5, L6, L9"});
+  S.push({id:"inject", n:"3", t:"Tasks + degradation injector", d:"sealed ground truth", sealed:true,
+    body:`<p>Each vehicle generates tasks (light / medium / heavy, about 6 tasks/s network-wide) with deadlines. The injector degrades a fraction of RSUs <i>per backhaul segment</i>. From step 400 their compute capacity ramps down over 300 steps (−60%) and they silently drop up to 15% of tasks. The failure correlation ρ sets how concentrated the degraded RSUs are on one segment.</p><p>Which RSUs are degraded is written to <code>*.SEALED.npz</code> and is never a feature or a label. <code>tests/test_sealing.py</code> walks the import graph to enforce this.</p>`,
+    kv:[["Degraded fraction","5–30% (demo: 20%)"],["ρ","0–1 (demo: 1.0)"],["Onset / ramp","step 400 / 300 steps"],["Severity / drop","0.6 / 0.15"]],
+    files:["src/trustgraph/tasks.py","src/trustgraph/execution.py","src/trustgraph/sealed/injector.py","src/trustgraph/sealed/ground_truth.py","scripts/generate_scenario.py"], dec:"L4, L5, D29–D32"});
+  S.push({id:"track", n:"4", t:"Observation + tracker", d:"advertised vs observed",
+    body:`<p>After each task the vehicle compares what the RSU <i>advertised</i> with what it <i>observed</i>. <b>success_ewma</b> is the average of "promise kept" (a promise is broken only if the RSU said it would meet the deadline and didn't). <b>latency_dev</b> is the average of how much slower than advertised the task was. Each new outcome counts 10%.</p>`,
+    kv:[["EWMA weight","0.1"],["Latency dev cap","2× advertised"],["Neutral start","success 1.0, dev 0.0"]],
+    files:["src/trustgraph/tracking.py","src/trustgraph/observed.py"], dec:"L8, D8, D24"});
+  S.push({id:"graph", n:"5", t:"Graph snapshot", d:"one PyG graph per step",
+    body:`<p>One homogeneous graph per time step. <b>Nodes:</b> RSUs (load, queue_depth, cert_valid, success_ewma, latency_dev, uptime_stability) and vehicles (task_demand, speed, dwell_estimate). <b>Edges:</b> vehicle–RSU and RSU–RSU links with link_latency, signal_strength, link_age and same_segment. All features are scaled to [0, 1].</p>`,
+    kv:[["Node features","6 RSU + 3 vehicle"],["Edge features","4"],["Format","torch_geometric Data"]],
+    files:["src/trustgraph/graph.py: SnapshotBuilder","src/trustgraph/features.py"], dec:"L6, D15, D16"});
+  if(p.learned) S.push({id:"train", n:"5b", t:"Self-supervised training", d:"label: next task met its deadline?", variant:false,
+    body:`<p>The trust head is trained to predict whether the <i>next</i> task sent to an RSU will meet its deadline. The label comes from observed outcomes only. Each head is trained once per seed on mixed conditions (ρ, fraction, draws &lt; 100), then frozen and reused unchanged across every sweep.</p>`,
+    kv:[["Target","next-task deadline met (binary)"],["Training draws","0, 1 (train/val), 40 held out, 90"],["Frozen across sweeps","yes (L12)"]],
+    files:["src/trustgraph/dataset.py","src/trustgraph/train.py","scripts/s3_train.py","scripts/s3_make_scenarios.sh","checkpoints/s3-seed<n>-<head>.pt"], dec:"L3, L12, D35, D43"});
+  S.push({id:"trust", n:"6", t:p.trust.title.replace("Trust source: ",""), d:"trust source", variant:true,
+    body:`<p>${esc(p.trust.d)}</p>`, kv:[["Pipeline role", p.role]], files:p.trust.files, dec:p.trust.decisions});
+  if(p.gate) S.push({id:"gate", n:"6b", t:`Trust floor τ = ${DD.weights.gate_tau ?? 0.9}`, d:"remove low-trust candidates", variant:true,
+    body:`<p>Candidates with trust &lt; τ are removed before selection. If none survive, the un-gated set is used. τ was tuned on the tuning seed from the grid 0.2–0.9.</p>`,
+    kv:[["τ", String(DD.weights.gate_tau ?? 0.9)],["Fallback","un-gated candidate set"]], files:["configs/gate.yaml","scripts/s9b_gate.py","src/trustgraph/offload.py: trust_gate_tau"], dec:"D59"});
+  const wtxt = cfgW ? `score = ${cfgW.alpha}·trust − ${cfgW.beta}·latency − ${cfgW.gamma}·load` : "score = α·trust − β·latency − γ·load";
+  S.push({id:"select", n:"7", t:"Selection rule (fixed, not learned)", d:cfgW?`α ${cfgW.alpha} · β ${cfgW.beta} · γ ${cfgW.gamma}`:"α · β · γ", variant:true,
+    body:`<p>Among in-range RSUs the vehicle can stay connected to for the task (dwell filter), pick the highest <span class="formula">${wtxt}</span>. Trust is a <i>weighted term</i>, not an admission gate (L1)${p.gate?" (except in Gate-C, which is exactly the gate test)":""}. The weights were tuned once on the tuning seed (seed 100, draws 0–2) and applied unchanged everywhere.</p>`,
+    kv:[["α (trust)", cfgW?String(cfgW.alpha):"–"],["β (latency)", cfgW?String(cfgW.beta):"–"],["γ (load)", cfgW?String(cfgW.gamma):"–"]],
+    files:["src/trustgraph/selection.py","src/trustgraph/offload.py: OffloadEngine.dispatch",k==="H"?"configs/weights_h.yaml":k==="D2"?"configs/weights_d2.yaml":"configs/weights.yaml"], dec:"L1, L2, D51, D52"});
+  S.push({id:"dispatch", n:"8", t:"Dispatch, execute, handoff", d:"closed loop",
+    body:`<p>The task runs on the chosen RSU under its true (sealed) load and degradation. If the vehicle leaves coverage before the result is ready, the result is relayed or lost. The outcome goes back to the tracker (stage 4), which closes the loop.</p>`,
+    kv:[["Handoff","relay (default) / off"],["Outcome","met / missed deadline"]], files:["src/trustgraph/simulator.py: run_closed_loop","src/trustgraph/offload.py: apply_handoff","scripts/s6_run.py"], dec:"D51"});
+  S.push({id:"explain", n:"9", t:p.explain2?"Explanation: Layer 1 + Layer 2":"Explanation: Layer 1", d:p.explain2?"exact score split + GNNExplainer":"exact score split", variant:!!p.explain2,
+    body:`<p><b>Layer 1</b> (every pipeline): because the score is linear, the winner's margin over the runner-up splits exactly into trust, latency and load contributions. "RSU-7 lost on trust: worth +0.532 of the 0.554 margin (96%)." It was checked on all 20,619 demo decisions with 0 failures.</p>${p.explain2?`<p><b>Layer 2</b> (E): GNNExplainer on the trust head explains why a node's trust has its value: its own evidence versus its same-segment neighbours (named only if they carry ≥ 30% of the attribution). Median cost ≈ 310 ms, so it runs asynchronously.</p>`:""}`,
+    kv:[["Layer 1 cost","≈ 0.09 ms / decision"],["Layer 2 cost", p.explain2?"≈ 310 ms (asynchronous)":"not part of this pipeline"]],
+    files:["explain.py","src/trustgraph/explain.py"].concat(p.explain2?["src/trustgraph/explain_layer2.py","scripts/s8_example.py"]:[]), dec:"D53, D54"});
+  S.push({id:"eval", n:"10", t:"Evaluation", d:"5 seeds × 50 draws",
+    body:`<p>Every pipeline runs on identical paired draws: seeds 1–5 × evaluation draws 100–149. Two 1-D sweeps (ρ at 20% degraded; fraction at ρ 1.0). Reports are mean ± sd across seeds with paired 95% t-intervals, against labels pre-registered before the numbers.</p>`,
+    kv:[["Seeds","1–5"],["Draws per seed","50 (100–149)"],["Tuning seed","100 (excluded from evaluation)"]],
+    files:["scripts/s9_sweep.py","configs/sweep.yaml","scripts/make_figures.py","results/s10/tables/"], dec:"L12, D43, D56"});
+  return S;
+}
+function renderPipeline(){
+  const k = state.pipe, p = PIPES[k], rowName = p.row;
+  const row = rowName && DD.tables.shared_point ? DD.tables.shared_point.find(r=>r.Variant===rowName) : null;
+  const w = p.weights;
+  let res = "";
+  if(row) res = `<div class="kv" style="margin-top:12px">
+      <div>Post-onset success</div><div><b>${esc(row["Success after onset"])}</b> <span class="muted">(shared point, 5 seeds)</span></div>
+      <div>Tasks to degraded RSUs, steps 400–1200</div><div>${esc(row["To degraded, [400,1200)"])}</div>
+      <div>Detection latency</div><div>${esc(row["Detection latency (steps)"])}</div></div>`;
+  else if(k==="D2"){
+    const g = (DD.tables.graph_tests||[]).filter(r=>r.Comparison && r.Comparison.startsWith("D2 minus C"));
+    res = `<div style="margin-top:12px" class="sub">Tested against C in S14 (draws 250–299). Every comparison was <b>NULL</b>: no measurable difference from C. ${g.length?`Example: ${esc(g[0].Quantity)} ${esc(g[0]["Difference [95% CI]"])}.`:""}</div>`;
+  }
+  $("#pipeHead").innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div><h2>${esc(p.name)}</h2><p class="sub" style="max-width:820px">${esc(p.summary)}</p></div>
+      <span class="pill"><span class="dot" style="background:${css(p.color)}"></span>${esc(p.role)}</span></div>
+    <div class="kv">
+      <div>Trust source</div><div>${esc(p.trust.title.replace("Trust source: ",""))}</div>
+      <div>Selection score</div><div><span class="formula">${w?`${w.alpha}·trust − ${w.beta}·latency − ${w.gamma}·load`:"α·trust − β·latency − γ·load"}</span></div>
+      <div>Demo replay</div><div>${p.replay ? (p.replayNote ? esc(p.replayNote) : `available (closed-loop run of Variant ${p.replay})`) : "not recorded for the demo scenario"}</div>
+      <div>Design decisions</div><div class="mono">${esc(p.trust.decisions)}</div>
+    </div>${res}`;
+  const S = stagesFor(k);
+  if(!S.find(s=>s.id===state.stage)) state.stage = "trust";
+  $("#flow").innerHTML = S.map((s,i)=>`${i?'<span class="arrow">→</span>':""}<div class="stage ${s.variant?"variant":""} ${s.sealed?"sealed":""} ${state.stage===s.id?"on":""}" data-id="${s.id}"><div class="n">${s.n}</div><div class="t">${esc(s.t)}</div><div class="d">${esc(s.d)}</div></div>`).join("");
+  document.querySelectorAll(".stage").forEach(el => el.onclick = () => { state.stage = el.dataset.id; renderPipeline(); });
+  const s = S.find(x=>x.id===state.stage);
+  $("#stageDetail").innerHTML = `<div class="card" style="background:var(--surface-2)"><h3>${esc(s.n)} · ${esc(s.t)}</h3>${s.body}
+    <div class="kv" style="margin:10px 0">${s.kv.map(([a,b])=>`<div>${esc(a)}</div><div>${esc(b)}</div>`).join("")}</div>
+    <div class="muted" style="font-size:12.5px">Files</div><ul class="files">${s.files.map(f=>`<li><code>${esc(f)}</code></li>`).join("")}</ul>
+    <div class="muted" style="font-size:12.5px;margin-top:8px">Decisions: <span class="mono">${esc(s.dec)}</span> (see DECISIONS.md / PROJECT_SPEC.md)</div></div>`;
+  $("#pipeRefs").innerHTML = `<h2>References for this pipeline</h2><p class="sub">Click a reference to open it. The full list is on the References tab.</p>` +
+    `<ol class="refs" style="padding-left:18px">${p.refs.map(id=>refItem(id)).join("")}</ol>`;
+}
+function refLabel(id){ return id.startsWith("r") && !isNaN(id.slice(1)) ? `[${id.slice(1)}]` : ""; }
+function refItem(id){
+  const r = REFS[id]; if(!r) return "";
+  return `<li><a href="${esc(r.u)}" target="_blank" rel="noopener"><b>${refLabel(id)} ${esc(r.t)}</b></a><br><span class="muted">${esc(r.a)} · ${esc(r.v)}</span>${r.say?`<br><span style="font-size:12.5px">${esc(r.say)}</span>`:""}</li>`;
+}
+function renderRefs(){
+  const groups = {};
+  for(const [id,r] of Object.entries(REFS)) (groups[r.g] = groups[r.g]||[]).push(id);
+  const usedBy = id => Object.entries(PIPES).filter(([k,p])=>p.refs.includes(id)).map(([k])=>k);
+  $("#refList").innerHTML = Object.entries(groups).map(([g,ids])=>`<h3 style="margin-top:14px">${esc(g)}</h3><ol class="refs" style="padding-left:18px">${ids.map(id=>{
+    const u = usedBy(id);
+    return refItem(id).replace(/<\/li>$/, (u.length?`<br>${u.map(k=>`<span class="refchip" data-pipe="${k}">${esc(k)}</span>`).join("")}`:"")+"</li>");
+  }).join("")}</ol>`).join("") +
+  `<p class="sub" style="margin-top:14px">The CVE records cited in TECHNICAL_AND_NOVELTY.md as motivation are not listed because they are not yet verified (CLAIMS X13).</p>`;
+  document.querySelectorAll(".refchip[data-pipe]").forEach(c => c.onclick = () => { sel.value = c.dataset.pipe; sel.onchange(); showTab("pipeline"); });
+}
+
+/* ------------------------------------------------------------------ charts */
+function lineChart(el, o){
+  // o: {x:[...], series:[{name,color,values,dash,width}], yMin,yMax, yFmt, xLabel, band:[a,b], h}
+  const W0 = el.clientWidth || 520, H = o.h || 240, m = {l:46, r:o.labelRight===false?14:96, t:10, b:34};
+  const iw = W0-m.l-m.r, ih = H-m.t-m.b;
+  const xs = o.x, x0 = xs[0], x1 = xs[xs.length-1];
+  const X = v => m.l + (v-x0)/(x1-x0||1)*iw, Y = v => m.t + ih - (v-o.yMin)/(o.yMax-o.yMin)*ih;
+  const yt = o.yTicks || [0,.25,.5,.75,1].map(f=>o.yMin+f*(o.yMax-o.yMin));
+  const xt = o.xTicks || xs;
+  let g = "";
+  if(o.band) g += `<rect x="${X(o.band[0])}" y="${m.t}" width="${X(o.band[1])-X(o.band[0])}" height="${ih}" fill="${css("--band")}"/>`;
+  yt.forEach(v=> g += `<line x1="${m.l}" x2="${m.l+iw}" y1="${Y(v)}" y2="${Y(v)}" stroke="${css("--grid")}"/><text x="${m.l-6}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="${css("--muted")}">${(o.yFmt||(v=>v.toFixed(2)))(v)}</text>`);
+  g += `<line x1="${m.l}" x2="${m.l+iw}" y1="${m.t+ih}" y2="${m.t+ih}" stroke="${css("--axis")}"/>`;
+  xt.forEach(v=> g += `<text x="${X(v)}" y="${m.t+ih+15}" text-anchor="middle" font-size="11" fill="${css("--muted")}">${(o.xFmt||(v=>v))(v)}</text>`);
+  if(o.xLabel) g += `<text x="${m.l+iw/2}" y="${H-3}" text-anchor="middle" font-size="11" fill="${css("--ink-2")}">${esc(o.xLabel)}</text>`;
+  const ends = [];
+  for(const s of o.series){
+    const c = s.color.startsWith("--") ? css(s.color) : s.color;
+    let d="", pen=false;
+    s.values.forEach((v,i)=>{ if(v==null||isNaN(v)){pen=false;return;} d += `${pen?"L":"M"}${X(xs[i]).toFixed(1)},${Y(v).toFixed(1)}`; pen=true; });
+    g += `<path d="${d}" fill="none" stroke="${c}" stroke-width="${s.width||2}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} opacity="${s.faded?0.25:1}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(s.markers) s.values.forEach((v,i)=>{ if(v!=null) g += `<circle cx="${X(xs[i])}" cy="${Y(v)}" r="4" fill="${c}" stroke="${css("--surface")}" stroke-width="2" opacity="${s.faded?0.25:1}"/>`; });
+    let li = s.values.length-1; while(li>=0 && (s.values[li]==null||isNaN(s.values[li]))) li--;
+    if(li>=0 && o.labelRight!==false) ends.push({y:Y(s.values[li]), name:s.name, c, faded:s.faded});
+  }
+  ends.sort((a,b)=>a.y-b.y); for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<13) ends[i].y = ends[i-1].y+13;
+  ends.forEach(e => g += `<text x="${m.l+iw+6}" y="${e.y+4}" font-size="11" fill="${css("--ink-2")}" opacity="${e.faded?0.45:1}"><tspan fill="${e.c}">■</tspan> ${esc(e.name)}</text>`);
+  g += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t+ih}" stroke="${css("--ink-2")}" stroke-width="1" visibility="hidden"/>`;
+  g += `<rect class="hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W0} ${H}" height="${H}">${g}</svg><div class="tip"></div>
+    <div class="legendrow">${o.series.map(s=>`<span style="opacity:${s.faded?0.5:1}"><span class="dot" style="background:${s.color.startsWith("--")?css(s.color):s.color}"></span> ${esc(s.name)}${s.dash?" (dashed)":""}</span>`).join("")}</div>`;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), xh = el.querySelector(".xh");
+  el.querySelector(".hit").addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX-r.left)*(W0/r.width);
+    let bi=0, bd=1e9; xs.forEach((v,i)=>{ const d=Math.abs(X(v)-sx); if(d<bd){bd=d;bi=i;} });
+    xh.setAttribute("x1",X(xs[bi])); xh.setAttribute("x2",X(xs[bi])); xh.setAttribute("visibility","visible");
+    tip.innerHTML = `<b>${esc((o.xTip||o.xFmt||(v=>v))(xs[bi]))}</b><br>` + o.series.map(s=>`<span class="dot" style="background:${s.color.startsWith("--")?css(s.color):s.color}"></span> ${esc(s.name)}: <b>${(o.yFmt||(v=>v.toFixed(3)))(s.values[bi])}</b>`).join("<br>");
+    tip.style.display="block"; tip.style.left = Math.min((ev.clientX-r.left)+12, r.width-190)+"px"; tip.style.top = "10px";
+  });
+  el.querySelector(".hit").addEventListener("mouseleave", ()=>{ tip.style.display="none"; xh.setAttribute("visibility","hidden"); });
+}
+function barChart(el, rows, o){
+  const W0 = el.clientWidth || 520, rowH = 26, m = {l:150, r:70, t:6, b:26}, H = m.t+m.b+rows.length*rowH;
+  const iw = W0-m.l-m.r, X = v => m.l + (v-o.min)/(o.max-o.min)*iw;
+  let g = "";
+  const ticks = o.ticks;
+  ticks.forEach(v=> g += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H-m.b}" stroke="${css("--grid")}"/><text x="${X(v)}" y="${H-m.b+15}" text-anchor="middle" font-size="11" fill="${css("--muted")}">${v.toFixed(2)}</text>`);
+  rows.forEach((r,i)=>{
+    const y = m.t + i*rowH + 4, c = css(r.color), op = r.hl ? 1 : 0.35;
+    g += `<g class="b" data-i="${i}"><rect x="0" y="${y-4}" width="${W0}" height="${rowH}" fill="transparent"/>
+      <text x="${m.l-8}" y="${y+12}" text-anchor="end" font-size="12" fill="${css(r.hl?"--ink":"--ink-2")}" font-weight="${r.hl?600:400}">${esc(r.name)}</text>
+      <rect x="${X(o.min)}" y="${y+2}" width="${Math.max(2,X(r.m)-X(o.min))}" height="${rowH-12}" rx="4" fill="${c}" opacity="${op}"/>
+      <line x1="${X(r.m-r.sd)}" x2="${X(r.m+r.sd)}" y1="${y+rowH/2-3}" y2="${y+rowH/2-3}" stroke="${css("--ink")}" stroke-width="1.5" opacity="${r.hl?0.9:0.4}"/>
+      <text x="${X(r.m+r.sd)+6}" y="${y+12}" font-size="11.5" fill="${css("--ink-2")}">${r.m.toFixed(3)}</text></g>`;
+  });
+  g += `<line x1="${X(o.min)}" x2="${X(o.min)}" y1="${m.t}" y2="${H-m.b}" stroke="${css("--axis")}"/>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W0} ${H}" height="${H}">${g}</svg><div class="tip"></div><div class="sub" style="margin:4px 0 0">${esc(o.note||"")}</div>`;
+  const tip = el.querySelector(".tip"), svg = el.querySelector("svg");
+  el.querySelectorAll("g.b").forEach(gr => {
+    gr.addEventListener("mousemove", ev => { const r = rows[+gr.dataset.i], b = svg.getBoundingClientRect();
+      tip.innerHTML = `<b>${esc(r.name)}</b><br>${r.m.toFixed(3)} ± ${r.sd.toFixed(3)}${r.extra?"<br>"+esc(r.extra):""}`; tip.style.display="block";
+      tip.style.left = Math.min(ev.clientX-b.left+12, b.width-180)+"px"; tip.style.top = (ev.clientY-b.top+10)+"px"; });
+    gr.addEventListener("mouseleave", ()=> tip.style.display="none");
+  });
+}
+const ROWCOLOR = {"A":"--s-A","B":"--s-A","B-oracle":"--s-Bo","C":"--s-C","D":"--s-D","E (= D)":"--s-D","Gate-C (extra baseline)":"--s-G","H (heuristic baseline)":"--s-H"};
+const ROWPIPE = {"A":"A","B":"B","B-oracle":"B_oracle","C":"C","D":"D","E (= D)":"E","Gate-C (extra baseline)":"Gate_C","H (heuristic baseline)":"H"};
+function tableHTML(rows, cols, hlFn){
+  if(!rows) return `<p class="muted">Table not found in results/s10/tables/.</p>`;
+  return `<table><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr class="${hlFn&&hlFn(r)?"hl":""}">${cols.map(c=>`<td>${esc(r[c]??"")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+function labelBadge(s){
+  const t = String(s||""); const cls = /NEGATIVE/.test(t)?"neg":/WIN/.test(t)?"win":"null";
+  return `<span class="badge ${cls}">${esc(t)}</span>`;
+}
+function renderResults(){
+  const k = state.pipe, tb = DD.tables;
+  // findings
+  const sp = tb.shared_point || [], get = n => pm((sp.find(r=>r.Variant===n)||{})["Success after onset"]);
+  const a=get("A"), c=get("C"), d=get("D"), o=get("B-oracle");
+  $("#findings").innerHTML = `
+    <div class="finding"><div class="lab">H3 · trust vs no trust</div><div class="big">${a&&c?`+${(c.m-a.m).toFixed(3)}`:"–"} <span style="font-size:13px;font-weight:400" class="muted">success, C over A</span></div><div style="font-size:12.5px">C and D beat A at all four degraded fractions (paired 95% CI above 0). ${labelBadge("WIN 4/4")}</div></div>
+    <div class="finding"><div class="lab">Near the upper bound</div><div class="big">${c&&o?(o.m-c.m).toFixed(3):"–"} <span style="font-size:13px;font-weight:400" class="muted">C below the oracle</span></div><div style="font-size:12.5px">The node-local head is within 0.001–0.003 of perfect knowledge at every fraction. ${labelBadge("NULL vs oracle")}</div></div>
+    <div class="finding"><div class="lab">H2 · does the graph help?</div><div class="big">${c&&d?(d.m-c.m).toFixed(3):"–"} <span style="font-size:13px;font-weight:400" class="muted">D minus C</span></div><div style="font-size:12.5px">Tested and <b>not supported</b>: the GNN did not beat the node-local MLP in this simulation. The contained head D2 was NULL. ${labelBadge("NEGATIVE")}</div></div>
+    <div class="finding"><div class="lab">Explanations</div><div class="big">0 <span style="font-size:13px;font-weight:400" class="muted">failures / 20,619 decisions</span></div><div style="font-size:12.5px">The Layer 1 breakdown is exact for every logged decision. Layer 1 ≈ 0.09 ms; Layer 2 ≈ 310 ms (asynchronous).</div></div>`;
+  // bars
+  const order = ["A","B","B-oracle","C","D","E (= D)","Gate-C (extra baseline)","H (heuristic baseline)"];
+  const rows = order.map(n=>{ const r = sp.find(x=>x.Variant===n); const v = r&&pm(r["Success after onset"]); return v ? {name:n.replace(" (extra baseline)","").replace(" (heuristic baseline)",""), m:v.m, sd:v.sd, color:ROWCOLOR[n], hl: ROWPIPE[n]===k || (k==="D2"), extra:r["To degraded, [400,1200)"]+" tasks to degraded RSUs"} : null; }).filter(Boolean);
+  barChart($("#chBars"), rows, {min:0.85, max:0.94, ticks:[0.85,0.87,0.89,0.91,0.93], note: k==="D2" ? "D2 was evaluated on a separate draw set (250–299) and is not in this table; see the H2 table below." : "Whiskers: ± sd across 5 seeds. B = A and E = D by construction."});
+  // fraction sweep
+  const ap = tb.all_points || [];
+  const fr = [0.05,0.10,0.20,0.30];
+  const fs = (name,color,dash) => ({name: name.replace(" (extra baseline)","").replace(" (heuristic baseline)",""), color, dash, markers:true,
+     values: fr.map(f => { const r = ap.find(x=>+x.rho===1 && Math.abs(+x.fraction-f)<1e-6 && x.Variant===name); const v = r&&pm(r["Success after onset"]); return v?v.m:null; }),
+     faded: !(ROWPIPE[name]===k || (k==="B"&&name==="A") || (k==="E"&&name==="D"))});
+  const fser = [fs("A","--s-A","5 4"), fs("B-oracle","--s-Bo","2 3"), fs("C","--s-C"), fs("D","--s-D"), fs("Gate-C (extra baseline)","--s-G"), fs("H (heuristic baseline)","--s-H")];
+  if(fser.every(s=>s.faded)) fser.forEach(s=>s.faded=false);
+  lineChart($("#chFrac"), {x:fr, series:fser, yMin:0.8, yMax:1.0, xFmt:v=>Math.round(v*100)+"%", xLabel:"fraction of RSUs degraded", yFmt:v=>v==null?"–":v.toFixed(3), h:250});
+  const rh = [0,0.25,0.5,0.75,1];
+  const rs = (name,color,dash) => ({name, color, dash, markers:true, values: rh.map(p => { const r = ap.find(x=>Math.abs(+x.rho-p)<1e-6 && Math.abs(+x.fraction-0.2)<1e-6 && x.Variant===name); const v=r&&pm(r["Success after onset"]); return v?v.m:null; }),
+     faded: !(ROWPIPE[name]===k || (k==="B"&&name==="A") || (k==="E"&&name==="D"))});
+  const rser = [rs("A","--s-A","5 4"), rs("B-oracle","--s-Bo","2 3"), rs("C","--s-C"), rs("D","--s-D")];
+  if(rser.every(s=>s.faded)) rser.forEach(s=>s.faded=false);
+  lineChart($("#chRho"), {x:rh, series:rser, yMin:0.85, yMax:0.97, xLabel:"ρ (0 = spread out, 1 = all on one segment)", yFmt:v=>v==null?"–":v.toFixed(3), yTicks:[0.85,0.88,0.91,0.94,0.97], h:250});
+  if(DD.agg){
+    const xs = DD.agg.trust_deg_D.map((_,i)=>i*25+12.5);
+    lineChart($("#chAggTrust"), {x:xs, series:[{name:"degraded RSUs",color:"--s-D",values:DD.agg.trust_deg_D},{name:"healthy RSUs",color:"--s-D",dash:"5 4",values:DD.agg.trust_ok_D}],
+      yMin:0, yMax:1, band:[ONSET,ONSET+RAMP], xTicks:[0,200,400,600,800,1000,1200].map(v=>v), xLabel:"step (seeds 1–5, draws 100–149)", xTip:v=>`steps ${v-12.5}–${v+12.5}`, h:250});
+  }
+  $("#tblShared").innerHTML = tableHTML(sp, ["Variant","Success after onset","To degraded, onset to avoidance","To degraded, [400,1200)","Runs never avoiding","Detection latency (steps)","Degraded RSUs detected"], r => ROWPIPE[r.Variant]===k);
+  const gt = tb.graph_tests;
+  $("#tblGraph").innerHTML = gt ? `<table><thead><tr><th>Experiment</th><th>Comparison</th><th>Quantity</th><th>ρ</th><th>Difference [95% CI]</th><th>Label</th></tr></thead><tbody>${gt.map(r=>`<tr class="${(k==="D2"&&/D2/.test(r.Comparison))||((k==="D"||k==="E"||k==="C")&&/^D minus C/.test(r.Comparison))?"hl":""}"><td>${esc(r.Experiment)}</td><td>${esc(r.Comparison)}</td><td>${esc(r.Quantity)}</td><td>${esc(r.rho)}</td><td class="mono">${esc(r["Difference [95% CI]"])}</td><td>${labelBadge(r["Pre-registered label"])}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Table not found.</p>`;
+  // demo charts
+  const xs = DD.runs.A.win_share_deg.map((_,i)=>i*25+12.5);
+  const deg = DD.sealed.degraded, ok = [...Array(N).keys()].filter(i=>!DEG.has(i));
+  const meanTr = (v, ids) => { const tr = DD.runs[v].trust; const out=[]; for(let w=0; w<xs.length; w++){ let s=0,c=0; for(let t=w*25;t<Math.min(T,(w+1)*25);t++) for(const i of ids){ s+=tr[t][i]; c++; } out.push(s/c);} return out; };
+  const fadeV = v => !(replayOf(k)===v) && !!replayOf(k);
+  lineChart($("#chTrust"), {x:xs, series:[
+      {name:"C degraded", color:"--s-C", values:meanTr("C",deg), faded:fadeV("C")},
+      {name:"C healthy", color:"--s-C", dash:"5 4", values:meanTr("C",ok), faded:fadeV("C")},
+      {name:"D degraded", color:"--s-D", values:meanTr("D",deg), faded:fadeV("D")},
+      {name:"D healthy", color:"--s-D", dash:"5 4", values:meanTr("D",ok), faded:fadeV("D")}],
+    yMin:0, yMax:1, band:[ONSET,ONSET+RAMP], xTicks:[0,200,400,600,800,1000,1200], xLabel:"step (1 step = 1 s)", xTip:v=>`steps ${v-12.5}–${v+12.5}`, h:250});
+  const vs = ["A","C","D"].map(v=>({v, name:{A:"A (no trust)",C:"C (MLP)",D:"D (GNN)"}[v], color:{A:"--s-A",C:"--s-C",D:"--s-D"}[v], dash:v==="A"?"5 4":null, faded:fadeV(v)}));
+  lineChart($("#chShare"), {x:xs, series:vs.map(s=>({...s, values:DD.runs[s.v].win_share_deg})), yMin:0, yMax:0.5, yTicks:[0,.1,.2,.3,.4,.5], band:[ONSET,ONSET+RAMP], xTicks:[0,200,400,600,800,1000,1200], xLabel:"step", xTip:v=>`steps ${v-12.5}–${v+12.5}`, h:250});
+  lineChart($("#chSucc"), {x:xs, series:vs.map(s=>({...s, values:DD.runs[s.v].win_success})), yMin:0.6, yMax:1, yTicks:[.6,.7,.8,.9,1], band:[ONSET,ONSET+RAMP], xTicks:[0,200,400,600,800,1000,1200], xLabel:"step", xTip:v=>`steps ${v-12.5}–${v+12.5}`, h:250});
+  const ph = ["pre-onset","ramp","plateau"];
+  $("#tblPhase").innerHTML = `<table><thead><tr><th>Phase</th>${["A","C","D"].map(v=>`<th class="num">${v}: share to degraded</th><th class="num">${v}: success</th>`).join("")}</tr></thead><tbody>${ph.map((p,i)=>`<tr><td>${p} <span class="muted">[${DD.runs.A.phases[i].lo}, ${DD.runs.A.phases[i].hi})</span></td>${["A","C","D"].map(v=>`<td class="num">${fmt(DD.runs[v].phases[i].share)}</td><td class="num">${fmt(DD.runs[v].phases[i].success)}</td>`).join("")}</tr>`).join("")}
+    <tr><td><b>whole run</b></td>${["A","C","D"].map(v=>`<td class="num">${fmt(DD.runs[v].summary.post_share_deg)}<span class="muted"> post-onset</span></td><td class="num">${fmt(DD.runs[v].summary.success_all,4)}</td>`).join("")}</tr></tbody></table>
+    <p class="sub" style="margin-top:10px">Under C and D the degraded RSUs still receive about 13–14% of plateau tasks: trust is one weighted term against latency and load, so the shift is partial (CLAIMS A8).</p>`;
+}
+
+/* ------------------------------------------------------------------ explain */
+function openDecision(id){ const ix = IDX[state.exVariant].idById.get(id); if(ix==null) return; state.exIdx = ix; showTab("explain"); renderExplain(); }
+function renderExplain(){
+  const p = PIPES[state.pipe];
+  const v = state.exVariant = replayOf(state.pipe) || state.exVariant;
+  $("#exBanner").innerHTML = !p.replay ? `<div class="banner">No decision log of the demo scenario exists for <b>${esc(p.name)}</b>. Showing the <b>${v}</b> log instead. Pick A, B, C, D or E in the dropdown to explain that pipeline's own decisions.</div>` :
+    p.replayNote ? `<div class="banner info">${esc(p.replayNote)}</div>` : "";
+  const run = DD.runs[v], d = run.decisions[state.exIdx];
+  $("#exId").value = d.id;
+  const w = run.weights;
+  const cands = d.c.map(([rsu,tr,lat,load,ms,elig]) => ({rsu,tr,lat,load,ms,elig, tt:w.alpha*tr, lt:-w.beta*lat, ld:-w.gamma*load})).map(c=>({...c, s:c.tt+c.lt+c.ld})).sort((a,b)=>b.s-a.s);
+  const win = cands.find(c=>c.rsu===d.sel), ru = cands.find(c=>c.rsu===d.ru);
+  const tf = d.t, fe = run.feat;
+  let html = `<h2 style="margin-top:14px">Decision ${d.id} · step ${d.t} (t = ${d.t} s) · vehicle ${d.veh} · ${d.type} task · deadline ${d.dl.toFixed(2)} s · Variant ${v}</h2>`;
+  html += win ? `<p style="margin:6px 0"><b>RSU-${d.sel}</b> was selected${ru?` over <b>RSU-${d.ru}</b> (score ${win.s.toFixed(3)} vs ${ru.s.toFixed(3)}, margin ${(win.s-ru.s).toFixed(3)})`:" (the only eligible RSU)"}.</p>` : `<p>No RSU was selected.</p>`;
+  if(d.why) html += `<div class="why"><b>Why:</b> ${esc(d.why)}</div>`;
+  if(win && ru){
+    const terms = [["trust", win.tt-ru.tt],["latency", win.lt-ru.lt],["load", win.ld-ru.ld]];
+    const mx = Math.max(...terms.map(t=>Math.abs(t[1])), 1e-6);
+    html += `<h3 style="margin-top:12px">Where the margin came from (winner minus runner-up)</h3><div class="contrib">${terms.map(([n,val])=>{
+      const wpct = Math.abs(val)/mx*50, left = val>=0 ? 50 : 50-wpct;
+      return `<div>${n}</div><div class="cbar"><span style="left:${left}%;width:${wpct}%;background:${css(val>=0?"--s-C":"--s-D")}"></span><span class="zero"></span></div><div class="mono" style="text-align:right">${val>=0?"+":""}${val.toFixed(3)}</div>`;}).join("")}</div>
+      <div class="legendrow"><span><span class="dot" style="background:${css("--s-C")}"></span> favours RSU-${d.sel} (winner)</span><span><span class="dot" style="background:${css("--s-D")}"></span> favours RSU-${d.ru} (runner-up)</span></div>`;
+  }
+  html += `<h3 style="margin-top:14px">Score = ${w.alpha}·trust − ${w.beta}·latency − ${w.gamma}·load <span class="muted" style="font-weight:400">(weights as logged)</span></h3>
+    <div class="scroll"><table><thead><tr><th>RSU</th><th class="num">trust</th><th class="num">α·trust</th><th class="num">latency</th><th class="num">−β·lat</th><th class="num">load</th><th class="num">−γ·load</th><th class="num">score</th><th class="num">promises kept</th><th class="num">latency dev</th></tr></thead><tbody>
+    ${cands.map(c=>`<tr class="${c.rsu===d.sel?"hl":""}"><td>${c.rsu===d.sel?"★ ":""}${c.elig?"":"✕ "}RSU-${c.rsu}${$("#tTruth").checked&&DEG.has(c.rsu)?` <span style="color:${css("--critical")}">⚠</span>`:""}</td><td class="num">${c.tr.toFixed(3)}</td><td class="num">${c.tt>=0?"+":""}${c.tt.toFixed(4)}</td><td class="num">${c.lat.toFixed(3)} <span class="muted">(${c.ms} ms)</span></td><td class="num">${c.lt.toFixed(4)}</td><td class="num">${c.load.toFixed(3)}</td><td class="num">${c.ld.toFixed(4)}</td><td class="num"><b>${c.s>=0?"+":""}${c.s.toFixed(4)}</b></td><td class="num">${fmt(fe.success_ewma[tf][c.rsu],2)}</td><td class="num">${fmt(fe.latency_dev[tf][c.rsu],2)}</td></tr>`).join("")}
+    </tbody></table></div><p class="sub">★ selected · ✕ excluded by the dwell filter${$("#tTruth").checked?" · ⚠ degraded (sealed truth, shown because the toggle on the Network tab is on)":""}. "Promises kept" and "latency dev" are the RSU's logged behaviour record: context, not an attribution.</p>
+    <p><b>Outcome:</b> <span style="color:${d.met?css("--good-text"):css("--critical")}">${d.met?"✓ deadline met":"✗ deadline missed"}</span> (observed ${d.obs.toFixed(3)} s, advertised ${d.adv.toFixed(3)} s).</p>`;
+  if(p.explain2 || state.pipe==="D"){
+    if(DD.layer2_example && d.id===3993 && v==="D") html += `<h3 style="margin-top:14px">Layer 2: why the trust scores are what they are (GNNExplainer)</h3><pre class="raw">${esc(DD.layer2_example.split("\n").filter(l=>/Primary factors|Layer 2|\[Layer 2/.test(l)).join("\n\n"))}</pre>`;
+    else html += `<p class="sub">Layer 2 (GNNExplainer) is precomputed for decision 3993; open it from the curated examples. For any other decision, run the Layer 2 command on the right.</p>`;
+  }
+  $("#exBody").innerHTML = html;
+  const log = `scenarios/s6/demo-seed100-rho1.00-frac0.20-draw7-cl-${v}.decisions.jsonl`;
+  $("#exCmd").textContent = `python explain.py --decision ${d.id} --log ${log}` + ((v==="D"||v==="C") ? `\n\n# + Layer 2 (needs PyTorch, ~0.3 s):\npython explain.py --decision ${d.id} --layer 2 --config configs/demo.yaml --seed 100 --log ${log}` : "");
+  $("#curated").innerHTML = DD.curated.map((c,i)=>`<div style="margin-bottom:8px"><button class="iconbtn" data-c="${i}" style="width:100%;text-align:left"><b>#${c.id} · Variant ${c.variant}</b><br><span class="muted" style="font-size:12.5px">${esc(c.title)}</span></button></div>`).join("") +
+    `<div><button class="iconbtn" data-l2="1" style="width:100%;text-align:left"><b>#3993 · Layer 2</b><br><span class="muted" style="font-size:12.5px">Merged Layer 1 + GNNExplainer explanation (S8)</span></button></div>`;
+  document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => { const c = DD.curated[+b.dataset.c]; sel.value = c.variant; state.pipe = c.variant; state.exVariant = c.variant; renderAll(false); openDecision(c.id); });
+  document.querySelector("[data-l2]").onclick = () => { sel.value="E"; state.pipe="E"; state.exVariant="D"; renderAll(false); openDecision(3993); };
+}
+function stepEx(dir){
+  const run = DD.runs[state.exVariant], f = $("#exFilter").value;
+  let i = state.exIdx;
+  for(let k=0;k<run.decisions.length;k++){
+    i = (i+dir+run.decisions.length) % run.decisions.length;
+    const d = run.decisions[i];
+    if(!f) break;
+    if(f==="No single term" ? d.why.startsWith("No single term") : d.why.includes(`lost on ${f}`)) break;
+  }
+  state.exIdx = i; renderExplain();
+}
+$("#exPrev").onclick = () => stepEx(-1);
+$("#exNext").onclick = () => stepEx(1);
+$("#exId").onchange = e => { const ix = IDX[state.exVariant].idById.get(+e.target.value); if(ix!=null){ state.exIdx = ix; renderExplain(); } };
+
+/* ------------------------------------------------------------------ boot */
+function renderAll(keepTab=true){
+  netBanner(); renderPipeline(); renderRefs(); updateSide(); drawNet(); renderExplain();
+  if($("#tab-results").classList.contains("on")) renderResults();
+}
+state.exIdx = IDX.D.idById.get(3993) ?? 0;
+renderAll();
+resizeNet();
+$("#loading").style.display = "none";
+</script>
+</body>
+</html>

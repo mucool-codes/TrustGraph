@@ -63,3 +63,7 @@ tools/
 paper/*.aux
 paper/*.log
 paper/*.out
+
+# ---- Demo front end ----
+# Built locally by demo/export_demo_data.py from the gitignored outputs above (~11 MB)
+demo/data.js
